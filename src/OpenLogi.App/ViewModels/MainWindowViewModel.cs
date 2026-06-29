@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -19,7 +20,7 @@ namespace OpenLogi.App.ViewModels;
 ///
 /// GUI builds with compiled bindings; behaviour confirmed by running the app.
 /// </summary>
-public partial class MainWindowViewModel : ViewModelBase
+public partial class MainWindowViewModel : ViewModelBase, IDisposable
 {
     private const double DiagramHeightPx = 300;
 
@@ -75,14 +76,28 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<uint> DpiPresets { get; } = [];
     public string DpiText => $"{(uint)Math.Round(DpiValue)} DPI";
 
-    // SmartShift live controls.
+    // SmartShift live controls. The wheel is really a single three-way choice —
+    // Free spin, SmartShift (auto-disengage on a fast flick), or permanent
+    // Ratchet — so we model it that way to avoid contradictory combinations.
     [ObservableProperty] private bool _showSmartShift;
-    [ObservableProperty] private bool _smartShiftRatchet;
-    [ObservableProperty] private bool _permanentRatchet;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFreeSpin), nameof(IsSmartShift), nameof(IsRatchet), nameof(ShowSensitivity))]
+    private WheelModeChoice _wheelModeChoice = WheelModeChoice.SmartShift;
     [ObservableProperty] private int _autoDisengage = 16;
+
+    /// <summary>Sensitivity only applies in SmartShift mode (it's the auto-disengage threshold).</summary>
+    public bool ShowSensitivity => WheelModeChoice == WheelModeChoice.SmartShift;
+
+    // RadioButton-friendly wrappers over the single enum. Setters act only on the
+    // selected (true) edge — a radio group also reports the deselected one as false.
+    public bool IsFreeSpin { get => WheelModeChoice == WheelModeChoice.FreeSpin; set { if (value) WheelModeChoice = WheelModeChoice.FreeSpin; } }
+    public bool IsSmartShift { get => WheelModeChoice == WheelModeChoice.SmartShift; set { if (value) WheelModeChoice = WheelModeChoice.SmartShift; } }
+    public bool IsRatchet { get => WheelModeChoice == WheelModeChoice.Ratchet; set { if (value) WheelModeChoice = WheelModeChoice.Ratchet; } }
 
     // Hosts (EasySwitch / multi-host).
     [ObservableProperty] private bool _showHosts;
+    /// <summary>Whether the selected device can clear/forget host slots (drives the host note + Forget buttons).</summary>
+    [ObservableProperty] private bool _hostsSupportClear;
 
     // Lighting (keyboards).
     [ObservableProperty][NotifyPropertyChangedFor(nameof(ShowColor))] private bool _lightingEnabled = true;
@@ -113,18 +128,33 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty] private int _gKeyProfile;
     private ushort _gkeyProfileSector;
 
+    // Per-key color editor (PerKeyLighting 0x8081) — shown when the device supports it.
+    [ObservableProperty] private bool _showPerKeyEditor;
+
     // Backlight brightness (BrightnessControl 0x8040) — hardware-verified.
     [ObservableProperty] private bool _showBacklight;
     [ObservableProperty] private double _backlightValue;
     [ObservableProperty] private double _backlightMax = 100;
 
     private DeviceSession? _session;
+    private IAsyncDisposable? _dpiCapture;
     private bool _loadingControls;
+
+    // The OS mouse hook that remaps Middle/Back/Forward to bound actions and
+    // injects keystrokes (e.g. Task View = Win+Tab). Runs for the app's lifetime.
+    private readonly AgentRuntime _agent;
 
     public MainWindowViewModel()
     {
+        _agent = new AgentRuntime(_config);
         if (!Design.IsDesignMode)
+        {
+            // A failed hook install (e.g. no interactive desktop) must not crash
+            // the UI — button remapping is simply inactive in that case.
+            try { _agent.Start(); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"mouse hook unavailable: {ex.Message}"); }
             _ = LoadAsync();
+        }
     }
 
     /// <summary>
@@ -193,6 +223,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
     partial void OnSelectedDeviceChanged(DeviceViewModel? value)
     {
+        // Apply the selected device's bindings to the live remap hook.
+        _agent.SetSelectedDevice(value?.ConfigKey);
+
         Buttons.Clear();
         Annotations.Clear();
         DiagramImage = null;
@@ -201,10 +234,10 @@ public partial class MainWindowViewModel : ViewModelBase
         ShowSmartShift = false;
         ShowHosts = false;
         ShowBacklight = false;
+        ShowPerKeyEditor = false;
         ShowProfiles = false;
         ProfileSelected = false;
         SelectedProfileForEdit = 0;
-        HasGKeysTab = false;
         GKeys.Clear();
         _effectCts?.Cancel();
         _effectCts = null;
@@ -212,11 +245,14 @@ public partial class MainWindowViewModel : ViewModelBase
         Profiles.Clear();
         _profileCount = 0;
         DpiPresets.Clear();
-        // Capability-gated tabs (Buttons needs a mouse/trackball; Pointer needs DPI).
+        // Capability-gated tabs, set synchronously from the scan-time feature set so
+        // they appear immediately (Buttons needs a mouse/trackball; Pointer needs DPI;
+        // G-keys content still loads in the background).
         HasButtonsTab = value?.HasButtons == true
             && value.Device.Kind is DeviceKind.Mouse or DeviceKind.Trackball or DeviceKind.Unknown;
         HasPointerTab = value?.HasPointer == true;
         HasLightingTab = value?.HasLighting == true;
+        HasGKeysTab = value?.HasGKeys == true;
         _ = LoadControlsAsync(value);
 
         if (value?.ConfigKey is not { } configKey)
@@ -338,6 +374,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         var old = _session;
         _session = null;
+        if (_dpiCapture is { } cap) { _dpiCapture = null; await cap.DisposeAsync(); }
         if (old is not null) await old.DisposeAsync();
 
         if (device?.Route is not { } route) return;
@@ -348,6 +385,12 @@ public partial class MainWindowViewModel : ViewModelBase
         if (session is null) return;
         if (!ReferenceEquals(SelectedDevice, device)) { await session.DisposeAsync(); return; }
         _session = session;
+        ShowPerKeyEditor = session.SupportsPerKey;
+
+        // Divert the DPI/ModeShift button over HID++ so it can be remapped — the
+        // OS mouse hook never sees it. Dispatched through the same binding map.
+        try { _dpiCapture = await session.StartDpiButtonCaptureAsync(() => _agent.DispatchDivertedButton(ButtonId.DpiToggle)); }
+        catch { /* device without a divertable DPI button */ }
 
         _loadingControls = true;
         try
@@ -365,18 +408,14 @@ public partial class MainWindowViewModel : ViewModelBase
             }
             if (await session.ReadSmartShiftAsync() is { } ss && ReferenceEquals(SelectedDevice, device))
             {
-                SmartShiftRatchet = ss.Ratchet;
-                PermanentRatchet = ss.AutoDisengage == 0xFF;
+                WheelModeChoice = !ss.Ratchet ? WheelModeChoice.FreeSpin
+                    : ss.AutoDisengage == 0xFF ? WheelModeChoice.Ratchet
+                    : WheelModeChoice.SmartShift;
                 AutoDisengage = ss.AutoDisengage is 0 or 0xFF ? 16 : ss.AutoDisengage;
                 ShowSmartShift = true;
             }
             if (await session.ReadHostsAsync() is { } hosts && ReferenceEquals(SelectedDevice, device))
-            {
-                Hosts.Clear();
-                foreach (var hd in hosts.Hosts)
-                    Hosts.Add(new HostSlotViewModel(hd.Index, hd.IsCurrent, hd.Paired, hd.BusType, hd.Name));
-                ShowHosts = hosts.HostCount > 1;
-            }
+                RebuildHosts(hosts);
             if (await session.ReadBrightnessAsync() is { } bright && ReferenceEquals(SelectedDevice, device))
             {
                 BacklightMax = bright.Info.MaxBrightness == 0 ? 100 : bright.Info.MaxBrightness;
@@ -414,6 +453,43 @@ public partial class MainWindowViewModel : ViewModelBase
         if (slot is null || slot.IsCurrent || _session is null) return;
         StatusText = $"Switching to host {slot.Number}…";
         await _session.SwitchHostAsync((byte)slot.Index);
+    }
+
+    /// <summary>
+    /// Forget (clear) an EasySwitch host so its slot is freed; that computer must
+    /// re-pair. Confirmation is handled by the caller (the view shows a warning
+    /// dialog, with a stronger one for the current host).
+    /// </summary>
+    public async Task ForgetHostAsync(HostSlotViewModel slot)
+    {
+        if (_session is null || SelectedDevice is not { } device) return;
+        var wasCurrent = slot.IsCurrent;
+        StatusText = $"Forgetting host {slot.Number}…";
+        if (!await _session.ClearHostAsync((byte)slot.Index))
+        {
+            StatusText = $"Could not forget host {slot.Number}.";
+            return;
+        }
+        if (wasCurrent)
+        {
+            // The device just dropped off this computer — return to the gallery and rescan.
+            StatusText = $"Host {slot.Number} forgotten — device disconnected.";
+            await RefreshAsync();
+            return;
+        }
+        // Refresh so the freed slot shows as empty.
+        if (await _session.ReadHostsAsync() is { } hosts && ReferenceEquals(SelectedDevice, device))
+            RebuildHosts(hosts);
+        StatusText = $"Host {slot.Number} forgotten.";
+    }
+
+    private void RebuildHosts(HostSnapshot hosts)
+    {
+        Hosts.Clear();
+        foreach (var hd in hosts.Hosts)
+            Hosts.Add(new HostSlotViewModel(hd.Index, hd.IsCurrent, hd.Paired, hd.BusType, hd.Name, hosts.SupportsDelete));
+        HostsSupportClear = hosts.SupportsDelete;
+        ShowHosts = hosts.HostCount > 1;
     }
 
     partial void OnDpiValueChanged(double value)
@@ -478,19 +554,26 @@ public partial class MainWindowViewModel : ViewModelBase
         if (SelectedDevice?.ConfigKey is { } ck) { _config.SetDpiPresets(ck, [.. DpiPresets]); SaveConfig(); }
     }
 
-    partial void OnSmartShiftRatchetChanged(bool value) { if (!_loadingControls) _ = ApplySmartShiftAsync(); }
-    partial void OnPermanentRatchetChanged(bool value) { if (!_loadingControls) _ = ApplySmartShiftAsync(); }
+    partial void OnWheelModeChoiceChanged(WheelModeChoice value) { if (!_loadingControls) _ = ApplySmartShiftAsync(); }
     partial void OnAutoDisengageChanged(int value) { if (!_loadingControls) _ = ApplySmartShiftAsync(); }
 
     private async Task ApplySmartShiftAsync()
     {
-        var auto = PermanentRatchet ? (byte)0xFF : (byte)AutoDisengage;
-        if (_session is not null) await _session.ApplySmartShiftAsync(SmartShiftRatchet, auto);
+        // Free spin → wheel mode Free. SmartShift → Ratchet with a finite
+        // auto-disengage threshold. Ratchet → Ratchet that never disengages (0xFF).
+        var ratchet = WheelModeChoice != WheelModeChoice.FreeSpin;
+        var auto = WheelModeChoice switch
+        {
+            WheelModeChoice.SmartShift => (byte)AutoDisengage,
+            WheelModeChoice.Ratchet => (byte)0xFF,
+            _ => (byte)0,
+        };
+        if (_session is not null) await _session.ApplySmartShiftAsync(ratchet, auto);
         if (SelectedDevice?.ConfigKey is { } ck)
         {
             _config.SetSmartShift(ck, new SmartShift
             {
-                Mode = SmartShiftRatchet ? WheelMode.Ratchet : WheelMode.Free,
+                Mode = ratchet ? WheelMode.Ratchet : WheelMode.Free,
                 AutoDisengage = auto,
                 TunableTorque = 0,
             });
@@ -642,6 +725,14 @@ public partial class MainWindowViewModel : ViewModelBase
         try { _config.SaveAtomic(); } catch { /* keep editing fluid */ }
     }
 
+    /// <summary>Tear down the remap hook and any open device session on app exit.</summary>
+    public void Dispose()
+    {
+        _agent.Dispose();
+        _ = _dpiCapture?.DisposeAsync();
+        _ = _session?.DisposeAsync();
+    }
+
     private async Task ResolveCardImageAsync(DeviceViewModel vm)
     {
         try
@@ -684,5 +775,19 @@ public partial class MainWindowViewModel : ViewModelBase
             return true;
         return InputKinds.Contains(d.Kind);
     }
+}
+
+/// <summary>
+/// The user-facing scroll-wheel mode: the single coherent choice behind the
+/// device's <c>wheelMode</c> + <c>autoDisengage</c> pair.
+/// </summary>
+public enum WheelModeChoice
+{
+    /// <summary>Smooth, frictionless free-spin (<c>wheelMode = Free</c>).</summary>
+    FreeSpin,
+    /// <summary>Ratchet that free-spins on a fast flick (<c>Ratchet</c> + finite auto-disengage).</summary>
+    SmartShift,
+    /// <summary>Always clicks line-by-line (<c>Ratchet</c> + auto-disengage 0xFF).</summary>
+    Ratchet,
 }
 

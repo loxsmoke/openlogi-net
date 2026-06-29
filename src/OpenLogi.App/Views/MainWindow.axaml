@@ -246,33 +246,34 @@
                             <Border Margin="8" Padding="16" Background="#11000000" CornerRadius="8"
                                     MinWidth="340" IsVisible="{Binding ShowSmartShift}">
                                 <StackPanel Spacing="12">
-                                    <TextBlock Text="SmartShift" FontSize="15" FontWeight="SemiBold"/>
-                                    <StackPanel Spacing="4">
+                                    <TextBlock Text="SmartShift / Smart Scrolling" FontSize="15" FontWeight="SemiBold"/>
+                                    <StackPanel Spacing="8">
                                         <TextBlock Text="Wheel mode" Opacity="0.7"/>
-                                        <StackPanel Orientation="Horizontal" Spacing="16">
+                                        <StackPanel Spacing="2">
                                             <RadioButton Content="Free spin" GroupName="WheelMode"
-                                                         IsChecked="{Binding !SmartShiftRatchet}"/>
+                                                         IsChecked="{Binding IsFreeSpin}"/>
+                                            <TextBlock Text="Smooth, frictionless scrolling." Opacity="0.5" FontSize="11" Margin="28,0,0,0"/>
+                                        </StackPanel>
+                                        <StackPanel Spacing="2">
+                                            <RadioButton Content="SmartShift" GroupName="WheelMode"
+                                                         IsChecked="{Binding IsSmartShift}"/>
+                                            <TextBlock Text="Ratchet that free-spins on a fast flick." Opacity="0.5" FontSize="11" Margin="28,0,0,0"/>
+                                        </StackPanel>
+                                        <StackPanel Spacing="2">
                                             <RadioButton Content="Ratchet" GroupName="WheelMode"
-                                                         IsChecked="{Binding SmartShiftRatchet}"/>
+                                                         IsChecked="{Binding IsRatchet}"/>
+                                            <TextBlock Text="Always clicks line-by-line." Opacity="0.5" FontSize="11" Margin="28,0,0,0"/>
                                         </StackPanel>
                                     </StackPanel>
-                                    <StackPanel Spacing="4">
+                                    <StackPanel Spacing="4" IsVisible="{Binding ShowSensitivity}">
                                         <Grid ColumnDefinitions="*,Auto">
                                             <TextBlock Grid.Column="0" Text="Sensitivity" Opacity="0.7"/>
                                             <TextBlock Grid.Column="1" Text="{Binding AutoDisengage}" Foreground="#3B82F6" FontWeight="SemiBold"/>
                                         </Grid>
-                                        <Slider Minimum="1" Maximum="50" Value="{Binding AutoDisengage}"
-                                                IsEnabled="{Binding !PermanentRatchet}"/>
+                                        <Slider Minimum="1" Maximum="50" Value="{Binding AutoDisengage}"/>
                                         <TextBlock Text="Higher keeps the ratchet engaged longer before free-spin."
                                                    Opacity="0.5" FontSize="11" TextWrapping="Wrap"/>
                                     </StackPanel>
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <StackPanel Grid.Column="0">
-                                            <TextBlock Text="Permanent ratchet"/>
-                                            <TextBlock Text="Never auto-switch to free-spin." Opacity="0.5" FontSize="11"/>
-                                        </StackPanel>
-                                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding PermanentRatchet}" VerticalAlignment="Center"/>
-                                    </Grid>
                                 </StackPanel>
                             </Border>
                         </WrapPanel>
@@ -352,6 +353,8 @@
                                     <Button Content="Restore keyboard default" Command="{Binding RestoreKeyboardDefaultCommand}"/>
                                     <Button Content="Save lighting to this profile" IsVisible="{Binding ProfileSelected}"
                                             Command="{Binding SaveLightingToProfileCommand}"/>
+                                    <Button Content="Per-key colors…" IsVisible="{Binding ShowPerKeyEditor}"
+                                            Click="OnOpenPerKeyEditor"/>
                                 </StackPanel>
                                 <TextBlock TextWrapping="Wrap" Opacity="0.5" FontSize="12" IsVisible="{Binding !ProfileSelected}"
                                            Text="With 'No profile', the color applies live; 'Restore keyboard default' hands lighting back to the onboard profile."/>
@@ -425,17 +428,32 @@
                                                         <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
                                                         <TextBlock Text="{Binding Status}" Opacity="0.6" FontSize="11"/>
                                                     </StackPanel>
-                                                    <Button Grid.Column="2" Content="Switch" VerticalAlignment="Center"
-                                                            IsVisible="{Binding CanSwitch}"
-                                                            Command="{Binding DataContext.SwitchHostCommand, ElementName=Root}"
-                                                            CommandParameter="{Binding}"/>
+                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6"
+                                                                VerticalAlignment="Center">
+                                                        <Button Content="Switch"
+                                                                IsVisible="{Binding CanSwitch}"
+                                                                Command="{Binding DataContext.SwitchHostCommand, ElementName=Root}"
+                                                                CommandParameter="{Binding}"/>
+                                                        <Button Content="Forget"
+                                                                IsVisible="{Binding CanClear}"
+                                                                Click="OnForgetHost"/>
+                                                    </StackPanel>
                                                 </Grid>
                                             </Border>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-                                <TextBlock Text="Switching host moves the device to another paired computer and disconnects it here."
+                                <TextBlock Text="Switching moves the device to another paired computer and disconnects it here."
                                            TextWrapping="Wrap" Opacity="0.5" FontSize="12"/>
+                                <TextBlock IsVisible="{Binding HostsSupportClear}"
+                                           Text="Forgetting a host clears its pairing — that computer must pair again to reconnect."
+                                           TextWrapping="Wrap" Opacity="0.5" FontSize="12"/>
+                                <Grid IsVisible="{Binding !HostsSupportClear}" ColumnDefinitions="Auto,*">
+                                    <TextBlock Grid.Column="0" Text="⚠" FontSize="12" Foreground="#E3B341"
+                                               Margin="0,0,6,0" VerticalAlignment="Top"/>
+                                    <TextBlock Grid.Column="1" Opacity="0.6" FontSize="12" TextWrapping="Wrap"
+                                               Text="This device doesn't support clearing host slots from software."/>
+                                </Grid>
                             </StackPanel>
                         </StackPanel>
                     </ScrollViewer>

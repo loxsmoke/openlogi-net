@@ -1,0 +1,22 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="OpenLogi.App.Views.ConfirmWindow"
+        Width="440" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False" ShowInTaskbar="False"
+        Title="Confirm">
+    <StackPanel Margin="24" Spacing="20">
+        <StackPanel Orientation="Horizontal" Spacing="18">
+            <TextBlock Text="⚠" FontSize="48" Foreground="#E3B341" VerticalAlignment="Top"/>
+            <StackPanel Spacing="8" MaxWidth="320">
+                <TextBlock x:Name="TitleText" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                <TextBlock x:Name="MessageText" Opacity="0.8" TextWrapping="Wrap"/>
+            </StackPanel>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Content="Cancel" Click="OnCancel" MinWidth="84"/>
+            <Button x:Name="ConfirmButton" Content="Confirm" Click="OnConfirm" MinWidth="84"
+                    Background="#DA3633" Foreground="White"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

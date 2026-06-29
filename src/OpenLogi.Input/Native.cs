@@ -49,6 +49,15 @@ public static class Native
     [DllImport("user32.dll", SetLastError = true)]
     public static extern nint SetWindowsHookExW(int idHook, HookProc lpfn, nint hMod, uint dwThreadId);
 
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    public static extern nint GetModuleHandleW(string? lpModuleName);
+
+    // Win+L cannot be synthesized via SendInput (the OS reserves the lock hotkey),
+    // so locking goes through this API instead.
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool LockWorkStation();
+
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool UnhookWindowsHookEx(nint hhk);

@@ -162,7 +162,7 @@ public enum ActionKind
     LeftClick, RightClick, MiddleClick, MouseBack, MouseForward,
     Copy, Paste, Cut, Undo, Redo, SelectAll, Find, Save,
     BrowserBack, BrowserForward, NewTab, CloseTab, ReopenTab, NextTab, PrevTab, ReloadPage,
-    MissionControl, AppExpose, PreviousDesktop, NextDesktop, ShowDesktop, LaunchpadShow,
+    TaskView, PreviousDesktop, NextDesktop, ShowDesktop, LaunchpadShow,
     LockScreen, Screenshot, CaptureRegion,
     PlayPause, NextTrack, PrevTrack, VolumeUp, VolumeDown, MuteVolume,
     CycleDpiPresets, SetDpiPreset, ToggleSmartShift,
@@ -226,8 +226,7 @@ public sealed record Action
     public static Action NextTab => Unit(ActionKind.NextTab);
     public static Action PrevTab => Unit(ActionKind.PrevTab);
     public static Action ReloadPage => Unit(ActionKind.ReloadPage);
-    public static Action MissionControl => Unit(ActionKind.MissionControl);
-    public static Action AppExpose => Unit(ActionKind.AppExpose);
+    public static Action TaskView => Unit(ActionKind.TaskView);
     public static Action PreviousDesktop => Unit(ActionKind.PreviousDesktop);
     public static Action NextDesktop => Unit(ActionKind.NextDesktop);
     public static Action ShowDesktop => Unit(ActionKind.ShowDesktop);
@@ -273,8 +272,7 @@ public sealed record Action
         ActionKind.NextTab => "Next Tab",
         ActionKind.PrevTab => "Previous Tab",
         ActionKind.ReloadPage => "Reload Page",
-        ActionKind.MissionControl => "Mission Control",
-        ActionKind.AppExpose => "App Exposé",
+        ActionKind.TaskView => "Task View",
         ActionKind.PreviousDesktop => "Previous Desktop",
         ActionKind.NextDesktop => "Next Desktop",
         ActionKind.ShowDesktop => "Show Desktop",
@@ -310,7 +308,7 @@ public sealed record Action
         ActionKind.BrowserBack or ActionKind.BrowserForward or ActionKind.NewTab or ActionKind.CloseTab
             or ActionKind.ReopenTab or ActionKind.NextTab or ActionKind.PrevTab
             or ActionKind.ReloadPage => OpenLogi.Core.Category.Browser,
-        ActionKind.MissionControl or ActionKind.AppExpose or ActionKind.PreviousDesktop
+        ActionKind.TaskView or ActionKind.PreviousDesktop
             or ActionKind.NextDesktop or ActionKind.ShowDesktop
             or ActionKind.LaunchpadShow => OpenLogi.Core.Category.Navigation,
         ActionKind.None or ActionKind.LockScreen or ActionKind.Screenshot
@@ -333,7 +331,7 @@ public sealed record Action
         LeftClick, RightClick, MiddleClick, MouseBack, MouseForward,
         Copy, Paste, Cut, Undo, Redo, SelectAll, Find, Save,
         BrowserBack, BrowserForward, NewTab, CloseTab, ReopenTab, NextTab, PrevTab, ReloadPage,
-        MissionControl, AppExpose, PreviousDesktop, NextDesktop, ShowDesktop, LaunchpadShow,
+        TaskView, PreviousDesktop, NextDesktop, ShowDesktop, LaunchpadShow,
         None, LockScreen, Screenshot, CaptureRegion,
         PlayPause, NextTrack, PrevTrack, VolumeUp, VolumeDown, MuteVolume,
         CycleDpiPresets, ToggleSmartShift,
@@ -442,21 +440,21 @@ public static class Bindings
         ButtonId.Back => Action.BrowserBack,
         ButtonId.Forward => Action.BrowserForward,
         ButtonId.DpiToggle => Action.CycleDpiPresets,
-        ButtonId.Thumbwheel => Action.AppExpose,
+        ButtonId.Thumbwheel => Action.TaskView,
         ButtonId.ThumbwheelScrollUp => Action.HorizontalScrollRight,
         ButtonId.ThumbwheelScrollDown => Action.HorizontalScrollLeft,
-        ButtonId.GestureButton => Action.MissionControl,
+        ButtonId.GestureButton => Action.TaskView,
         _ => Action.None,
     };
 
     /// <summary>Per-direction defaults for the gesture button.</summary>
     public static Action DefaultGestureBinding(GestureDirection direction) => direction switch
     {
-        GestureDirection.Up => Action.MissionControl,
+        GestureDirection.Up => Action.TaskView,
         GestureDirection.Down => Action.ShowDesktop,
         GestureDirection.Left => Action.PrevTab,
         GestureDirection.Right => Action.NextTab,
-        GestureDirection.Click => Action.AppExpose,
+        GestureDirection.Click => Action.TaskView,
         _ => Action.None,
     };
 

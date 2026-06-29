@@ -1,7 +1,7 @@
 namespace OpenLogi.App.ViewModels;
 
 /// <summary>One EasySwitch host slot: its name, pairing status, bus, and whether it's current.</summary>
-public sealed class HostSlotViewModel(int index, bool isCurrent, bool paired, string busType, string? name)
+public sealed class HostSlotViewModel(int index, bool isCurrent, bool paired, string busType, string? name, bool supportsDelete)
 {
     /// <summary>Zero-based host index sent to the device.</summary>
     public int Index { get; } = index;
@@ -14,6 +14,13 @@ public sealed class HostSlotViewModel(int index, bool isCurrent, bool paired, st
 
     /// <summary>Switchable only if it's a paired host that isn't the current one.</summary>
     public bool CanSwitch => Paired && !IsCurrent;
+
+    /// <summary>
+    /// Forgettable if it's an active pairing (paired, or the current host) and the
+    /// device supports clearing. Forgetting the current host is allowed but warned
+    /// about, since it disconnects the device from this computer.
+    /// </summary>
+    public bool CanClear => (Paired || IsCurrent) && supportsDelete;
 
     /// <summary>The host's name, or a generic label when unnamed/empty.</summary>
     public string Title => !string.IsNullOrWhiteSpace(name) ? name! : $"Host {Number}";

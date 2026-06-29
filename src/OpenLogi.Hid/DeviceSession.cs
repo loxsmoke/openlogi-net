@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using OpenLogi.HidPP.Channel;
 using OpenLogi.HidPP.Device;
 using OpenLogi.HidPP.Feature;
@@ -15,8 +16,8 @@ public sealed record SmartShiftSnapshot(bool Ratchet, byte AutoDisengage, byte T
 /// <summary>One host slot's detail.</summary>
 public sealed record HostDetail(int Index, bool IsCurrent, bool Paired, string BusType, string? Name);
 
-/// <summary>Host (EasySwitch) state: count, current slot (0-based), and per-slot detail.</summary>
-public sealed record HostSnapshot(byte HostCount, byte CurrentHost, IReadOnlyList<HostDetail> Hosts);
+/// <summary>Host (EasySwitch) state: count, current slot (0-based), per-slot detail, and whether slots can be cleared.</summary>
+public sealed record HostSnapshot(byte HostCount, byte CurrentHost, IReadOnlyList<HostDetail> Hosts, bool SupportsDelete);
 
 /// <summary>
 /// An open HID++ session to one device, used by the GUI to read/apply DPI and
@@ -277,7 +278,8 @@ public sealed class DeviceSession : IAsyncDisposable
                     details.Add(new HostDetail(i, i == current, paired,
                         h.BusType.ToString(), string.IsNullOrWhiteSpace(name) ? null : name));
                 }
-                return new HostSnapshot(info.HostCount, (byte)Math.Max(current, 0), details);
+                var canDelete = info.Capabilities.HasFlag(HostsInfoCapabilities.DeleteHost);
+                return new HostSnapshot(info.HostCount, (byte)Math.Max(current, 0), details, canDelete);
             }
             catch { /* fall back */ }
         }
@@ -289,7 +291,7 @@ public sealed class DeviceSession : IAsyncDisposable
                 var info = await ch.GetHostInfoAsync().ConfigureAwait(false);
                 var details = Enumerable.Range(0, info.HostCount)
                     .Select(i => new HostDetail(i, i == info.CurrentHost, false, "", null)).ToList();
-                return new HostSnapshot(info.HostCount, info.CurrentHost, details);
+                return new HostSnapshot(info.HostCount, info.CurrentHost, details, SupportsDelete: false);
             }
             catch { /* ignore */ }
         }
@@ -304,6 +306,18 @@ public sealed class DeviceSession : IAsyncDisposable
     {
         if (_device.GetFeature<ChangeHostFeature>() is not { } ch) return false;
         try { await ch.SetCurrentHostAsync(host).ConfigureAwait(false); return true; }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Forget the pairing in EasySwitch slot <paramref name="host"/> (0-based) via
+    /// HostsInfo (0x1815), freeing it. Returns false if the device lacks delete
+    /// support or refuses (e.g. the current host).
+    /// </summary>
+    public async Task<bool> ClearHostAsync(byte host)
+    {
+        if (_device.GetFeature<HostsInfoFeature>() is not { } hi) return false;
+        try { await hi.DeleteHostAsync(new HostIndex.Slot(host)).ConfigureAwait(false); return true; }
         catch { return false; }
     }
 
@@ -666,4 +680,101 @@ public sealed class DeviceSession : IAsyncDisposable
     }
 
     public async ValueTask DisposeAsync() => await _channel.DisposeAsync().ConfigureAwait(false);
+
+    // ── Diverted-button capture (ReprogControls 0x1b04) ─────────────────────────
+
+    /// <summary>
+    /// The "DPI / ModeShift" button control-ID family. Whichever a device exposes
+    /// and can divert is captured and surfaced as <see cref="ButtonId.DpiToggle"/>.
+    /// Values from the 0x1b04 control list (ported from the Rust original).
+    /// </summary>
+    private static readonly ushort[] DpiModeShiftCids = [0x00c4, 0x00ed, 0x00fd];
+
+    /// <summary>
+    /// Divert the device's DPI/ModeShift button over 0x1b04 so it stops doing its
+    /// native function and instead notifies us when pressed; <paramref name="onPressed"/>
+    /// fires on each rising edge. Returns a handle that restores the button's
+    /// native behaviour when disposed, or <c>null</c> if the device has no
+    /// divertable DPI button. Unlike Middle/Back/Forward (seen by the OS mouse
+    /// hook), the DPI button is only reachable this way.
+    /// </summary>
+    public async Task<IAsyncDisposable?> StartDpiButtonCaptureAsync(Action onPressed)
+    {
+        if (_device.GetFeature<ReprogControlsFeature>() is not { } rc) return null;
+
+        var diverted = new List<ushort>();
+        try
+        {
+            var present = new HashSet<ushort>();
+            var count = await rc.GetCountAsync().ConfigureAwait(false);
+            for (byte i = 0; i < count; i++)
+            {
+                var info = await rc.GetCidInfoAsync(i).ConfigureAwait(false);
+                if (DpiModeShiftCids.Contains(info.Cid.Value) && info.Flags.IsDivertable())
+                    present.Add(info.Cid.Value);
+            }
+            foreach (var cid in present)
+            {
+                await rc.SetCidReportingAsync(new ControlId(cid),
+                    CidReportingChange.TemporaryDiversion(diverted: true, rawXy: false)).ConfigureAwait(false);
+                diverted.Add(cid);
+            }
+        }
+        catch { /* best-effort; whatever diverted is handed back on dispose */ }
+
+        if (diverted.Count == 0) { rc.Dispose(); return null; }
+        return new DpiButtonCapture(rc, diverted, onPressed);
+    }
+
+    /// <summary>Listens for diverted DPI/ModeShift presses and restores the controls on dispose.</summary>
+    private sealed class DpiButtonCapture : IAsyncDisposable
+    {
+        private readonly ReprogControlsFeature _rc;
+        private readonly ushort[] _cids;
+        private readonly CancellationTokenSource _cts = new();
+        private readonly Task _pump;
+        private bool _down;
+
+        public DpiButtonCapture(ReprogControlsFeature rc, IEnumerable<ushort> cids, Action onPressed)
+        {
+            _rc = rc;
+            _cids = [.. cids];
+            _pump = PumpAsync(rc.Listen(), onPressed, _cts.Token);
+        }
+
+        private async Task PumpAsync(ChannelReader<ReprogControlsEvent> reader, Action onPressed, CancellationToken ct)
+        {
+            try
+            {
+                await foreach (var ev in reader.ReadAllAsync(ct).ConfigureAwait(false))
+                {
+                    if (ev is not ReprogControlsEvent.DivertedButtons db) continue;
+                    // The event carries the set of currently-held diverted controls;
+                    // fire once on the press (rising) edge, not while held or on release.
+                    var held = db.Controls.Any(c => _cids.Contains(c.Value));
+                    if (held && !_down) onPressed();
+                    _down = held;
+                }
+            }
+            catch (OperationCanceledException) { /* shutting down */ }
+            catch { /* listener torn down with the channel */ }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            _cts.Cancel();
+            try { await _pump.ConfigureAwait(false); } catch { /* already faulted/cancelled */ }
+            foreach (var cid in _cids)
+            {
+                try
+                {
+                    await _rc.SetCidReportingAsync(new ControlId(cid),
+                        CidReportingChange.TemporaryDiversion(diverted: false, rawXy: false)).ConfigureAwait(false);
+                }
+                catch { /* device gone — nothing to restore */ }
+            }
+            _rc.Dispose();
+            _cts.Dispose();
+        }
+    }
 }

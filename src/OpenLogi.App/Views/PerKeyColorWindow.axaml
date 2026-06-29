@@ -16,6 +16,7 @@
         <ctrl:QuickColorPicker Color="{Binding SelectedColor}" HorizontalAlignment="Left"/>
         <TextBlock Text="Base color" FontWeight="SemiBold"/>
         <ctrl:QuickColorPicker Color="{Binding BaseColor}" HorizontalAlignment="Left"/>
+        <Button Content="Reset all keys to base" Click="OnResetAll"/>
         <TextBlock Text="Special keys (OS swallows these — click to paint)" FontWeight="SemiBold"/>
         <ItemsControl ItemsSource="{Binding SpecialKeys}">
             <ItemsControl.ItemsPanel>
@@ -29,7 +30,6 @@
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
-        <Button Content="Reset all keys to base" Click="OnResetAll"/>
         <Border Background="#15000000" Padding="10" CornerRadius="6">
             <TextBlock Text="{Binding Status}" TextWrapping="Wrap"/>
         </Border>

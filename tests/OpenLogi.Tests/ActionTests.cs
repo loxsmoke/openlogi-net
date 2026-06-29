@@ -54,7 +54,7 @@ public class ActionTests
     [InlineData(ActionKind.LeftClick, Category.Mouse)]
     [InlineData(ActionKind.CycleDpiPresets, Category.Dpi)]
     [InlineData(ActionKind.ScrollUp, Category.Scroll)]
-    [InlineData(ActionKind.MissionControl, Category.Navigation)]
+    [InlineData(ActionKind.TaskView, Category.Navigation)]
     [InlineData(ActionKind.LockScreen, Category.System)]
     public void CategoryAssignment(ActionKind kind, Category expected)
     {

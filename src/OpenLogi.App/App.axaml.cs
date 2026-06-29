@@ -20,10 +20,13 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            var viewModel = new MainWindowViewModel();
             desktop.MainWindow = new MainWindow
             {
-                DataContext = new MainWindowViewModel(),
+                DataContext = viewModel,
             };
+            // Tear down the OS mouse hook cleanly when the app quits.
+            desktop.Exit += (_, _) => viewModel.Dispose();
         }
 
         base.OnFrameworkInitializationCompleted();

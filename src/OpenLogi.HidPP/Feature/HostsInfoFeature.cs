@@ -115,6 +115,15 @@ public sealed class HostsInfoFeature(FeatureEndpoint endpoint) : ICreatableFeatu
             p[2..16]);
     }
 
+    /// <summary>
+    /// Forget the pairing stored in <paramref name="host"/> (EasySwitch "clear
+    /// host"), freeing the slot. Only valid when the feature reports
+    /// <see cref="HostsInfoCapabilities.DeleteHost"/>; the device refuses to
+    /// delete the host it is currently connected through.
+    /// </summary>
+    public async Task DeleteHostAsync(HostIndex host) =>
+        await endpoint.CallAsync(6, [host.ToByte(), 0, 0]).ConfigureAwait(false);
+
     private static T ParseEnum<T>(byte raw) where T : struct, Enum =>
         Enum.IsDefined(typeof(T), raw) ? (T)Enum.ToObject(typeof(T), raw) : throw Hidpp20Exception.UnsupportedResponse();
 }

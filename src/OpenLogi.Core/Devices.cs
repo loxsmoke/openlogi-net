@@ -63,6 +63,8 @@ public sealed record Capabilities
     public bool Lighting { get; init; }
     /// <summary>Native vertical wheel inversion — HID++ 0x2121 with has_invert.</summary>
     public bool ScrollInversion { get; init; }
+    /// <summary>Programmable G-keys — HID++ 0x8010 (GKeys).</summary>
+    public bool GKeys { get; init; }
 
     /// <summary>Derive capabilities from the set of HID++ feature IDs a device reports.</summary>
     public static Capabilities FromFeatureIds(IReadOnlyCollection<ushort> ids)
@@ -78,6 +80,7 @@ public sealed record Capabilities
             Pointer = Has(pointer),
             Lighting = Has(lighting),
             ScrollInversion = false,
+            GKeys = ids.Contains((ushort)0x8010),
         };
     }
 

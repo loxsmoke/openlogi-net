@@ -347,6 +347,9 @@ public static class ConfigCodec
     {
         if (value is string name)
         {
+            // Legacy macOS action names that collapsed onto TaskView on Windows.
+            if (name is "MissionControl" or "AppExpose")
+                name = nameof(ActionKind.TaskView);
             if (Enum.TryParse<ActionKind>(name, out var kind)
                 && kind is not (ActionKind.SetDpiPreset or ActionKind.CustomShortcut))
                 return Action.Unit(kind);

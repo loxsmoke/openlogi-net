@@ -43,7 +43,10 @@ public sealed class MouseHook : IDisposable
         hook._thread = new Thread(() =>
         {
             _proc = HookCallback;
-            var handle = Native.SetWindowsHookExW(Native.WH_MOUSE_LL, _proc, nint.Zero, 0);
+            // Pass the current process's module handle. A NULL hMod can fail with
+            // ERROR_INVALID_PARAMETER for WH_MOUSE_LL on some Windows configurations.
+            var hMod = Native.GetModuleHandleW(null);
+            var handle = Native.SetWindowsHookExW(Native.WH_MOUSE_LL, _proc, hMod, 0);
             if (handle == nint.Zero)
             {
                 startError = new HookException($"SetWindowsHookExW failed: {Marshal.GetLastWin32Error()}");

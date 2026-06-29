@@ -33,6 +33,7 @@ public sealed partial class DeviceViewModel(string receiverName, PairedDevice de
     public bool HasPointer => Device.Capabilities?.Pointer ?? false;
     public bool HasButtons => Device.Capabilities?.Buttons ?? false;
     public bool HasLighting => Device.Capabilities?.Lighting ?? false;
+    public bool HasGKeys => Device.Capabilities?.GKeys ?? false;
 
     public string Capabilities
     {

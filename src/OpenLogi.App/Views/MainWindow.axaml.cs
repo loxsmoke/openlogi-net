@@ -63,16 +63,11 @@ public partial class MainWindow : Window
         if (_tray is not null) _tray.IsVisible = false;
     }
 
-    // Secret hotkey: Ctrl+Alt+L opens the per-key color editor (keyboards with 0x8081).
-    protected override void OnKeyDown(KeyEventArgs e)
+    // Opens the per-key color editor (keyboards with PerKeyLighting 0x8081).
+    private void OnOpenPerKeyEditor(object? sender, RoutedEventArgs e)
     {
-        if (e.Key == Key.L && e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Alt))
-        {
-            if (DataContext is MainWindowViewModel { PerKeySession: { } session })
-                new PerKeyColorWindow(session).Show(this);
-            e.Handled = true;
-        }
-        base.OnKeyDown(e);
+        if (DataContext is MainWindowViewModel { PerKeySession: { } session })
+            new PerKeyColorWindow(session).Show(this);
     }
 
     private void OnSettings(object? sender, RoutedEventArgs e)
@@ -82,6 +77,22 @@ public partial class MainWindow : Window
     }
 
     private void OnAbout(object? sender, RoutedEventArgs e) => new AboutWindow().ShowDialog(this);
+
+    private async void OnForgetHost(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Control { DataContext: HostSlotViewModel slot }) return;
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        var (title, message) = slot.IsCurrent
+            ? ($"Forget host {slot.Number} — the one you're using?",
+               $"This device is connected to this computer through host {slot.Number}. " +
+               "Forgetting it disconnects the device now, and you'll have to pair it again to use it.")
+            : ($"Forget host {slot.Number}?",
+               "The computer paired in this slot will have to pair again to reconnect.");
+
+        var confirmed = await new ConfirmWindow(title, message, "Forget host").ShowDialog<bool>(this);
+        if (confirmed) await vm.ForgetHostAsync(slot);
+    }
 
     private async void OnPickGKey(object? sender, RoutedEventArgs e)
     {

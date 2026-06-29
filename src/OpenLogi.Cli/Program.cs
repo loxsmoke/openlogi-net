@@ -528,7 +528,7 @@ static async Task HostsAsync()
             if (session is null) continue;
             var hosts = await session.ReadHostsAsync();
             if (hosts is not { } h) { Console.WriteLine($"{label}: no host-switching feature"); continue; }
-            Console.WriteLine($"{label}: current host {h.CurrentHost + 1} of {h.HostCount}");
+            Console.WriteLine($"{label}: current host {h.CurrentHost + 1} of {h.HostCount} — clear/delete supported: {h.SupportsDelete}");
             foreach (var host in h.Hosts)
             {
                 var marker = host.IsCurrent ? "*" : " ";

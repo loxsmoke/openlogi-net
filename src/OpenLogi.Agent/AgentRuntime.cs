@@ -52,6 +52,23 @@ public sealed class AgentRuntime : IDisposable
         return disposition;
     }
 
+    /// <summary>
+    /// Fire the action bound to a HID++-diverted button (e.g. the DPI/ModeShift
+    /// button), which the OS mouse hook can't see. Uses the same effective
+    /// binding map as <see cref="OnMouseEvent"/>. Already diverted at the device,
+    /// so there is no native click to suppress.
+    /// </summary>
+    public void DispatchDivertedButton(ButtonId button)
+    {
+        string? configKey;
+        lock (_gate) configKey = _selectedConfigKey;
+
+        var appBundle = MouseHook.FrontmostProcessPath();
+        var bindings = BindingMaps.BindingsFor(_config, configKey, appBundle);
+        if (bindings.TryGetValue(button, out var action))
+            ActionInjector.Execute(action);
+    }
+
     public void Dispose()
     {
         lock (_gate)
