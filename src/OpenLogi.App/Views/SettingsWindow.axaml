@@ -1,0 +1,26 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:OpenLogi.App.ViewModels"
+        x:Class="OpenLogi.App.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Width="440" Height="300"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Icon="/Assets/icon.png"
+        Title="Settings">
+    <Design.DataContext>
+        <vm:SettingsViewModel/>
+    </Design.DataContext>
+
+    <StackPanel Margin="24" Spacing="16">
+        <TextBlock Text="Settings" FontSize="18" FontWeight="Bold"/>
+
+        <CheckBox Content="Launch at login" IsChecked="{Binding LaunchAtLogin}"/>
+        <CheckBox Content="Check for updates on launch" IsChecked="{Binding CheckForUpdates}"/>
+        <CheckBox Content="Automatically download device images" IsChecked="{Binding AutoDownloadAssets}"/>
+        <CheckBox Content="Minimize to the system tray (hide from the taskbar)" IsChecked="{Binding MinimizeToTray}"/>
+
+        <TextBlock Text="Settings are saved to config.toml. Update checks are opt-in and off by default."
+                   TextWrapping="Wrap" Opacity="0.5" FontSize="12"/>
+    </StackPanel>
+</Window>

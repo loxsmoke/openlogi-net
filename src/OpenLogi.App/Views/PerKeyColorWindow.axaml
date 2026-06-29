@@ -1,0 +1,37 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:OpenLogi.App.ViewModels"
+        xmlns:ctrl="using:OpenLogi.App.Controls"
+        x:Class="OpenLogi.App.Views.PerKeyColorWindow"
+        x:DataType="vm:PerKeyColorViewModel"
+        Width="340" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Icon="/Assets/keyboard.png"
+        Title="Color keys">
+    <StackPanel Margin="16" Spacing="12">
+        <TextBlock TextWrapping="Wrap"
+                   Text="Press a physical key on the keyboard to paint it with the color below. Press the same key again to reset it to the base color."/>
+        <TextBlock Text="Paint color" FontWeight="SemiBold"/>
+        <ctrl:QuickColorPicker Color="{Binding SelectedColor}" HorizontalAlignment="Left"/>
+        <TextBlock Text="Base color" FontWeight="SemiBold"/>
+        <ctrl:QuickColorPicker Color="{Binding BaseColor}" HorizontalAlignment="Left"/>
+        <TextBlock Text="Special keys (OS swallows these — click to paint)" FontWeight="SemiBold"/>
+        <ItemsControl ItemsSource="{Binding SpecialKeys}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:SpecialKey">
+                    <Button Content="{Binding Label}" MinWidth="64" Margin="0,0,6,6"
+                            Command="{Binding $parent[ItemsControl].((vm:PerKeyColorViewModel)DataContext).PaintSpecialCommand}"
+                            CommandParameter="{Binding}"/>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Button Content="Reset all keys to base" Click="OnResetAll"/>
+        <Border Background="#15000000" Padding="10" CornerRadius="6">
+            <TextBlock Text="{Binding Status}" TextWrapping="Wrap"/>
+        </Border>
+    </StackPanel>
+</Window>

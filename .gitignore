@@ -427,3 +427,6 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Local helper scripts in the repo root (e.g. d.cmd)
+/*.cmd

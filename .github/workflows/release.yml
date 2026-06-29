@@ -1,0 +1,215 @@
+name: Release
+
+# Manually triggered. Computes the next version from version.win (dry run),
+# stamps it into OpenLogi.App and OpenLogi.Cli, builds an installable Windows
+# release, then — only after the build succeeds — reserves the version on
+# version.win, commits and tags the bump, and publishes a GitHub Release with
+# the installer and a portable zip attached. The dry run means a failed build
+# does not burn a version number.
+on:
+  workflow_dispatch:
+    inputs:
+      increment:
+        description: increment settings (semantic.3) 1.0.0=azz 0.1.0=az 0.0.1=a
+        required: true
+        default: az
+        type: string
+      postfix:
+        description: postfix like rc or beta for a pre-release version (also marks the release as pre-release)
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # Windows runner because the app targets net10.0-windows.
+    runs-on: windows-latest
+
+    env:
+      RID: win-x64
+      PUBLISH_DIR: publish/win-x64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require a branch run
+        if: ${{ github.ref_type != 'branch' }}
+        shell: bash
+        run: |
+          echo "::error::Run this workflow from the branch that should receive the version commit" >&2
+          exit 1
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Compute version from version.win (dry run)
+        id: version
+        shell: bash
+        env:
+          INCREMENT: ${{ inputs.increment }}
+          POSTFIX: ${{ inputs.postfix }}
+          VERSION_WIN_API_KEY: ${{ secrets.VERSION_WIN_API_KEY }}
+          VERSION_WIN_PROJECT_ID: ${{ secrets.VERSION_WIN_PROJECT_ID }}
+        run: |
+          # /dryrun computes the next version without consuming it, so a build
+          # failure later doesn't burn a version number.
+          VERSION_URL="https://api.version.win/v/${VERSION_WIN_PROJECT_ID}/dryrun?key=${VERSION_WIN_API_KEY}&increment=${INCREMENT}"
+
+          if [ -n "$POSTFIX" ]; then
+            VERSION_URL="${VERSION_URL}&postfix=${POSTFIX}"
+          fi
+
+          if ! VERSION=$(curl -sf "$VERSION_URL"); then
+            echo "::error::Failed to fetch version from version.win" >&2
+            exit 1
+          fi
+
+          # Strip any pre-release postfix (e.g. -rc1) for the numeric assembly version.
+          BASE_VERSION="${VERSION%%-*}"
+          if [[ "$BASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            ASSEMBLY_VERSION="${BASE_VERSION}.0"
+          elif [[ "$BASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            ASSEMBLY_VERSION="$BASE_VERSION"
+          else
+            echo "::error::Version '$VERSION' does not start with a three-part or four-part numeric version" >&2
+            exit 1
+          fi
+
+          echo "project=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "assembly=$ASSEMBLY_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Project version: $VERSION"
+          echo "Assembly and file version: $ASSEMBLY_VERSION"
+
+      - name: Install dotnet-property
+        run: dotnet tool install --global dotnet-property
+
+      - name: Apply project version
+        shell: bash
+        env:
+          PROJECT_VERSION: ${{ steps.version.outputs.project }}
+          ASSEMBLY_VERSION: ${{ steps.version.outputs.assembly }}
+        run: |
+          # dotnet-property matches a relative glob, so run it from each
+          # project's own directory with a bare filename.
+          stamp() {
+            local dir="$1" file="$2"
+            ( cd "$dir" && \
+              dotnet-property "$file" "Version:$PROJECT_VERSION" && \
+              dotnet-property "$file" "AssemblyVersion:$ASSEMBLY_VERSION" && \
+              dotnet-property "$file" "FileVersion:$ASSEMBLY_VERSION" )
+          }
+          stamp src/OpenLogi.App OpenLogi.App.csproj
+          stamp src/OpenLogi.Cli OpenLogi.Cli.csproj
+
+      # Self-contained so end users don't need the .NET runtime installed.
+      # Trimmed in partial mode: only assemblies marked trimmable (the .NET BCL,
+      # which is the bulk of the size) are trimmed; HidSharp, Tomlyn and the app
+      # assemblies are kept whole, so reflection (device I/O, TOML config, XAML
+      # bindings) keeps working. Roughly halves the package vs. an untrimmed build.
+      - name: Publish
+        run: >
+          dotnet publish src/OpenLogi.App/OpenLogi.App.csproj
+          --configuration Release
+          --runtime ${{ env.RID }}
+          --self-contained true
+          -p:PublishTrimmed=true
+          -p:TrimMode=partial
+          --output ${{ env.PUBLISH_DIR }}
+
+      # Drop debug symbols — the native Skia/HarfBuzz .pdb files alone are ~100 MB
+      # and are not needed at runtime. Halves the package size.
+      - name: Strip debug symbols
+        shell: bash
+        run: find "${{ env.PUBLISH_DIR }}" -name '*.pdb' -delete
+
+      # Portable build for users who don't want an installer.
+      - name: Package portable zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          Compress-Archive -Path "${{ env.PUBLISH_DIR }}/*" `
+            -DestinationPath "artifacts/OpenLogi.net-${{ steps.version.outputs.project }}-${{ env.RID }}-portable.zip"
+
+      # Inno Setup ships preinstalled on the windows-latest runner image.
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $publish = (Resolve-Path "${{ env.PUBLISH_DIR }}").Path
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
+            "/DAppVersion=${{ steps.version.outputs.project }}" `
+            "/DSourceDir=$publish" `
+            build/OpenLogi.iss
+          Copy-Item "build/installer/OpenLogi.net-${{ steps.version.outputs.project }}-setup.exe" -Destination artifacts/
+
+      # Build succeeded — now actually consume the version on version.win.
+      - name: Reserve version on version.win
+        shell: bash
+        env:
+          INCREMENT: ${{ inputs.increment }}
+          POSTFIX: ${{ inputs.postfix }}
+          EXPECTED: ${{ steps.version.outputs.project }}
+          VERSION_WIN_API_KEY: ${{ secrets.VERSION_WIN_API_KEY }}
+          VERSION_WIN_PROJECT_ID: ${{ secrets.VERSION_WIN_PROJECT_ID }}
+        run: |
+          VERSION_URL="https://api.version.win/v/${VERSION_WIN_PROJECT_ID}/new?key=${VERSION_WIN_API_KEY}&increment=${INCREMENT}"
+
+          if [ -n "$POSTFIX" ]; then
+            VERSION_URL="${VERSION_URL}&postfix=${POSTFIX}"
+          fi
+
+          if ! VERSION=$(curl -sf "$VERSION_URL"); then
+            echo "::error::Failed to reserve version on version.win" >&2
+            exit 1
+          fi
+
+          # Guard against a concurrent release consuming the number between the
+          # dry run and now — the build was stamped with EXPECTED.
+          if [ "$VERSION" != "$EXPECTED" ]; then
+            echo "::error::version.win issued '$VERSION' but the build used '$EXPECTED' (concurrent release?)" >&2
+            exit 1
+          fi
+          echo "Reserved version $VERSION"
+
+      - name: Commit and tag version
+        shell: bash
+        env:
+          PROJECT_VERSION: ${{ steps.version.outputs.project }}
+          TARGET_BRANCH: ${{ github.ref_name }}
+        run: |
+          TAG="v$PROJECT_VERSION"
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
+            echo "::error::Tag '$TAG' already exists on origin" >&2
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/OpenLogi.App/OpenLogi.App.csproj src/OpenLogi.Cli/OpenLogi.Cli.csproj
+
+          if git diff --cached --quiet; then
+            echo "::error::Version update did not change the project files" >&2
+            exit 1
+          fi
+
+          git commit -m "Set version $PROJECT_VERSION"
+          git tag "$TAG"
+          git push --atomic origin "HEAD:$TARGET_BRANCH" "refs/tags/$TAG"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.project }}
+          name: OpenLogi.net v${{ steps.version.outputs.project }}
+          prerelease: ${{ inputs.postfix != '' }}
+          generate_release_notes: true
+          files: |
+            artifacts/OpenLogi.net-${{ steps.version.outputs.project }}-setup.exe
+            artifacts/OpenLogi.net-${{ steps.version.outputs.project }}-${{ env.RID }}-portable.zip

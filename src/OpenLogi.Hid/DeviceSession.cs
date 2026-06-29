@@ -1,0 +1,669 @@
+using OpenLogi.HidPP.Channel;
+using OpenLogi.HidPP.Device;
+using OpenLogi.HidPP.Feature;
+using OpenLogi.HidPP.Protocol;
+using OpenLogi.HidPP.Receiver;
+
+namespace OpenLogi.Hid;
+
+/// <summary>Current sensor DPI plus the values the device supports.</summary>
+public sealed record DpiSnapshot(ushort Current, IReadOnlyList<ushort> Supported);
+
+/// <summary>Current SmartShift wheel state.</summary>
+public sealed record SmartShiftSnapshot(bool Ratchet, byte AutoDisengage, byte TunableTorque, bool TorqueSupported);
+
+/// <summary>One host slot's detail.</summary>
+public sealed record HostDetail(int Index, bool IsCurrent, bool Paired, string BusType, string? Name);
+
+/// <summary>Host (EasySwitch) state: count, current slot (0-based), and per-slot detail.</summary>
+public sealed record HostSnapshot(byte HostCount, byte CurrentHost, IReadOnlyList<HostDetail> Hosts);
+
+/// <summary>
+/// An open HID++ session to one device, used by the GUI to read/apply DPI and
+/// SmartShift. Holds the channel + an enumerated <see cref="HidppDevice"/> for the
+/// device's lifetime in the UI; dispose when the selection changes.
+///
+/// HARDWARE-VERIFIED read path uses the same engine the CLI exercises; apply
+/// writes to the physical device (only on explicit user action).
+/// </summary>
+public sealed class DeviceSession : IAsyncDisposable
+{
+    private readonly HidppChannel _channel;
+    private readonly HidppDevice _device;
+
+    private DeviceSession(HidppChannel channel, HidppDevice device)
+    {
+        _channel = channel;
+        _device = device;
+    }
+
+    /// <summary>
+    /// Open a session for <paramref name="route"/>, or <c>null</c> if unreachable.
+    /// A composite device (e.g. the G915 keyboard) exposes several HID++
+    /// interfaces with different feature subsets; for a direct device we keep the
+    /// one that enumerates the most features (the main control interface).
+    /// </summary>
+    public static async Task<DeviceSession?> OpenAsync(DeviceRoute route)
+    {
+        DeviceSession? best = null;
+        var bestCount = -1;
+
+        foreach (var hid in HidDiscovery.EnumerateHidppDevices())
+        {
+            if (route is DeviceRoute.Direct d && (hid.VendorID != d.VendorId || hid.ProductID != d.ProductId))
+                continue;
+
+            HidppChannel channel;
+            try { channel = await HidppChannel.FromRawChannelAsync(WindowsRawHidChannel.Open(hid)).ConfigureAwait(false); }
+            catch { continue; }
+
+            if (!await MatchesReceiverAsync(channel, route).ConfigureAwait(false))
+            {
+                await channel.DisposeAsync().ConfigureAwait(false);
+                continue;
+            }
+
+            HidppDevice device;
+            int featureCount;
+            try
+            {
+                device = await HidppDevice.NewAsync(channel, route.DeviceIndex()).ConfigureAwait(false);
+                var features = await device.EnumerateFeaturesAsync().ConfigureAwait(false);
+                featureCount = features?.Count ?? 0;
+            }
+            catch
+            {
+                await channel.DisposeAsync().ConfigureAwait(false);
+                continue;
+            }
+
+            // A receiver match is unique — use it. For a direct device, keep the
+            // richest interface among the (possibly several) matching nodes.
+            if (route is not DeviceRoute.Direct)
+                return new DeviceSession(channel, device);
+
+            if (featureCount > bestCount)
+            {
+                if (best is not null) await best.DisposeAsync().ConfigureAwait(false);
+                best = new DeviceSession(channel, device);
+                bestCount = featureCount;
+            }
+            else
+            {
+                await channel.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+        return best;
+    }
+
+    private static async Task<bool> MatchesReceiverAsync(HidppChannel channel, DeviceRoute route)
+    {
+        switch (route)
+        {
+            case DeviceRoute.Direct:
+                return true;
+            case DeviceRoute.Bolt b:
+                return Receivers.Detect(channel) is DetectedReceiver.Bolt rb
+                       && string.Equals(await rb.Receiver.GetUniqueIdAsync().ConfigureAwait(false), b.ReceiverUid, StringComparison.OrdinalIgnoreCase);
+            case DeviceRoute.Unifying u:
+                return Receivers.Detect(channel) is DetectedReceiver.Unifying ru
+                       && string.Equals(await ru.Receiver.GetUniqueIdAsync().ConfigureAwait(false), u.ReceiverUid, StringComparison.OrdinalIgnoreCase);
+            default:
+                return false;
+        }
+    }
+
+    // ── DPI ──────────────────────────────────────────────────────────────────
+
+    /// <summary>Read current + supported DPI (sensor 0) via AdjustableDpi (0x2201).</summary>
+    public async Task<DpiSnapshot?> ReadDpiAsync()
+    {
+        if (_device.GetFeature<AdjustableDpiFeature>() is not { } dpi) return null;
+        try
+        {
+            var current = await dpi.GetSensorDpiAsync(0).ConfigureAwait(false);
+            var supported = await dpi.GetSensorDpiListAsync(0).ConfigureAwait(false);
+            return new DpiSnapshot(current, supported);
+        }
+        catch { return null; }
+    }
+
+    /// <summary>Apply a sensor DPI (sensor 0). Writes to the device.</summary>
+    public async Task<bool> ApplyDpiAsync(ushort dpi)
+    {
+        if (_device.GetFeature<AdjustableDpiFeature>() is not { } feature) return false;
+        try { await feature.SetSensorDpiAsync(0, dpi).ConfigureAwait(false); return true; }
+        catch { return false; }
+    }
+
+    // ── SmartShift ─────────────────────────────────────────────────────────────
+
+    /// <summary>Read SmartShift state, preferring the enhanced feature (0x2111), else 0x2110.</summary>
+    public async Task<SmartShiftSnapshot?> ReadSmartShiftAsync()
+    {
+        try
+        {
+            if (_device.GetFeature<SmartShiftEnhancedFeature>() is { } enhanced)
+            {
+                var status = await enhanced.GetRatchetControlModeAsync().ConfigureAwait(false);
+                var caps = await enhanced.GetCapabilitiesAsync().ConfigureAwait(false);
+                return new SmartShiftSnapshot(
+                    status.WheelMode == SmartShiftWheelMode.Ratchet,
+                    status.AutoDisengage, status.CurrentTunableTorque,
+                    caps.Capabilities.HasFlag(SmartShiftEnhancedCapabilities.TunableTorque));
+            }
+            if (_device.GetFeature<SmartShiftFeature>() is { } basic)
+            {
+                var mode = await basic.GetRatchetControlModeAsync().ConfigureAwait(false);
+                return new SmartShiftSnapshot(mode.WheelMode == SmartShiftWheelMode.Ratchet, mode.AutoDisengage, 0, false);
+            }
+        }
+        catch { /* fall through */ }
+        return null;
+    }
+
+    /// <summary>Apply SmartShift wheel mode + auto-disengage threshold. Writes to the device.</summary>
+    public async Task<bool> ApplySmartShiftAsync(bool ratchet, byte autoDisengage)
+    {
+        var mode = ratchet ? SmartShiftWheelMode.Ratchet : SmartShiftWheelMode.Freespin;
+        try
+        {
+            if (_device.GetFeature<SmartShiftEnhancedFeature>() is { } enhanced)
+            {
+                await enhanced.SetRatchetControlModeAsync(
+                    new SmartShiftEnhancedStatusChange(mode, autoDisengage == 0 ? null : autoDisengage)).ConfigureAwait(false);
+                return true;
+            }
+            if (_device.GetFeature<SmartShiftFeature>() is { } basic)
+            {
+                await basic.SetRatchetControlModeAsync(mode, autoDisengage == 0 ? null : autoDisengage).ConfigureAwait(false);
+                return true;
+            }
+        }
+        catch { /* ignore */ }
+        return false;
+    }
+
+    // ── Lighting ────────────────────────────────────────────────────────────
+
+    /// <summary>Whether the device exposes a supported lighting engine (0x8070 or 0x8071).</summary>
+    public bool SupportsLighting =>
+        _device.GetFeature<ColorLedEffectsFeature>() is not null
+        || _device.GetFeature<RgbEffectsFeature>() is not null;
+
+    /// <summary>
+    /// Set a solid keyboard colour: prefer ColorLedEffects (0x8070); fall back to
+    /// PerKeyLighting v2 (0x8081, newer G-series like the G915 — HARDWARE-VERIFIED);
+    /// else RgbEffects (0x8071). Returns false if the device exposes none.
+    /// </summary>
+    public async Task<bool> ApplyLightingAsync(byte r, byte g, byte b)
+    {
+        try
+        {
+            if (_device.GetFeature<ColorLedEffectsFeature>() is { } led)
+            {
+                var zoneCount = await led.GetZoneCountAsync().ConfigureAwait(false);
+                var zones = zoneCount == 0 ? (byte)4 : Math.Min(zoneCount, (byte)4);
+                var p = new byte[ColorLedEffectsFeature.ZoneEffectParamCount];
+                p[0] = r; p[1] = g; p[2] = b;
+                for (byte zone = 0; zone < zones; zone++)
+                {
+                    await led.SetZoneEffectAsync(zone, ColorLedEffectsFeature.EffectFixedColor, p,
+                        ColorLedEffectsFeature.PersistenceVolatile).ConfigureAwait(false);
+                    await Task.Delay(8).ConfigureAwait(false);
+                }
+                return true;
+            }
+
+            // 0x8081 (PerKeyLighting v2) — works on the G915 via host mode; prefer it
+            // over 0x8071 (which the onboard profile replays over).
+            if (await ApplyPerKeyColorAsync(r, g, b).ConfigureAwait(false))
+                return true;
+
+            if (_device.GetFeature<RgbEffectsFeature>() is { } rgb)
+            {
+                // 0x8071 needs software control first; then set each real cluster
+                // (0xff "all clusters" is a read-only selector — invalid for set).
+                // NB: on G-series keyboards with an onboard profile (e.g. the G915)
+                // the firmware replays the stored profile over these writes; live
+                // colour there needs host mode + 0x8081 per-key streaming, not yet
+                // implemented, so we don't switch host mode here (it would just go dark).
+                await rgb.SetSwControlAsync(RgbEffectsFeature.SwControlAllClusters).ConfigureAwait(false);
+                var p = new byte[RgbEffectsFeature.ClusterEffectParamCount];
+                p[0] = r; p[1] = g; p[2] = b;
+                var applied = false;
+                for (byte cluster = 0; cluster < 4; cluster++)
+                {
+                    try
+                    {
+                        await rgb.SetRgbClusterEffectAsync(cluster, RgbEffectsFeature.EffectFixed, p,
+                            RgbEffectsFeature.PersistenceVolatile, RgbEffectsFeature.PowerFull).ConfigureAwait(false);
+                        applied = true;
+                        await Task.Delay(8).ConfigureAwait(false);
+                    }
+                    catch (Hidpp20Exception) { /* cluster doesn't exist on this device */ }
+                }
+                return applied;
+            }
+        }
+        catch { /* fall through */ }
+        return false;
+    }
+
+    // ── Hosts (EasySwitch / multi-host) ──────────────────────────────────────
+
+    /// <summary>
+    /// Read host count, current host and per-host detail (name + paired status +
+    /// bus) — preferring HostsInfo (0x1815) for names, falling back to ChangeHost
+    /// (0x1814) for just count/current. <c>null</c> if neither is supported.
+    /// </summary>
+    public async Task<HostSnapshot?> ReadHostsAsync()
+    {
+        if (_device.GetFeature<HostsInfoFeature>() is { } hi)
+        {
+            try
+            {
+                var info = await hi.GetFeatureInfoAsync().ConfigureAwait(false);
+                var current = info.CurrentHost is HostIndex.Slot s ? s.Index : 0;
+                var details = new List<HostDetail>(info.HostCount);
+                for (byte i = 0; i < info.HostCount; i++)
+                {
+                    var h = await hi.GetHostInfoAsync(new HostIndex.Slot(i)).ConfigureAwait(false);
+                    var paired = h.Status == HostSlotStatus.Paired;
+                    string? name = null;
+                    if (paired && h.NameLen > 0)
+                        try { name = await hi.GetHostFriendlyNameAsync(new HostIndex.Slot(i), h.NameLen).ConfigureAwait(false); }
+                        catch { /* name read unsupported */ }
+                    details.Add(new HostDetail(i, i == current, paired,
+                        h.BusType.ToString(), string.IsNullOrWhiteSpace(name) ? null : name));
+                }
+                return new HostSnapshot(info.HostCount, (byte)Math.Max(current, 0), details);
+            }
+            catch { /* fall back */ }
+        }
+
+        if (_device.GetFeature<ChangeHostFeature>() is { } ch)
+        {
+            try
+            {
+                var info = await ch.GetHostInfoAsync().ConfigureAwait(false);
+                var details = Enumerable.Range(0, info.HostCount)
+                    .Select(i => new HostDetail(i, i == info.CurrentHost, false, "", null)).ToList();
+                return new HostSnapshot(info.HostCount, info.CurrentHost, details);
+            }
+            catch { /* ignore */ }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Switch the device to <paramref name="host"/> (0-based). Fire-and-forget — the
+    /// device drops off the current host, so this disconnects it from this computer.
+    /// </summary>
+    public async Task<bool> SwitchHostAsync(byte host)
+    {
+        if (_device.GetFeature<ChangeHostFeature>() is not { } ch) return false;
+        try { await ch.SetCurrentHostAsync(host).ConfigureAwait(false); return true; }
+        catch { return false; }
+    }
+
+    // ── Brightness + lighting effects ────────────────────────────────────────
+
+    /// <summary>
+    /// Switch a G-series device to host (software) mode via OnboardProfiles
+    /// (0x8100) if present, so software lighting writes aren't overridden by the
+    /// replayed onboard profile. No-op for devices without 0x8100.
+    /// </summary>
+    public async Task EnsureHostModeAsync()
+    {
+        if (_device.GetFeature<OnboardProfilesFeature>() is not { } ob) return;
+        try { await ob.SetModeAsync(OnboardProfilesFeature.ModeHost).ConfigureAwait(false); }
+        catch { /* not all 0x8100 implementations allow the switch */ }
+    }
+
+    /// <summary>Read onboard-profile info (count + current), or <c>null</c> if no 0x8100.</summary>
+    public async Task<(OnboardProfilesInfo Info, byte Current)?> ReadProfilesAsync()
+    {
+        if (_device.GetFeature<OnboardProfilesFeature>() is not { } ob) return null;
+        try { return (await ob.GetInfoAsync().ConfigureAwait(false), await ob.GetCurrentProfileAsync().ConfigureAwait(false)); }
+        catch { return null; }
+    }
+
+    /// <summary>Read 16 bytes at sector/offset (OnboardProfiles readMemory), or <c>null</c> if no 0x8100.</summary>
+    public async Task<byte[]?> ReadMemoryRawAsync(ushort sector, ushort offset)
+    {
+        if (_device.GetFeature<OnboardProfilesFeature>() is not { } ob) return null;
+        return await ob.ReadMemoryAsync(sector, offset).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Read a profile sector, tolerant of the final partial 16-byte chunk past the
+    /// sector size. Returns whatever was read (the device's readable range), or
+    /// <c>null</c> if no 0x8100 / nothing read. Groundwork for profile editing.
+    /// </summary>
+    public async Task<byte[]?> ReadProfileSectorAsync(ushort sectorId)
+    {
+        if (_device.GetFeature<OnboardProfilesFeature>() is not { } ob) return null;
+        var data = new byte[256];
+        var got = 0;
+        for (var off = 0; off < 256; off += 16)
+        {
+            try { Array.Copy(await ob.ReadMemoryAsync(sectorId, (ushort)off).ConfigureAwait(false), 0, data, off, 16); got = off + 16; }
+            catch { break; }
+        }
+        return got == 0 ? null : data[..got];
+    }
+
+    /// <summary>
+    /// Read a full sector of <paramref name="size"/> bytes, clamping the final read
+    /// offset so it never runs past the sector (which errors). <c>null</c> if no 0x8100.
+    /// </summary>
+    public async Task<byte[]?> ReadFullSectorAsync(ushort sectorId, int size)
+    {
+        if (_device.GetFeature<OnboardProfilesFeature>() is not { } ob) return null;
+        var data = new byte[size];
+        var off = 0;
+        while (off < size)
+        {
+            var readOff = Math.Min(off, size - 16);
+            var chunk = await ob.ReadMemoryAsync(sectorId, (ushort)readOff).ConfigureAwait(false);
+            var copyStart = off - readOff;
+            var copyLen = Math.Min(16 - copyStart, size - off);
+            Array.Copy(chunk, copyStart, data, off, copyLen);
+            off += copyLen;
+        }
+        return data;
+    }
+
+    // Format-4 (G915) G-key bindings: five 4-byte entries [0x80, 0x02, modifier,
+    // HID-usage] starting at sector offset 0x20 (G1..G5). HARDWARE-VERIFIED:
+    // patching the usage byte remapped G1 (F1 → 'a').
+    private const int GKeyBindingsOffset = 0x20;
+    public const int GKeyCount = 5;
+
+    /// <summary>Whether the device exposes the GKeys feature (0x8010).</summary>
+    public bool SupportsGKeys => _device.FeatureIndex(0x8010) is not null;
+
+    /// <summary>Read the five G-keys' current (modifier, usage) from a profile sector, or <c>null</c>.</summary>
+    public async Task<(byte Modifier, byte Usage)[]?> ReadGKeyBindingsAsync(ushort profileSector)
+    {
+        var data = await ReadFullSectorAsync(profileSector, 255).ConfigureAwait(false);
+        if (data is null) return null;
+        var bindings = new (byte, byte)[GKeyCount];
+        for (var i = 0; i < GKeyCount; i++)
+        {
+            var off = GKeyBindingsOffset + i * 4;
+            bindings[i] = (data[off + 2], data[off + 3]);
+        }
+        return bindings;
+    }
+
+    /// <summary>Remap one G-key (0-based) to a HID keyboard usage in a profile (persists on-device).</summary>
+    public async Task<bool> SetGKeyUsageAsync(ushort profileSector, int gkeyIndex, byte usage, byte modifier = 0)
+    {
+        if (gkeyIndex < 0 || gkeyIndex >= GKeyCount) return false;
+        var data = await ReadFullSectorAsync(profileSector, 255).ConfigureAwait(false);
+        if (data is null) return false;
+        var off = GKeyBindingsOffset + gkeyIndex * 4;
+        data[off] = 0x80; data[off + 1] = 0x02; data[off + 2] = modifier; data[off + 3] = usage;
+        return await WriteProfileSectorAsync(profileSector, data).ConfigureAwait(false);
+    }
+
+    // Format-4 (G915) profile lighting: three 11-byte effect descriptors
+    // [effect, R, G, B, …] at these sector offsets. effect 0x01=fixed, 0x03=cycle,
+    // 0x0a=breathing. HARDWARE-VERIFIED: patching these to 01/RGB sets a persistent
+    // device-side solid colour. (Offsets are device-format-specific.)
+    private static readonly int[] ProfileLedOffsets = [0xD0, 0xDB, 0xE6];
+
+    /// <summary>
+    /// Set a profile's stored lighting to a solid colour (persists on the device,
+    /// runs even after the app closes). Reads the sector, patches the LED
+    /// descriptors, recomputes the CRC and writes. <c>false</c> if no 0x8100.
+    /// </summary>
+    public async Task<bool> SetProfileSolidColorAsync(ushort profileSector, byte r, byte g, byte b) =>
+        await SetProfileEffectAsync(profileSector, 0x01, r, g, b, 0, 100).ConfigureAwait(false);
+
+    /// <summary>Effect bytes for a profile lighting descriptor.</summary>
+    public const byte EffectOff = 0x00, EffectFixed = 0x01, EffectCycle = 0x03, EffectBreathing = 0x0a;
+
+    /// <summary>
+    /// Write a lighting effect into a profile's three descriptors (persists,
+    /// device-side). Descriptor layout (hardware-probed): byte0=effect; Fixed
+    /// [r,g,b]; Breathing [r,g,b, period(2 BE ms), brightness]; Cycle keeps the
+    /// device's default speed + brightness. <paramref name="brightness"/> is 0–100.
+    /// </summary>
+    public async Task<bool> SetProfileEffectAsync(ushort profileSector, byte effect, byte r, byte g, byte b, ushort periodMs, byte brightness)
+    {
+        var data = await ReadFullSectorAsync(profileSector, 255).ConfigureAwait(false);
+        if (data is null) return false;
+        var desc = new byte[11];
+        desc[0] = effect;
+        switch (effect)
+        {
+            case EffectFixed:
+                desc[1] = r; desc[2] = g; desc[3] = b;
+                break;
+            case EffectBreathing:
+                desc[1] = r; desc[2] = g; desc[3] = b;
+                desc[4] = (byte)(periodMs >> 8); desc[5] = (byte)(periodMs & 0xff);
+                desc[6] = brightness;
+                break;
+            case EffectCycle:
+                desc[6] = 0x08; desc[7] = 0x34; // device default cycle period
+                desc[8] = brightness;
+                break;
+            // EffectOff: all zero.
+        }
+        foreach (var off in ProfileLedOffsets)
+            Array.Copy(desc, 0, data, off, 11);
+        return await WriteProfileSectorAsync(profileSector, data).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Write a 255-byte profile sector back to flash, recomputing the trailing
+    /// CRC-16 over [0..253] first. Streams in 16-byte chunks (startWrite →
+    /// writeMemory… → endWrite). DESTRUCTIVE: corrupts the profile if the layout
+    /// is wrong (recoverable by rewriting from G HUB). <c>false</c> if no 0x8100.
+    /// </summary>
+    public async Task<bool> WriteProfileSectorAsync(ushort sectorId, byte[] sector)
+    {
+        if (_device.GetFeature<OnboardProfilesFeature>() is not { } ob) return false;
+        if (sector.Length < 255) return false;
+        var crc = OpenLogi.HidPP.Crc16.Ccitt(sector.AsSpan(0, 253));
+        sector[253] = (byte)(crc >> 8);
+        sector[254] = (byte)(crc & 0xff);
+        try
+        {
+            await ob.StartWriteAsync(sectorId, 0, 255).ConfigureAwait(false);
+            for (var off = 0; off < 255; off += 16)
+                await ob.WriteMemoryAsync(sector.AsMemory(off, Math.Min(16, 255 - off))).ConfigureAwait(false);
+            await ob.EndWriteAsync().ConfigureAwait(false);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Switch the active onboard profile (1-based), or false if unsupported.</summary>
+    public async Task<bool> SwitchProfileAsync(byte profileIndex)
+    {
+        if (_device.GetFeature<OnboardProfilesFeature>() is not { } ob) return false;
+        try
+        {
+            // setCurrentProfile only works (and getCurrentProfile only reads) in onboard mode.
+            await ob.SetModeAsync(OnboardProfilesFeature.ModeOnboard).ConfigureAwait(false);
+            await ob.SetCurrentProfileAsync(profileIndex).ConfigureAwait(false);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Set the device to host or onboard mode via OnboardProfiles (0x8100).</summary>
+    public async Task<bool> SetOnboardModeAsync(bool host)
+    {
+        if (_device.GetFeature<OnboardProfilesFeature>() is not { } ob) return false;
+        try
+        {
+            await ob.SetModeAsync(host ? OnboardProfilesFeature.ModeHost : OnboardProfilesFeature.ModeOnboard).ConfigureAwait(false);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Whether the device exposes BrightnessControl (0x8040).</summary>
+    public bool SupportsBrightness => _device.GetFeature<BrightnessControlFeature>() is not null;
+
+    /// <summary>Read the backlight brightness range + current value, or <c>null</c> if unsupported.</summary>
+    public async Task<(BrightnessInfo Info, ushort Current)?> ReadBrightnessAsync()
+    {
+        if (_device.GetFeature<BrightnessControlFeature>() is not { } bc) return null;
+        try { return (await bc.GetInfoAsync().ConfigureAwait(false), await bc.GetBrightnessAsync().ConfigureAwait(false)); }
+        catch { return null; }
+    }
+
+    /// <summary>Set the backlight brightness (0..max).</summary>
+    public async Task<bool> ApplyBrightnessAsync(ushort brightness)
+    {
+        if (_device.GetFeature<BrightnessControlFeature>() is not { } bc) return false;
+        try { await bc.SetBrightnessAsync(brightness).ConfigureAwait(false); return true; }
+        catch { return false; }
+    }
+
+    /// <summary>Whether the device exposes PerKeyLighting v2 (0x8081).</summary>
+    public bool SupportsPerKey => _device.GetFeature<PerKeyLightingFeature>() is not null;
+
+    /// <summary>
+    /// Set a solid colour via PerKeyLighting v2 (0x8081): switch to host mode (so
+    /// the onboard profile stops replaying), fill the whole zone range with the
+    /// colour, then commit the frame. The session must stay open to hold it.
+    /// </summary>
+    public async Task<bool> ApplyPerKeyColorAsync(byte r, byte g, byte b)
+    {
+        if (_device.GetFeature<PerKeyLightingFeature>() is not { } pk) return false;
+        try
+        {
+            await EnsureHostModeAsync().ConfigureAwait(false);
+            // One range covering every addressable zone; absent zones are ignored.
+            await pk.SetRangeRgbZonesAsync([new RgbZoneRange(0x00, 0xfe, r, g, b)]).ConfigureAwait(false);
+            await pk.FrameEndAsync(PerKeyLightingFeature.FramePersistenceVolatile).ConfigureAwait(false);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Fast per-frame colour fill for animations: fill all zones + commit, WITHOUT
+    /// the host-mode switch (call <see cref="ApplyPerKeyColorAsync"/> once first to
+    /// enter host mode). Returns false if the device has no 0x8081.
+    /// </summary>
+    public async Task<bool> ApplyPerKeyColorFastAsync(byte r, byte g, byte b)
+    {
+        if (_device.GetFeature<PerKeyLightingFeature>() is not { } pk) return false;
+        try
+        {
+            await pk.SetRangeAllFastAsync(r, g, b).ConfigureAwait(false);
+            await pk.FrameEndFastAsync(PerKeyLightingFeature.FramePersistenceVolatile).ConfigureAwait(false);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Light a single per-key zone (host mode, others left dark). Used to probe the
+    /// zone-id → key mapping. Returns false if no 0x8081.
+    /// </summary>
+    public async Task<bool> SetKeyZoneAsync(byte zoneId, byte r, byte g, byte b)
+    {
+        if (_device.GetFeature<PerKeyLightingFeature>() is not { } pk) return false;
+        try
+        {
+            await EnsureHostModeAsync().ConfigureAwait(false);
+            await pk.SetSingleValueAsync(r, g, b, [zoneId]).ConfigureAwait(false);
+            await pk.FrameEndAsync(PerKeyLightingFeature.FramePersistenceVolatile).ConfigureAwait(false);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Update a single per-key zone and commit, WITHOUT re-entering host mode or
+    /// clearing — other keys keep their colors (call <see cref="ApplyPerKeyColorAsync"/>
+    /// once first to set a base + enter host mode). For the press-to-color editor.
+    /// </summary>
+    public async Task<bool> SetZoneAsync(byte zone, byte r, byte g, byte b)
+    {
+        if (_device.GetFeature<PerKeyLightingFeature>() is not { } pk) return false;
+        try
+        {
+            await pk.SetSingleValueAsync(r, g, b, [zone]).ConfigureAwait(false);
+            await pk.FrameEndAsync(PerKeyLightingFeature.FramePersistenceVolatile).ConfigureAwait(false);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Apply a full per-key color map (zone id → RGB) live via 0x8081: host mode,
+    /// fill all zones dark, then set each requested zone, then commit. Returns false
+    /// if no 0x8081.
+    /// </summary>
+    public async Task<bool> ApplyPerKeyMapAsync(IReadOnlyDictionary<byte, (byte R, byte G, byte B)> map)
+    {
+        if (_device.GetFeature<PerKeyLightingFeature>() is not { } pk) return false;
+        try
+        {
+            await EnsureHostModeAsync().ConfigureAwait(false);
+            await pk.SetRangeRgbZonesAsync([new RgbZoneRange(0x00, 0xfe, 0, 0, 0)]).ConfigureAwait(false); // clear to dark (awaited)
+            foreach (var (zone, c) in map)
+                await pk.SetSingleValueAsync(c.R, c.G, c.B, [zone]).ConfigureAwait(false);
+            await pk.FrameEndAsync(PerKeyLightingFeature.FramePersistenceVolatile).ConfigureAwait(false);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Enumerate cluster 0's effects as (index, effectId), or <c>null</c> if unsupported.</summary>
+    public async Task<IReadOnlyList<(byte Index, ushort EffectId)>?> EnumerateEffectsAsync()
+    {
+        if (_device.GetFeature<RgbEffectsFeature>() is not { } rgb) return null;
+        try
+        {
+            var count = await rgb.GetEffectCountAsync(0).ConfigureAwait(false);
+            var list = new List<(byte, ushort)>(count);
+            for (byte i = 0; i < count; i++)
+                list.Add((i, await rgb.GetEffectIdAsync(0, i).ConfigureAwait(false)));
+            return list;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Apply an RGB effect by its cluster-effect index with raw params, to every
+    /// cluster (0..3). Takes software control first. Returns false if no 0x8071.
+    /// </summary>
+    public async Task<bool> ApplyEffectAsync(byte effectIndex, byte[] effectParams, byte persistence = RgbEffectsFeature.PersistenceVolatile, bool takeSwControl = true)
+    {
+        if (_device.GetFeature<RgbEffectsFeature>() is not { } rgb) return false;
+        try
+        {
+            await EnsureHostModeAsync().ConfigureAwait(false);
+            if (takeSwControl)
+                await rgb.SetSwControlAsync(RgbEffectsFeature.SwControlAllClusters).ConfigureAwait(false);
+            var applied = false;
+            for (byte cluster = 0; cluster < 4; cluster++)
+            {
+                try
+                {
+                    await rgb.SetRgbClusterEffectAsync(cluster, effectIndex, effectParams,
+                        persistence, RgbEffectsFeature.PowerFull).ConfigureAwait(false);
+                    applied = true;
+                    await Task.Delay(8).ConfigureAwait(false);
+                }
+                catch (Hidpp20Exception) { /* cluster doesn't exist */ }
+            }
+            return applied;
+        }
+        catch { return false; }
+    }
+
+    public async ValueTask DisposeAsync() => await _channel.DisposeAsync().ConfigureAwait(false);
+}

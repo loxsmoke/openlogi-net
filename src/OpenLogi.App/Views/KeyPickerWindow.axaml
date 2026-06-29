@@ -1,0 +1,69 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:OpenLogi.App.ViewModels"
+        x:Class="OpenLogi.App.Views.KeyPickerWindow"
+        x:Name="Root"
+        x:CompileBindings="False"
+        Width="660" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Icon="/Assets/keyboard.png"
+        Title="Pick a key">
+    <Window.Styles>
+        <Style Selector="Button.key">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="Margin" Value="2"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.key.active">
+            <Setter Property="Background" Value="#2563EB"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <!-- Selected key stays blue on hover/press (close to its resting colour),
+             unlike the default grey hover of unselected keys. -->
+        <Style Selector="Button.key.active:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#3B74F2"/>
+            <Setter Property="TextBlock.Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.key.active:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#1D4FD0"/>
+            <Setter Property="TextBlock.Foreground" Value="White"/>
+        </Style>
+    </Window.Styles>
+
+    <StackPanel Margin="16" Spacing="10">
+        <TextBlock Text="Click modifiers (Shift / Ctrl / Alt) to toggle them, then click a key. Greyed keys can't be targets."
+                   Opacity="0.6" TextWrapping="Wrap"/>
+        <Border Background="#15000000" Padding="10" CornerRadius="6">
+            <TextBlock Text="{Binding Preview}" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+        </Border>
+
+        <ItemsControl ItemsSource="{Binding Rows}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <ItemsControl ItemsSource="{Binding}" HorizontalAlignment="Center">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Classes="key" Classes.active="{Binding IsActive}"
+                                        Width="{Binding PixelWidth}" Content="{Binding Label}"
+                                        IsEnabled="{Binding IsEnabled}"
+                                        Command="{Binding DataContext.SelectCommand, ElementName=Root}"
+                                        CommandParameter="{Binding}"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,6,0,0">
+            <Button Content="Cancel" Click="OnCancel"/>
+            <Button Content="OK" Click="OnOk"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

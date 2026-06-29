@@ -1,0 +1,22 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="OpenLogi.App.Views.AboutWindow"
+        Width="400" Height="330"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Icon="/Assets/icon.png"
+        Title="About OpenLogi.net">
+    <StackPanel Margin="28" Spacing="10" HorizontalAlignment="Center">
+        <Image Source="/Assets/icon.png" Width="72" Height="72" HorizontalAlignment="Center"
+               RenderOptions.BitmapInterpolationMode="HighQuality"/>
+        <TextBlock Text="OpenLogi.net" FontSize="26" FontWeight="Bold" HorizontalAlignment="Center"/>
+        <TextBlock x:Name="VersionText" Opacity="0.7" HorizontalAlignment="Center"/>
+        <TextBlock Text="A local-first alternative to Logitech Options+ for HID++ devices. No account, no telemetry."
+                   TextWrapping="Wrap" TextAlignment="Center" MaxWidth="320" Opacity="0.85"/>
+        <StackPanel HorizontalAlignment="Center" Margin="0,4,0,0">
+            <HyperlinkButton Content="GitHub" Click="OnGitHub" HorizontalAlignment="Center"/>
+            <HyperlinkButton Content="Releases" Click="OnReleases" HorizontalAlignment="Center"/>
+        </StackPanel>
+        <TextBlock Text="Licensed under MIT" Opacity="0.5" FontSize="11" HorizontalAlignment="Center"/>
+    </StackPanel>
+</Window>

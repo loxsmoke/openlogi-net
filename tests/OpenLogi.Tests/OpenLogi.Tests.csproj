@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- net10.0-windows because it references OpenLogi.App (a Windows-only app). -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\OpenLogi.Core\OpenLogi.Core.csproj" />
+    <ProjectReference Include="..\..\src\OpenLogi.HidPP\OpenLogi.HidPP.csproj" />
+    <ProjectReference Include="..\..\src\OpenLogi.Hid\OpenLogi.Hid.csproj" />
+    <ProjectReference Include="..\..\src\OpenLogi.Input\OpenLogi.Input.csproj" />
+    <ProjectReference Include="..\..\src\OpenLogi.Agent\OpenLogi.Agent.csproj" />
+    <ProjectReference Include="..\..\src\OpenLogi.Assets\OpenLogi.Assets.csproj" />
+    <ProjectReference Include="..\..\src\OpenLogi.App\OpenLogi.App.csproj" />
+  </ItemGroup>
+
+</Project>

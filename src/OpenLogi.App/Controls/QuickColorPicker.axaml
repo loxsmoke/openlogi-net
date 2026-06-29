@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="OpenLogi.App.Controls.QuickColorPicker"
+             x:Name="Root">
+    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+        <StackPanel.Styles>
+            <Style Selector="Border.swatch">
+                <Setter Property="Width" Value="26"/>
+                <Setter Property="Height" Value="26"/>
+                <Setter Property="CornerRadius" Value="4"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="BorderBrush" Value="#40000000"/>
+                <Setter Property="Cursor" Value="Hand"/>
+            </Style>
+            <Style Selector="Border.swatch:pointerover">
+                <Setter Property="BorderThickness" Value="2"/>
+                <Setter Property="BorderBrush" Value="#FF3B82F6"/>
+            </Style>
+        </StackPanel.Styles>
+        <ColorPicker Color="{Binding Color, ElementName=Root, Mode=TwoWay}" Margin="0,0,6,0"/>
+        <Border Classes="swatch" Background="#E53935" Tag="#E53935" PointerPressed="OnSwatch"/>
+        <Border Classes="swatch" Background="#FB8C00" Tag="#FB8C00" PointerPressed="OnSwatch"/>
+        <Border Classes="swatch" Background="#FDD835" Tag="#FDD835" PointerPressed="OnSwatch"/>
+        <Border Classes="swatch" Background="#43A047" Tag="#43A047" PointerPressed="OnSwatch"/>
+        <Border Classes="swatch" Background="#1E88E5" Tag="#1E88E5" PointerPressed="OnSwatch"/>
+        <Border Classes="swatch" Background="#8E24AA" Tag="#8E24AA" PointerPressed="OnSwatch"/>
+        <Border Classes="swatch" Background="#FFFFFF" Tag="#FFFFFF" PointerPressed="OnSwatch"/>
+    </StackPanel>
+</UserControl>

@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/OpenLogi.Agent/OpenLogi.Agent.csproj" />
+    <Project Path="src/OpenLogi.App/OpenLogi.App.csproj" />
+    <Project Path="src/OpenLogi.Assets/OpenLogi.Assets.csproj" />
+    <Project Path="src/OpenLogi.Cli/OpenLogi.Cli.csproj" />
+    <Project Path="src/OpenLogi.Core/OpenLogi.Core.csproj" />
+    <Project Path="src/OpenLogi.Hid/OpenLogi.Hid.csproj" />
+    <Project Path="src/OpenLogi.HidPP/OpenLogi.HidPP.csproj" />
+    <Project Path="src/OpenLogi.Input/OpenLogi.Input.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OpenLogi.Tests/OpenLogi.Tests.csproj" />
+  </Folder>
+</Solution>

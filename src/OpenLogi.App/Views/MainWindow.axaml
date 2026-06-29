@@ -1,0 +1,446 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:OpenLogi.App.ViewModels"
+        xmlns:ctrl="using:OpenLogi.App.Controls"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
+        x:Class="OpenLogi.App.Views.MainWindow"
+        x:Name="Root"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/icon.png"
+        Width="900" Height="600" MinWidth="720" MinHeight="480"
+        Title="OpenLogi.net">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <DockPanel>
+        <!-- Header (switches between home and device detail) -->
+        <Border DockPanel.Dock="Top" Padding="16,12" Background="#10000000">
+            <Panel>
+                <Grid IsVisible="{Binding !ShowingDevice}" ColumnDefinitions="*,Auto,Auto,Auto">
+                    <TextBlock Text="Devices" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Content="Refresh" Command="{Binding RefreshCommand}" Margin="0,0,8,0"/>
+                    <Button Grid.Column="2" Content="Settings" Click="OnSettings" Margin="0,0,8,0"/>
+                    <Button Grid.Column="3" Content="About" Click="OnAbout"/>
+                </Grid>
+                <Grid IsVisible="{Binding ShowingDevice}" ColumnDefinitions="Auto,*">
+                    <Button Content="←  Devices" Command="{Binding GoHomeCommand}"/>
+                    <TextBlock Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center"
+                               FontSize="18" FontWeight="SemiBold"
+                               Text="{Binding SelectedDevice.Name}"/>
+                </Grid>
+            </Panel>
+        </Border>
+
+        <!-- Status bar -->
+        <Border DockPanel.Dock="Bottom" Padding="16,8" Background="#08000000">
+            <TextBlock Text="{Binding StatusText}" Opacity="0.7"/>
+        </Border>
+
+        <!-- Content -->
+        <Panel>
+            <!-- Home gallery (with scanning + no-devices states) -->
+            <Panel IsVisible="{Binding !ShowingDevice}">
+            <ScrollViewer>
+                <ItemsControl ItemsSource="{Binding Devices}" Margin="12" x:CompileBindings="False">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Width="200" Height="220" Margin="8" Padding="14"
+                                    HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                    Command="{Binding DataContext.OpenDeviceCommand, ElementName=Root}"
+                                    CommandParameter="{Binding}">
+                                <DockPanel>
+                                    <StackPanel DockPanel.Dock="Bottom" Spacing="2" Height="56">
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                                   HorizontalAlignment="Center" TextAlignment="Center"
+                                                   TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding Battery}" Opacity="0.6" FontSize="11"
+                                                   HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                    <Image Source="{Binding Image}" Stretch="Uniform"
+                                           RenderOptions.BitmapInterpolationMode="HighQuality"/>
+                                </DockPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+                <!-- Scanning (first load / refresh) -->
+                <StackPanel IsVisible="{Binding IsScanning}" HorizontalAlignment="Center"
+                            VerticalAlignment="Center" Spacing="14">
+                    <ProgressBar IsIndeterminate="True" Width="180"/>
+                    <TextBlock Text="Scanning for devices…" HorizontalAlignment="Center" Opacity="0.7"/>
+                </StackPanel>
+
+                <!-- No devices found -->
+                <StackPanel IsVisible="{Binding NoDevices}" HorizontalAlignment="Center"
+                            VerticalAlignment="Center" Spacing="10" MaxWidth="320">
+                    <Image Source="/Assets/no-devices.png" Width="120" Height="120" Opacity="0.85"
+                           HorizontalAlignment="Center" RenderOptions.BitmapInterpolationMode="HighQuality"/>
+                    <TextBlock Text="No devices detected" FontSize="18" FontWeight="SemiBold"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="Connect a Logitech mouse or keyboard, then refresh."
+                               TextWrapping="Wrap" TextAlignment="Center" Opacity="0.6"/>
+                    <Button Content="Refresh" HorizontalAlignment="Center" Margin="0,4,0,0"
+                            Command="{Binding RefreshCommand}"/>
+                </StackPanel>
+            </Panel>
+
+            <!-- Device detail -->
+            <TabControl IsVisible="{Binding ShowingDevice}" Margin="8,4"
+                        SelectedIndex="{Binding InitialTabIndex, Mode=OneWay}">
+                <!-- Buttons tab: mouse diagram with leader-line labels -->
+                <TabItem Header="Buttons" IsVisible="{Binding HasButtonsTab}">
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto">
+                        <Panel Margin="16" HorizontalAlignment="Center"
+                               IsVisible="{Binding DiagramImage, Converter={x:Static ObjectConverters.IsNotNull}}">
+                            <Canvas Width="{Binding DiagramWidth}" Height="{Binding DiagramHeight}">
+                                <!-- Render -->
+                                <Image Source="{Binding DiagramImage}" Canvas.Left="{Binding ImageX}" Canvas.Top="0"
+                                       Width="{Binding ImageWidth}" Height="{Binding DiagramHeight}" Stretch="Uniform"
+                                       RenderOptions.BitmapInterpolationMode="HighQuality"/>
+
+                                <!-- Leader lines -->
+                                <ItemsControl ItemsSource="{Binding Annotations}"
+                                              Width="{Binding DiagramWidth}" Height="{Binding DiagramHeight}">
+                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><Canvas/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:DiagramAnnotationViewModel">
+                                            <Polyline Points="{Binding LinePoints}" Stroke="#8895A5"
+                                                      StrokeThickness="1.2" StrokeLineCap="Round"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- Side labels (name + current action; click opens the picker) -->
+                                <ItemsControl ItemsSource="{Binding Annotations}"
+                                              Width="{Binding DiagramWidth}" Height="{Binding DiagramHeight}">
+                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><Canvas/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                    <ItemsControl.Styles>
+                                        <Style Selector="ContentPresenter" x:DataType="vm:DiagramAnnotationViewModel">
+                                            <Setter Property="Canvas.Left" Value="{Binding LabelX}"/>
+                                            <Setter Property="Canvas.Top" Value="{Binding LabelY}"/>
+                                        </Style>
+                                    </ItemsControl.Styles>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:DiagramAnnotationViewModel">
+                                            <Button Width="{Binding LabelWidth}" Padding="6,2"
+                                                    Background="Transparent" BorderThickness="0"
+                                                    HorizontalContentAlignment="Right">
+                                                <Button.Flyout>
+                                                    <Flyout>
+                                                        <StackPanel Width="220" Spacing="6">
+                                                            <TextBlock Text="{Binding Binding.Label}" FontWeight="SemiBold"/>
+                                                            <ListBox ItemsSource="{Binding Binding.Choices}"
+                                                                     SelectedItem="{Binding Binding.Selected}" MaxHeight="280">
+                                                                <ListBox.ItemTemplate>
+                                                                    <DataTemplate x:DataType="vm:ActionChoice">
+                                                                        <TextBlock Text="{Binding Label}"/>
+                                                                    </DataTemplate>
+                                                                </ListBox.ItemTemplate>
+                                                            </ListBox>
+                                                        </StackPanel>
+                                                    </Flyout>
+                                                </Button.Flyout>
+                                                <StackPanel HorizontalAlignment="Right">
+                                                    <TextBlock Text="{Binding Binding.Label}" FontSize="11" Opacity="0.6"
+                                                               TextAlignment="Right"/>
+                                                    <TextBlock Text="{Binding Binding.Selected.Label}" FontWeight="SemiBold"
+                                                               TextAlignment="Right"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- Hotspot markers -->
+                                <ItemsControl ItemsSource="{Binding Annotations}"
+                                              Width="{Binding DiagramWidth}" Height="{Binding DiagramHeight}">
+                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><Canvas/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                    <ItemsControl.Styles>
+                                        <Style Selector="ContentPresenter" x:DataType="vm:DiagramAnnotationViewModel">
+                                            <Setter Property="Canvas.Left" Value="{Binding MarkerX}"/>
+                                            <Setter Property="Canvas.Top" Value="{Binding MarkerY}"/>
+                                        </Style>
+                                    </ItemsControl.Styles>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:DiagramAnnotationViewModel">
+                                            <Button Width="{Binding Size}" Height="{Binding Size}" Padding="0"
+                                                    CornerRadius="20" Background="#CC2563EB" Foreground="White"
+                                                    ToolTip.Tip="{Binding Binding.Label}">
+                                                <Button.Flyout>
+                                                    <Flyout>
+                                                        <StackPanel Width="220" Spacing="6">
+                                                            <TextBlock Text="{Binding Binding.Label}" FontWeight="SemiBold"/>
+                                                            <ListBox ItemsSource="{Binding Binding.Choices}"
+                                                                     SelectedItem="{Binding Binding.Selected}" MaxHeight="280">
+                                                                <ListBox.ItemTemplate>
+                                                                    <DataTemplate x:DataType="vm:ActionChoice">
+                                                                        <TextBlock Text="{Binding Label}"/>
+                                                                    </DataTemplate>
+                                                                </ListBox.ItemTemplate>
+                                                            </ListBox>
+                                                        </StackPanel>
+                                                    </Flyout>
+                                                </Button.Flyout>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Canvas>
+                        </Panel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- Pointer tab: DPI + SmartShift cards -->
+                <TabItem Header="Pointer" IsVisible="{Binding HasPointerTab}">
+                    <ScrollViewer>
+                        <WrapPanel Margin="8">
+                            <!-- Pointer tuning (DPI) -->
+                            <Border Margin="8" Padding="16" Background="#11000000" CornerRadius="8"
+                                    MinWidth="340" IsVisible="{Binding ShowDpi}">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Pointer tuning" FontSize="15" FontWeight="SemiBold"/>
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Grid.Column="0" Text="DPI" Opacity="0.7"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding DpiText}" Foreground="#3B82F6" FontWeight="SemiBold"/>
+                                    </Grid>
+                                    <Slider Minimum="{Binding DpiMin}" Maximum="{Binding DpiMax}"
+                                            TickFrequency="{Binding DpiStep}" IsSnapToTickEnabled="True"
+                                            Value="{Binding DpiValue}"/>
+                                    <TextBlock Text="{Binding DpiRangeText}" Opacity="0.5" FontSize="11"/>
+                                    <TextBlock Text="PRESETS" Opacity="0.5" FontSize="11" Margin="0,4,0,0"/>
+                                    <WrapPanel>
+                                        <ItemsControl ItemsSource="{Binding DpiPresets}" x:CompileBindings="False">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Margin="0,0,6,6" Padding="2" CornerRadius="6" Background="#18000000">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <Button Content="{Binding}" Padding="8,4" Background="Transparent" BorderThickness="0"
+                                                                    Command="{Binding DataContext.ApplyDpiPresetCommand, ElementName=Root}"
+                                                                    CommandParameter="{Binding}"/>
+                                                            <Button Content="✕" Padding="6,4" Background="Transparent" BorderThickness="0" Opacity="0.6"
+                                                                    Command="{Binding DataContext.RemoveDpiPresetCommand, ElementName=Root}"
+                                                                    CommandParameter="{Binding}"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <Button Content="+ Add" Padding="10,4" Command="{Binding AddDpiPresetCommand}"/>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- SmartShift -->
+                            <Border Margin="8" Padding="16" Background="#11000000" CornerRadius="8"
+                                    MinWidth="340" IsVisible="{Binding ShowSmartShift}">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="SmartShift" FontSize="15" FontWeight="SemiBold"/>
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="Wheel mode" Opacity="0.7"/>
+                                        <StackPanel Orientation="Horizontal" Spacing="16">
+                                            <RadioButton Content="Free spin" GroupName="WheelMode"
+                                                         IsChecked="{Binding !SmartShiftRatchet}"/>
+                                            <RadioButton Content="Ratchet" GroupName="WheelMode"
+                                                         IsChecked="{Binding SmartShiftRatchet}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel Spacing="4">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Grid.Column="0" Text="Sensitivity" Opacity="0.7"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding AutoDisengage}" Foreground="#3B82F6" FontWeight="SemiBold"/>
+                                        </Grid>
+                                        <Slider Minimum="1" Maximum="50" Value="{Binding AutoDisengage}"
+                                                IsEnabled="{Binding !PermanentRatchet}"/>
+                                        <TextBlock Text="Higher keeps the ratchet engaged longer before free-spin."
+                                                   Opacity="0.5" FontSize="11" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Permanent ratchet"/>
+                                            <TextBlock Text="Never auto-switch to free-spin." Opacity="0.5" FontSize="11"/>
+                                        </StackPanel>
+                                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding PermanentRatchet}" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </WrapPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- Lighting tab: backlight brightness + solid colour (keyboards) -->
+                <TabItem Header="Lighting" IsVisible="{Binding HasLightingTab}">
+                    <ScrollViewer>
+                        <StackPanel Margin="16" Spacing="16" MaxWidth="400">
+                            <!-- Backlight brightness (BrightnessControl 0x8040) — hardware-verified -->
+                            <StackPanel Spacing="4" IsVisible="{Binding ShowBacklight}">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="Backlight brightness" FontWeight="SemiBold"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding BacklightValue, StringFormat='{}{0:0}'}"
+                                               Foreground="#3B82F6" FontWeight="SemiBold"/>
+                                </Grid>
+                                <Slider Minimum="0" Maximum="{Binding BacklightMax}" Value="{Binding BacklightValue}"/>
+                            </StackPanel>
+
+                            <!-- Onboard profiles (0x8100) + "No profile" (custom colour) -->
+                            <StackPanel Spacing="4" IsVisible="{Binding ShowProfiles}">
+                                <TextBlock Text="Keyboard profile" FontWeight="SemiBold"/>
+                                <ItemsControl ItemsSource="{Binding Profiles}" x:CompileBindings="False">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Content="{Binding Label}" MinWidth="72" Margin="0,0,8,8"
+                                                    IsEnabled="{Binding CanSwitch}"
+                                                    Command="{Binding DataContext.SwitchProfileCommand, ElementName=Root}"
+                                                    CommandParameter="{Binding}"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="A profile runs the keyboard's built-in lighting on the device (smooth, stays after this app closes). 'No profile' uses the custom color configured below."
+                                           TextWrapping="Wrap" Opacity="0.5" FontSize="12"/>
+                            </StackPanel>
+
+                            <!-- Color + effect -->
+                            <StackPanel Spacing="10">
+                                <!-- No profile: just the on/off toggle (live solid color). -->
+                                <CheckBox Content="Lighting on" IsChecked="{Binding LightingEnabled}"
+                                          IsVisible="{Binding ShowLightingToggle}"/>
+                                <!-- Profile: pick the effect to save. -->
+                                <StackPanel Spacing="4" IsVisible="{Binding ShowEffect}">
+                                    <TextBlock Text="Effect" FontWeight="SemiBold"/>
+                                    <ComboBox ItemsSource="{Binding LightingEffects}" SelectedItem="{Binding SelectedEffect}"
+                                              Width="180" HorizontalAlignment="Left">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Converter={x:Static vm:Converters.EffectLabel}}"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Spacing="4" IsVisible="{Binding ShowSpeed}">
+                                    <TextBlock Text="Breathing speed" FontWeight="SemiBold"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Slider Minimum="500" Maximum="6000" Width="240" Value="{Binding LightingSpeed}"/>
+                                        <TextBlock Text="{Binding LightingSpeed, StringFormat='{}{0} ms'}" VerticalAlignment="Center" Width="60"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <StackPanel Spacing="10" IsVisible="{Binding ShowColor}">
+                                    <TextBlock Text="Color" FontWeight="SemiBold"/>
+                                    <ctrl:QuickColorPicker Color="{Binding LightingColor}" HorizontalAlignment="Left"/>
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="Color intensity" FontWeight="SemiBold"/>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Slider Minimum="0" Maximum="100" Width="240" Value="{Binding LightingBrightness}"/>
+                                            <TextBlock Text="{Binding LightingBrightness}" VerticalAlignment="Center" Width="34"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Content="Restore keyboard default" Command="{Binding RestoreKeyboardDefaultCommand}"/>
+                                    <Button Content="Save lighting to this profile" IsVisible="{Binding ProfileSelected}"
+                                            Command="{Binding SaveLightingToProfileCommand}"/>
+                                </StackPanel>
+                                <TextBlock TextWrapping="Wrap" Opacity="0.5" FontSize="12" IsVisible="{Binding !ProfileSelected}"
+                                           Text="With 'No profile', the color applies live; 'Restore keyboard default' hands lighting back to the onboard profile."/>
+                                <TextBlock TextWrapping="Wrap" Opacity="0.5" FontSize="12" IsVisible="{Binding ProfileSelected}"
+                                           Text="Choose an effect, color and speed, then 'Save lighting to this profile' — it writes into the keyboard's onboard profile (persistent, device-side, smooth). Cycle colors uses the device's default speed."/>
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- G-Keys tab: remap the macro keys (per active profile) -->
+                <TabItem Header="G-Keys" IsVisible="{Binding HasGKeysTab}">
+                    <ScrollViewer>
+                        <StackPanel Margin="16" Spacing="10" MaxWidth="380">
+                            <TextBlock Text="{Binding GKeyProfile, StringFormat='Macro keys — profile {0}'}" FontWeight="SemiBold"/>
+                            <ItemsControl ItemsSource="{Binding GKeys}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:GKeyViewModel">
+                                        <Grid ColumnDefinitions="40,*,Auto" Margin="0,3" VerticalAlignment="Center">
+                                            <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                            <Border Grid.Column="1" Margin="4,0" Padding="10,5" CornerRadius="4" Background="#15000000">
+                                                <TextBlock Text="{Binding CurrentLabel}" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <Button Grid.Column="2" Content="⌨ Change" Click="OnPickGKey"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="Reassign the G1–G5 macro keys for the active profile. Changes write to the keyboard's onboard profile and persist after the app closes."
+                                       TextWrapping="Wrap" Opacity="0.5" FontSize="12"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- Device tab: identity + info + hosts -->
+                <TabItem Header="Device">
+                    <ScrollViewer>
+                        <StackPanel Spacing="16" Margin="16" MaxWidth="520">
+                            <StackPanel Spacing="10" DataContext="{Binding SelectedDevice}" x:DataType="vm:DeviceViewModel">
+                                <Image Source="{Binding Image}" Height="170" Stretch="Uniform" HorizontalAlignment="Left"
+                                       RenderOptions.BitmapInterpolationMode="HighQuality"
+                                       IsVisible="{Binding Image, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                                <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Name" Opacity="0.6"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Name}"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Type" Opacity="0.6"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Kind}"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Status" Opacity="0.6"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Status}"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Battery" Opacity="0.6"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Battery}"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Connection" Opacity="0.6"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding ReceiverName}"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- Hosts (EasySwitch) -->
+                            <StackPanel Spacing="6" IsVisible="{Binding ShowHosts}">
+                                <TextBlock Text="Hosts (EasySwitch)" FontWeight="SemiBold"/>
+                                <ItemsControl ItemsSource="{Binding Hosts}" x:CompileBindings="False">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Padding="10,8" Margin="0,2" CornerRadius="6" Background="#10000000">
+                                                <Grid ColumnDefinitions="Auto,*,Auto" >
+                                                    <Ellipse Grid.Column="0" Width="9" Height="9" Margin="0,0,10,0"
+                                                             VerticalAlignment="Center"
+                                                             Fill="#3FB950" IsVisible="{Binding IsCurrent}"/>
+                                                    <Border Grid.Column="0" Width="9" Height="9" Margin="0,0,10,0"
+                                                            VerticalAlignment="Center" IsVisible="{Binding !IsCurrent}"/>
+                                                    <StackPanel Grid.Column="1">
+                                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                                                        <TextBlock Text="{Binding Status}" Opacity="0.6" FontSize="11"/>
+                                                    </StackPanel>
+                                                    <Button Grid.Column="2" Content="Switch" VerticalAlignment="Center"
+                                                            IsVisible="{Binding CanSwitch}"
+                                                            Command="{Binding DataContext.SwitchHostCommand, ElementName=Root}"
+                                                            CommandParameter="{Binding}"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="Switching host moves the device to another paired computer and disconnects it here."
+                                           TextWrapping="Wrap" Opacity="0.5" FontSize="12"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+            </TabControl>
+        </Panel>
+    </DockPanel>
+</Window>
