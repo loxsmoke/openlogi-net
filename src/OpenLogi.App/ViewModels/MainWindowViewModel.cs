@@ -137,8 +137,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private double _backlightMax = 100;
 
     private DeviceSession? _session;
-    private IAsyncDisposable? _dpiCapture;
+    // One persistent session per connected mouse, kept open for the app lifetime so
+    // each mouse's HID++ button overrides (DPI/ModeShift) work without opening its
+    // page — and dispatch that mouse's own bindings, so multiple mice differ.
+    private readonly List<MouseCapture> _mouseCaptures = [];
     private bool _loadingControls;
+
+    private sealed record MouseCapture(DeviceViewModel Device, DeviceSession Session, IAsyncDisposable Capture);
+
+    private bool IsPersistentSession(DeviceSession s) =>
+        _mouseCaptures.Any(mc => ReferenceEquals(mc.Session, s));
 
     // The OS mouse hook that remaps Middle/Back/Forward to bound actions and
     // injects keystrokes (e.g. Task View = Win+Tab). Runs for the app's lifetime.
@@ -206,6 +214,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             ShowingDevice = false;
             StatusText = Devices.Count == 0 ? "No Logitech HID++ devices found." : $"{Devices.Count} device(s).";
 
+            // Activate every connected mouse's overrides as soon as the app is running,
+            // without opening any page: the OS hook for Middle/Back/Forward (global) and
+            // a per-mouse session that diverts each mouse's DPI button.
+            _ = ActivateAgentMiceAsync([.. Devices.Where(d => d.HasButtons)]);
+
             foreach (var vm in Devices)
                 if (vm.ConfigKey is not null)
                     _ = ResolveCardImageAsync(vm);
@@ -223,8 +236,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     partial void OnSelectedDeviceChanged(DeviceViewModel? value)
     {
-        // Apply the selected device's bindings to the live remap hook.
-        _agent.SetSelectedDevice(value?.ConfigKey);
+        // Point the remap hook at the selected device only when it's a mouse — the OS
+        // hook handles mouse buttons, so viewing a keyboard must not deactivate the
+        // mouse's overrides. The connected mouse is also activated at startup (LoadAsync).
+        if (value?.HasButtons == true)
+            _agent.SetSelectedDevice(value.ConfigKey);
 
         Buttons.Clear();
         Annotations.Clear();
@@ -370,27 +386,74 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         return binding;
     }
 
+    /// <summary>
+    /// Open a persistent session for every connected mouse and divert its
+    /// DPI/ModeShift button, so each mouse's HID++ overrides work whenever the app
+    /// runs — independent of which page (if any) is open — and each dispatches its
+    /// own bindings. The OS hook (Middle/Back/Forward) is global and can't tell mice
+    /// apart, so it tracks the first mouse. Sessions are reused by
+    /// <see cref="LoadControlsAsync"/> when viewing that mouse, so only one HID
+    /// handle is ever held per device.
+    /// </summary>
+    private async Task ActivateAgentMiceAsync(IReadOnlyList<DeviceViewModel> mice)
+    {
+        var old = _mouseCaptures.ToArray();
+        _mouseCaptures.Clear();
+        foreach (var mc in old)
+        {
+            await mc.Capture.DisposeAsync();
+            // Don't dispose a session the UI is still showing — LoadControlsAsync owns that.
+            if (!ReferenceEquals(mc.Session, _session)) await mc.Session.DisposeAsync();
+        }
+
+        // The global OS hook applies one mouse's Middle/Back/Forward bindings.
+        _agent.SetSelectedDevice(mice.FirstOrDefault()?.ConfigKey);
+
+        foreach (var mouse in mice)
+        {
+            if (mouse.Route is not { } route) continue;
+            try
+            {
+                var session = await DeviceSession.OpenAsync(route);
+                if (session is null) continue;
+                var ck = mouse.ConfigKey; // capture this mouse's bindings, not the global selection
+                var capture = await session.StartDpiButtonCaptureAsync(() => _agent.DispatchDivertedButton(ck, ButtonId.DpiToggle));
+                if (capture is null) { await session.DisposeAsync(); continue; } // no divertable DPI button
+                _mouseCaptures.Add(new MouseCapture(mouse, session, capture));
+            }
+            catch { /* mouse unreachable */ }
+        }
+    }
+
     private async Task LoadControlsAsync(DeviceViewModel? device)
     {
         var old = _session;
         _session = null;
-        if (_dpiCapture is { } cap) { _dpiCapture = null; await cap.DisposeAsync(); }
-        if (old is not null) await old.DisposeAsync();
+        // Persistent per-mouse sessions (which run the DPI-button capture) are owned by
+        // ActivateAgentMiceAsync — never dispose them here, only throwaway sessions.
+        if (old is not null && !IsPersistentSession(old)) await old.DisposeAsync();
 
         if (device?.Route is not { } route) return;
 
+        // Reuse this mouse's already-open persistent session instead of opening a
+        // second HID handle to the same device.
         DeviceSession? session;
-        try { session = await DeviceSession.OpenAsync(route); }
-        catch { return; }
+        var persistent = _mouseCaptures.FirstOrDefault(mc => ReferenceEquals(mc.Device, device))?.Session;
+        if (persistent is not null)
+            session = persistent;
+        else
+        {
+            try { session = await DeviceSession.OpenAsync(route); }
+            catch { return; }
+        }
         if (session is null) return;
-        if (!ReferenceEquals(SelectedDevice, device)) { await session.DisposeAsync(); return; }
+        if (!ReferenceEquals(SelectedDevice, device))
+        {
+            if (!IsPersistentSession(session)) await session.DisposeAsync();
+            return;
+        }
         _session = session;
         ShowPerKeyEditor = session.SupportsPerKey;
-
-        // Divert the DPI/ModeShift button over HID++ so it can be remapped — the
-        // OS mouse hook never sees it. Dispatched through the same binding map.
-        try { _dpiCapture = await session.StartDpiButtonCaptureAsync(() => _agent.DispatchDivertedButton(ButtonId.DpiToggle)); }
-        catch { /* device without a divertable DPI button */ }
 
         _loadingControls = true;
         try
@@ -729,8 +792,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _agent.Dispose();
-        _ = _dpiCapture?.DisposeAsync();
-        _ = _session?.DisposeAsync();
+        foreach (var mc in _mouseCaptures)
+        {
+            _ = mc.Capture.DisposeAsync();
+            if (!ReferenceEquals(mc.Session, _session)) _ = mc.Session.DisposeAsync();
+        }
+        if (_session is not null && !IsPersistentSession(_session))
+            _ = _session.DisposeAsync();
     }
 
     private async Task ResolveCardImageAsync(DeviceViewModel vm)
