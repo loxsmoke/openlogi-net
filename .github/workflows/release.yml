@@ -204,7 +204,7 @@ jobs:
           git push --atomic origin "HEAD:$TARGET_BRANCH" "refs/tags/$TAG"
 
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.version.outputs.project }}
           name: OpenLogi.net v${{ steps.version.outputs.project }}
