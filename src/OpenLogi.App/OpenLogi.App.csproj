@@ -13,12 +13,10 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
-
   <ItemGroup>
     <Folder Include="Models\" />
     <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.0.5" />
     <PackageReference Include="Avalonia.Controls.ColorPicker" Version="12.0.5" />
@@ -31,7 +29,6 @@
     </PackageReference>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.1" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\OpenLogi.Core\OpenLogi.Core.csproj" />
     <ProjectReference Include="..\OpenLogi.Agent\OpenLogi.Agent.csproj" />
