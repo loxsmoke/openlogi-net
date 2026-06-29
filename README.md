@@ -1,6 +1,9 @@
 # openlogi-net
 
 [![CI](https://github.com/loxsmoke/openlogi-net/actions/workflows/ci.yml/badge.svg)](https://github.com/loxsmoke/openlogi-net/actions/workflows/ci.yml)
+[![Download – Releases](https://img.shields.io/github/v/release/loxsmoke/openlogi-net?label=Download%20%E2%80%93%20Releases&logo=github)](https://github.com/loxsmoke/openlogi-net/releases/latest)
+
+📥 **[Download the latest release](https://github.com/loxsmoke/openlogi-net/releases/latest)** — installer or portable build.
 
 **A native, local-first alternative to Logitech Options+ for Windows.** Remap
 buttons, drive DPI and SmartShift, control RGB lighting, and switch profiles over
