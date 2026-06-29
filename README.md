@@ -138,8 +138,6 @@ dotnet run --project src/OpenLogi.App
 dotnet run --project src/OpenLogi.Cli -- list
 ```
 
-`d.cmd` is a shortcut for `dotnet run --project src/OpenLogi.App`.
-
 ### Test
 
 ```sh
