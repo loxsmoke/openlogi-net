@@ -126,6 +126,34 @@ public sealed class DeviceSession : IAsyncDisposable
         }
     }
 
+    // ── Read retry ────────────────────────────────────────────────────────────
+    // A wireless device waking from power-saving, or contention on the shared HID++
+    // engine, makes the first read or two return null / throw. A few quick re-reads
+    // ride that out — HARDWARE-VERIFIED: 4 concurrent reads all fail without this and
+    // recover with it. (null = "not ready, retry"; a non-null result is returned.)
+
+    private static async Task<T?> RetryAsync<T>(Func<Task<T?>> read, int attempts = 4, int delayMs = 120) where T : class
+    {
+        for (var i = 0; ; i++)
+        {
+            try { if (await read().ConfigureAwait(false) is { } r) return r; }
+            catch { /* transient — retry */ }
+            if (i >= attempts - 1) return null;
+            await Task.Delay(delayMs).ConfigureAwait(false);
+        }
+    }
+
+    private static async Task<T?> RetryStructAsync<T>(Func<Task<T?>> read, int attempts = 4, int delayMs = 120) where T : struct
+    {
+        for (var i = 0; ; i++)
+        {
+            try { if (await read().ConfigureAwait(false) is { } r) return r; }
+            catch { /* transient — retry */ }
+            if (i >= attempts - 1) return null;
+            await Task.Delay(delayMs).ConfigureAwait(false);
+        }
+    }
+
     // ── DPI ──────────────────────────────────────────────────────────────────
 
     /// <summary>Read current + supported DPI (sensor 0) via AdjustableDpi (0x2201).</summary>
@@ -300,7 +328,9 @@ public sealed class DeviceSession : IAsyncDisposable
     /// bus) — preferring HostsInfo (0x1815) for names, falling back to ChangeHost
     /// (0x1814) for just count/current. <c>null</c> if neither is supported.
     /// </summary>
-    public async Task<HostSnapshot?> ReadHostsAsync()
+    public Task<HostSnapshot?> ReadHostsAsync() => RetryAsync(ReadHostsOnceAsync);
+
+    private async Task<HostSnapshot?> ReadHostsOnceAsync()
     {
         if (_device.GetFeature<HostsInfoFeature>() is { } hi)
         {
@@ -378,7 +408,9 @@ public sealed class DeviceSession : IAsyncDisposable
     }
 
     /// <summary>Read onboard-profile info (count + current), or <c>null</c> if no 0x8100.</summary>
-    public async Task<(OnboardProfilesInfo Info, byte Current)?> ReadProfilesAsync()
+    public Task<(OnboardProfilesInfo Info, byte Current)?> ReadProfilesAsync() => RetryStructAsync(ReadProfilesOnceAsync);
+
+    private async Task<(OnboardProfilesInfo Info, byte Current)?> ReadProfilesOnceAsync()
     {
         if (_device.GetFeature<OnboardProfilesFeature>() is not { } ob) return null;
 
@@ -477,8 +509,14 @@ public sealed class DeviceSession : IAsyncDisposable
     /// <summary>Whether the device exposes the GKeys feature (0x8010).</summary>
     public bool SupportsGKeys => _device.FeatureIndex(0x8010) is not null;
 
+    /// <summary>Whether the device exposes OnboardProfiles (0x8100) — a keyboard's real control interface.</summary>
+    public bool SupportsOnboardProfiles => _device.FeatureIndex(0x8100) is not null;
+
     /// <summary>Read the five G-keys' current (modifier, usage) from a profile sector, or <c>null</c>.</summary>
-    public async Task<(byte Modifier, byte Usage)[]?> ReadGKeyBindingsAsync(ushort profileSector)
+    public Task<(byte Modifier, byte Usage)[]?> ReadGKeyBindingsAsync(ushort profileSector) =>
+        RetryAsync(() => ReadGKeyBindingsOnceAsync(profileSector));
+
+    private async Task<(byte Modifier, byte Usage)[]?> ReadGKeyBindingsOnceAsync(ushort profileSector)
     {
         var data = await ReadFullSectorAsync(profileSector, 255).ConfigureAwait(false);
         if (data is null) return null;
@@ -776,6 +814,103 @@ public sealed class DeviceSession : IAsyncDisposable
             return applied;
         }
         catch { return false; }
+    }
+
+    // ── Battery (UnifiedBattery 0x1004) ──────────────────────────────────────
+
+    /// <summary>
+    /// Read the current battery via UnifiedBattery (0x1004), mapped to the core
+    /// <see cref="OpenLogi.Core.BatteryInfo"/>, or <c>null</c> if the device has no
+    /// 0x1004 / the read fails. Unlike the startup-scan read, this runs on the live
+    /// (wake-retried) session, so a sleeping keyboard's level resolves on open.
+    /// </summary>
+    public Task<OpenLogi.Core.BatteryInfo?> ReadBatteryAsync() => RetryAsync(ReadBatteryOnceAsync);
+
+    private async Task<OpenLogi.Core.BatteryInfo?> ReadBatteryOnceAsync()
+    {
+        // Prefer UnifiedBattery (0x1004); fall back to BatteryVoltage (0x1001), which
+        // Logitech G keyboards expose instead. Both normalize to HidppBatteryInfo.
+        if (_device.GetFeature<UnifiedBatteryFeature>() is { } unified)
+        {
+            using (unified)
+            {
+                try { return MapBattery(await unified.GetBatteryInfoAsync().ConfigureAwait(false)); }
+                catch { /* fall through to 0x1001 */ }
+            }
+        }
+        if (_device.GetFeature<BatteryVoltageFeature>() is { } voltage)
+        {
+            try { return MapBattery(await voltage.GetBatteryInfoAsync().ConfigureAwait(false)); }
+            catch { return null; }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Subscribe to live battery-change broadcasts (UnifiedBattery 0x1004); <paramref
+    /// name="onUpdate"/> fires on each event. Returns a handle that stops listening on
+    /// dispose, or <c>null</c> if the device has no 0x1004. The handle owns its own
+    /// feature listener, so it is safe alongside a persistent session on the device.
+    /// </summary>
+    public IAsyncDisposable? StartBatteryMonitor(Action<OpenLogi.Core.BatteryInfo> onUpdate)
+    {
+        if (_device.GetFeature<UnifiedBatteryFeature>() is not { } batt) return null;
+        return new BatteryMonitor(batt, onUpdate);
+    }
+
+    private static OpenLogi.Core.BatteryInfo MapBattery(HidppBatteryInfo b) => new()
+    {
+        Percentage = b.ChargingPercentage,
+        Level = b.Level switch
+        {
+            HidppBatteryLevel.Critical => OpenLogi.Core.BatteryLevel.Critical,
+            HidppBatteryLevel.Low => OpenLogi.Core.BatteryLevel.Low,
+            HidppBatteryLevel.Good => OpenLogi.Core.BatteryLevel.Good,
+            HidppBatteryLevel.Full => OpenLogi.Core.BatteryLevel.Full,
+            _ => OpenLogi.Core.BatteryLevel.Unknown,
+        },
+        Status = b.Status switch
+        {
+            HidppBatteryStatus.Discharging => OpenLogi.Core.BatteryStatus.Discharging,
+            HidppBatteryStatus.Charging => OpenLogi.Core.BatteryStatus.Charging,
+            HidppBatteryStatus.ChargingSlow => OpenLogi.Core.BatteryStatus.ChargingSlow,
+            HidppBatteryStatus.Full => OpenLogi.Core.BatteryStatus.Full,
+            HidppBatteryStatus.Error => OpenLogi.Core.BatteryStatus.Error,
+            _ => OpenLogi.Core.BatteryStatus.Unknown,
+        },
+    };
+
+    /// <summary>Listens for 0x1004 battery broadcasts and tears down the listener on dispose.</summary>
+    private sealed class BatteryMonitor : IAsyncDisposable
+    {
+        private readonly UnifiedBatteryFeature _batt;
+        private readonly CancellationTokenSource _cts = new();
+        private readonly Task _pump;
+
+        public BatteryMonitor(UnifiedBatteryFeature batt, Action<OpenLogi.Core.BatteryInfo> onUpdate)
+        {
+            _batt = batt;
+            _pump = PumpAsync(batt.Listen(), onUpdate, _cts.Token);
+        }
+
+        private static async Task PumpAsync(ChannelReader<BatteryEvent> reader, Action<OpenLogi.Core.BatteryInfo> onUpdate, CancellationToken ct)
+        {
+            try
+            {
+                await foreach (var ev in reader.ReadAllAsync(ct).ConfigureAwait(false))
+                    onUpdate(MapBattery(ev.Info));
+            }
+            catch (OperationCanceledException) { /* shutting down */ }
+            catch { /* listener torn down with the channel */ }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            _cts.Cancel();
+            try { await _pump.ConfigureAwait(false); } catch { /* already faulted/cancelled */ }
+            _batt.Dispose();
+            _cts.Dispose();
+        }
     }
 
     public async ValueTask DisposeAsync() => await _channel.DisposeAsync().ConfigureAwait(false);

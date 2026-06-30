@@ -17,6 +17,18 @@
     </Design.DataContext>
 
     <DockPanel>
+        <!-- Update banner (shown when the launch-time check finds a newer release) -->
+        <Border DockPanel.Dock="Top" Padding="16,10" Background="#1F3B82F6"
+                IsVisible="{Binding UpdateAvailable}">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                <TextBlock Grid.Column="0" Text="⬆" FontSize="16" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <TextBlock Grid.Column="1" Text="{Binding UpdateBannerText}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                <Button Grid.Column="2" Content="Download" Margin="0,0,8,0" Command="{Binding DownloadUpdateCommand}"/>
+                <Button Grid.Column="3" Content="✕" Command="{Binding DismissUpdateCommand}"
+                        Background="Transparent" BorderThickness="0"/>
+            </Grid>
+        </Border>
+
         <!-- Header (switches between home and device detail) -->
         <Border DockPanel.Dock="Top" Padding="16,12" Background="#10000000">
             <Panel>
@@ -60,8 +72,12 @@
                                         <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
                                                    HorizontalAlignment="Center" TextAlignment="Center"
                                                    TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"/>
-                                        <TextBlock Text="{Binding Battery}" Opacity="0.6" FontSize="11"
-                                                   HorizontalAlignment="Center"/>
+                                        <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
+                                            <ctrl:BatteryIcon Percent="{Binding BatteryPercent}" Charging="{Binding BatteryCharging}"
+                                                              IsVisible="{Binding HasBattery}" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Battery}" Opacity="0.6" FontSize="11"
+                                                       VerticalAlignment="Center"/>
+                                        </StackPanel>
                                     </StackPanel>
                                     <Image Source="{Binding Image}" Stretch="Uniform"
                                            RenderOptions.BitmapInterpolationMode="HighQuality"/>
@@ -93,8 +109,9 @@
                 </StackPanel>
             </Panel>
 
-            <!-- Device detail -->
-            <TabControl IsVisible="{Binding ShowingDevice}" Margin="8,4"
+            <!-- Device detail (with a thin loading line overlaid at the top) -->
+            <Panel IsVisible="{Binding ShowingDevice}">
+            <TabControl Margin="8,4"
                         SelectedIndex="{Binding InitialTabIndex, Mode=OneWay}">
                 <!-- Buttons tab: mouse diagram with leader-line labels -->
                 <TabItem Header="Buttons" IsVisible="{Binding HasButtonsTab}">
@@ -416,7 +433,11 @@
                                     <TextBlock Grid.Row="2" Grid.Column="0" Text="Status" Opacity="0.6"/>
                                     <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Status}"/>
                                     <TextBlock Grid.Row="3" Grid.Column="0" Text="Battery" Opacity="0.6"/>
-                                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Battery}"/>
+                                    <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                        <ctrl:BatteryIcon Percent="{Binding BatteryPercent}" Charging="{Binding BatteryCharging}"
+                                                          IsVisible="{Binding HasBattery}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding Battery}" VerticalAlignment="Center"/>
+                                    </StackPanel>
                                     <TextBlock Grid.Row="4" Grid.Column="0" Text="Connection" Opacity="0.6"/>
                                     <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding ReceiverName}"/>
                                 </Grid>
@@ -470,6 +491,12 @@
                     </ScrollViewer>
                 </TabItem>
             </TabControl>
+            <!-- Indeterminate loading line just under the header. VerticalAlignment=Top +
+                 overlay (last child) means toggling it never shifts the tabs/content. -->
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsLoadingDevice}"
+                         VerticalAlignment="Top" HorizontalAlignment="Stretch"
+                         Height="3" MinHeight="3" Padding="0" CornerRadius="0"/>
+            </Panel>
         </Panel>
     </DockPanel>
 </Window>

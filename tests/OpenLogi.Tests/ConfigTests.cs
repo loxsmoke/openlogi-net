@@ -280,6 +280,24 @@ public class ConfigTests
     }
 
     [Fact]
+    public void AppSettingsDismissedUpdateRoundtrips()
+    {
+        var cfg = new Config();
+        cfg.AppSettings.DismissedUpdate = "0.3.0";
+        var parsed = WriteAndRead(cfg);
+        Assert.Equal("0.3.0", parsed.AppSettings.DismissedUpdate);
+    }
+
+    [Fact]
+    public void AppSettingsMinimizeToTrayRoundtrips()
+    {
+        var cfg = new Config();
+        cfg.AppSettings.MinimizeToTray = true;
+        var parsed = WriteAndRead(cfg);
+        Assert.True(parsed.AppSettings.MinimizeToTray);
+    }
+
+    [Fact]
     public void UnsupportedNewerSchemaIsRejected()
     {
         var dir = Directory.CreateTempSubdirectory("openlogi-cfg");

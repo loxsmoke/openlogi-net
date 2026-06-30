@@ -18,7 +18,23 @@ public sealed partial class DeviceViewModel(string receiverName, PairedDevice de
     public string Kind => Device.Kind.ToString();
     public string Status => Device.Online ? "Online" : "Offline";
 
-    public string Battery => Device.Battery is { } b ? $"{b.Percentage}% · {b.Status}" : "—";
+    /// <summary>Live battery from the open session (0x1004/0x1001), overriding the scan-time snapshot when present.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Battery), nameof(HasBattery), nameof(BatteryPercent), nameof(BatteryCharging))]
+    private BatteryInfo? _liveBattery;
+
+    private BatteryInfo? CurrentBattery => LiveBattery ?? Device.Battery;
+
+    public string Battery => CurrentBattery is { } b ? $"{b.Percentage}% · {b.Status}" : "—";
+
+    /// <summary>Whether a battery reading is available (drives the battery icon's visibility).</summary>
+    public bool HasBattery => CurrentBattery is not null;
+
+    /// <summary>Charge percent for the battery icon (0 when unknown).</summary>
+    public int BatteryPercent => CurrentBattery?.Percentage ?? 0;
+
+    /// <summary>Whether the device is currently charging (icon shows the charging colour).</summary>
+    public bool BatteryCharging => CurrentBattery is { Status: BatteryStatus.Charging or BatteryStatus.ChargingSlow };
 
     /// <summary>HID++ config key (model id), used to resolve the device render.</summary>
     public string? ConfigKey => Device.ModelInfo?.ConfigKey();

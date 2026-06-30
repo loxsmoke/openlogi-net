@@ -20,6 +20,9 @@ public static class Brand
     /// <summary>The "latest release" page.</summary>
     public const string ReleasesUrl = "https://github.com/LoxSmoke/openlogi-net/releases/latest";
 
+    /// <summary>The GitHub API endpoint for the latest release (used by the launch-time update check).</summary>
+    public const string LatestReleaseApiUrl = "https://api.github.com/repos/LoxSmoke/openlogi-net/releases/latest";
+
     /// <summary>The release page for a specific version tag (e.g. the running build).</summary>
     public static string ReleaseTagUrl(string version) => $"{RepoUrl}/releases/tag/v{version}";
 }

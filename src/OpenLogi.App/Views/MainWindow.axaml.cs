@@ -19,6 +19,23 @@ public partial class MainWindow : Window
         var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3);
         Title = version is null ? "OpenLogi.net" : $"OpenLogi.net {version}";
         InitTray();
+        Opened += OnOpened;
+    }
+
+    // First launch: ask once whether to enable update checks (UpdatePromptSeen gates
+    // re-prompting). Then, if opted in, run the launch-time check which drives the banner.
+    private async void OnOpened(object? sender, EventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+        if (!vm.Configuration.AppSettings.UpdatePromptSeen)
+        {
+            var enable = await new UpdateConsentWindow().ShowDialog<bool>(this);
+            await vm.ApplyUpdateConsentAsync(enable);
+        }
+        else
+        {
+            await vm.CheckForUpdatesAsync();
+        }
     }
 
     // System-tray icon (hidden until the window is minimized to tray).

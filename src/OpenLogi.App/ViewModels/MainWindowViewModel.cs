@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Reflection;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using OpenLogi.Agent;
+using OpenLogi.App.Services;
 using OpenLogi.Assets;
 using OpenLogi.Core;
 using OpenLogi.Hid;
@@ -96,6 +98,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     // Home-gallery states: scanning (loading) and "no devices found".
     [ObservableProperty] private bool _isScanning;
     [ObservableProperty] private bool _noDevices;
+
+    // Drives the thin indeterminate loading line under the device-detail header.
+    [ObservableProperty] private bool _isLoadingDevice;
+
+    // Launch-time update check: banner shown when GitHub reports a newer release.
+    [ObservableProperty] private bool _updateAvailable;
+    [ObservableProperty] private string _updateBannerText = "";
+    private string? _latestUpdate;
 
     // Navigation: false = home gallery, true = device detail.
     [ObservableProperty] private bool _showingDevice;
@@ -200,6 +210,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private double _backlightMax = 100;
 
     private DeviceSession? _session;
+    // Live battery listener for the currently-selected device; replaced on each selection.
+    private IAsyncDisposable? _batteryMonitor;
     // One persistent session per connected mouse, kept open for the app lifetime so
     // each mouse's HID++ button overrides (DPI/ModeShift) work without opening its
     // page — and dispatch that mouse's own bindings, so multiple mice differ.
@@ -257,6 +269,54 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>Return to the home gallery.</summary>
     [RelayCommand]
     private void GoHome() => ShowingDevice = false;
+
+    /// <summary>
+    /// Record the user's answer to the first-run "check for updates?" prompt (so it's
+    /// asked only once), then run the check immediately if they opted in.
+    /// </summary>
+    public async Task ApplyUpdateConsentAsync(bool enable)
+    {
+        _config.AppSettings.CheckForUpdates = enable;
+        _config.AppSettings.UpdatePromptSeen = true;
+        SaveConfig();
+        await CheckForUpdatesAsync();
+    }
+
+    /// <summary>
+    /// When the user has opted in, ask GitHub for the latest release and show the
+    /// update banner if it's newer than this build (and not a version already
+    /// dismissed). Silent on every failure; a no-op when update checks are off.
+    /// </summary>
+    public async Task CheckForUpdatesAsync()
+    {
+        if (!_config.AppSettings.CheckForUpdates) return;
+        if (Assembly.GetExecutingAssembly().GetName().Version is not { } current) return;
+        var newer = await UpdateService.CheckAsync(current);
+        if (newer is null || newer == _config.AppSettings.DismissedUpdate) return;
+        _latestUpdate = newer;
+        UpdateBannerText = $"Update available: v{newer}";
+        UpdateAvailable = true;
+    }
+
+    /// <summary>Open the releases page to download the available update.</summary>
+    [RelayCommand]
+    private void DownloadUpdate()
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Brand.ReleasesUrl) { UseShellExecute = true }); }
+        catch { /* no browser / blocked — ignore */ }
+    }
+
+    /// <summary>Hide the banner and remember this version so it won't reappear for it.</summary>
+    [RelayCommand]
+    private void DismissUpdate()
+    {
+        if (_latestUpdate is not null)
+        {
+            _config.AppSettings.DismissedUpdate = _latestUpdate;
+            SaveConfig();
+        }
+        UpdateAvailable = false;
+    }
 
     private async Task LoadAsync()
     {
@@ -492,15 +552,65 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
+    /// <summary>
+    /// Open a session for a device that may be waking from power-saving. A wireless
+    /// keyboard that's asleep enumerates only partially, so the first open can land on
+    /// an interface missing the control features (OnboardProfiles 0x8100 / G-keys
+    /// 0x8010 / per-key 0x8081) — leaving the Profiles, G-Keys and battery readouts
+    /// empty. So for a keyboard we keep re-opening (with backoff) until the session
+    /// actually exposes a control feature, or the open fails outright. This keys off
+    /// the SESSION's own features, not the flaky startup-scan capability guess, so it
+    /// fires even when the scan itself missed the control interface. The repeated
+    /// traffic wakes the device — automating the manual Refresh that used to be
+    /// needed. Zero extra latency for an already-awake device (returns on first open).
+    /// </summary>
+    private async Task<DeviceSession?> OpenWokenAsync(DeviceViewModel device, DeviceRoute route)
+    {
+        const int attempts = 6;
+        var isKeyboard = device.Device.Kind == DeviceKind.Keyboard;
+        DeviceSession? session = null;
+        for (var attempt = 0; attempt < attempts; attempt++)
+        {
+            try { session = await DeviceSession.OpenAsync(route); }
+            catch { session = null; }
+
+            // The user navigated away while we were opening — discard and bail.
+            if (!ReferenceEquals(SelectedDevice, device))
+            {
+                if (session is not null) await session.DisposeAsync();
+                return null;
+            }
+
+            // Good when the open succeeded and either it isn't a keyboard or this
+            // interface actually exposes a control feature (profiles/G-keys/per-key).
+            var hasControl = session is not null
+                && (session.SupportsOnboardProfiles || session.SupportsGKeys || session.SupportsPerKey);
+            if (session is not null && (!isKeyboard || hasControl))
+                return session;
+            if (attempt == attempts - 1)
+                return session;
+
+            // Wrong/partial interface (or no answer at all): wake it and retry.
+            if (session is not null) await session.DisposeAsync();
+            session = null;
+            await Task.Delay(Math.Min(200 * (attempt + 1), 600)).ConfigureAwait(false);
+        }
+        return session;
+    }
+
     private async Task LoadControlsAsync(DeviceViewModel? device)
     {
+        // Stop the previous device's live battery listener before switching.
+        if (_batteryMonitor is not null) { await _batteryMonitor.DisposeAsync(); _batteryMonitor = null; }
+
         var old = _session;
         _session = null;
         // Persistent per-mouse sessions (which run the DPI-button capture) are owned by
         // ActivateAgentMiceAsync — never dispose them here, only throwaway sessions.
         if (old is not null && !IsPersistentSession(old)) await old.DisposeAsync();
 
-        if (device?.Route is not { } route) return;
+        if (device?.Route is not { } route) { IsLoadingDevice = false; return; }
+        IsLoadingDevice = true; // show the thin loading line while the device's controls load
 
         // Reuse this mouse's already-open persistent session instead of opening a
         // second HID handle to the same device.
@@ -509,18 +619,27 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (persistent is not null)
             session = persistent;
         else
-        {
-            try { session = await DeviceSession.OpenAsync(route); }
-            catch { return; }
-        }
-        if (session is null) return;
+            session = await OpenWokenAsync(device, route);
+        if (session is null) { IsLoadingDevice = false; return; }
         if (!ReferenceEquals(SelectedDevice, device))
         {
             if (!IsPersistentSession(session)) await session.DisposeAsync();
+            IsLoadingDevice = false;
             return;
         }
         _session = session;
         ShowPerKeyEditor = session.SupportsPerKey;
+
+        // Battery: read once on open (benefits from the wake-retry), then subscribe to
+        // 0x1004 broadcasts so the card/detail update live while the app is open.
+        if (await session.ReadBatteryAsync() is { } battery && ReferenceEquals(SelectedDevice, device))
+            device.LiveBattery = battery;
+        if (ReferenceEquals(SelectedDevice, device))
+            _batteryMonitor = session.StartBatteryMonitor(info =>
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    if (ReferenceEquals(SelectedDevice, device)) device.LiveBattery = info;
+                }));
 
         _loadingControls = true;
         try
@@ -559,6 +678,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 BacklightValue = bright.Current;
                 ShowBacklight = true;
             }
+            byte gkeyProfile = 1;
             if (await session.ReadProfilesAsync() is { } prof && ReferenceEquals(SelectedDevice, device))
             {
                 _profileCount = prof.Info.ProfileCount;
@@ -566,23 +686,28 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 ShowProfiles = prof.Info.ProfileCount >= 1;
                 if (prof.Current >= 1 && ReferenceEquals(SelectedDevice, device))
                     await LoadProfileLightingAsync(prof.Current);
+                gkeyProfile = Math.Max(prof.Current, (byte)1);
+            }
 
-                if (session.SupportsGKeys)
+            // Read G-keys independently of the profile read: a failed/empty profile
+            // read must not also hide the G-keys (they share the control interface but
+            // not the read). They only need the active profile sector, which defaults
+            // to 1 when the profile read didn't yield one.
+            if (session.SupportsGKeys && ReferenceEquals(SelectedDevice, device))
+            {
+                _gkeyProfileSector = gkeyProfile;
+                GKeyProfile = _gkeyProfileSector;
+                if (await session.ReadGKeyBindingsAsync(_gkeyProfileSector) is { } bindings
+                    && ReferenceEquals(SelectedDevice, device))
                 {
-                    _gkeyProfileSector = Math.Max(prof.Current, (byte)1);
-                    GKeyProfile = _gkeyProfileSector;
-                    if (await session.ReadGKeyBindingsAsync(_gkeyProfileSector) is { } bindings
-                        && ReferenceEquals(SelectedDevice, device))
-                    {
-                        GKeys.Clear();
-                        for (var i = 0; i < bindings.Length; i++)
-                            GKeys.Add(new GKeyViewModel(i, bindings[i].Usage, bindings[i].Modifier, OnGKeyChanged));
-                        HasGKeysTab = true;
-                    }
+                    GKeys.Clear();
+                    for (var i = 0; i < bindings.Length; i++)
+                        GKeys.Add(new GKeyViewModel(i, bindings[i].Usage, bindings[i].Modifier, OnGKeyChanged));
+                    HasGKeysTab = true;
                 }
             }
         }
-        finally { _loadingControls = false; }
+        finally { _loadingControls = false; IsLoadingDevice = false; }
     }
 
     /// <summary>Switch the device to another EasySwitch host (disconnects it from this PC).</summary>
@@ -912,6 +1037,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _agent.Dispose();
+        _ = _batteryMonitor?.DisposeAsync();
         foreach (var mc in _mouseCaptures)
         {
             _ = mc.Capture.DisposeAsync();

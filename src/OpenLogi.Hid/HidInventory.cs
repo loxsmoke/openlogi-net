@@ -151,6 +151,14 @@ public static class HidInventory
                     if (bi is { } info2) battery = MapBattery(info2);
                 }
             }
+            // Fall back to BatteryVoltage (0x1001) — Logitech G keyboards expose this
+            // instead of UnifiedBattery — so the gallery shows their charge immediately,
+            // not only after the device page is opened.
+            if (battery is null && device.GetFeature<BatteryVoltageFeature>() is { } volt)
+            {
+                var bv = await TryStructAsync(volt.GetBatteryInfoAsync).ConfigureAwait(false);
+                if (bv is { } info3) battery = MapBattery(info3);
+            }
         }
 
         return new PairedDevice

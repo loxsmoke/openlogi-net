@@ -1,0 +1,15 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="OpenLogi.App.Controls.BatteryIcon">
+    <!-- A small battery glyph: a shell whose interior fills (left → right) to the
+         charge level, with the whole icon tinted by level colour. The trailing nub
+         is the positive terminal. Sizes/padding here must match InnerWidth in the
+         code-behind. -->
+    <StackPanel Orientation="Horizontal" Spacing="1" VerticalAlignment="Center">
+        <Border x:Name="Shell" Width="22" Height="12" CornerRadius="2.5"
+                BorderThickness="1.3" Padding="1.5" BorderBrush="#888888">
+            <Border x:Name="Fill" HorizontalAlignment="Left" CornerRadius="1"/>
+        </Border>
+        <Border x:Name="Nub" Width="2" Height="5" CornerRadius="0,1.5,1.5,0" Background="#888888"/>
+    </StackPanel>
+</UserControl>

@@ -1,0 +1,24 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="OpenLogi.App.Views.UpdateConsentWindow"
+        Width="440" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False" ShowInTaskbar="False"
+        Title="Check for updates?">
+    <StackPanel Margin="24" Spacing="20">
+        <StackPanel Orientation="Horizontal" Spacing="18">
+            <TextBlock Text="⬆" FontSize="44" Foreground="#3B82F6" VerticalAlignment="Top"/>
+            <StackPanel Spacing="8" MaxWidth="320">
+                <TextBlock FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"
+                           Text="Check for updates automatically?"/>
+                <TextBlock Opacity="0.8" TextWrapping="Wrap"
+                           Text="OpenLogi.net can check GitHub at launch for a newer release and show a banner when one is available. No personal data is sent — you can change this any time in Settings."/>
+            </StackPanel>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Content="Not now" Click="OnDecline" MinWidth="84"/>
+            <Button Content="Check for updates" Click="OnAccept" MinWidth="84"
+                    Background="#1F6FEB" Foreground="White"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

@@ -45,7 +45,10 @@ public static class ConfigCodec
             ["update_prompt_seen"] = s.UpdatePromptSeen,
             ["show_in_menu_bar"] = s.ShowInMenuBar,
             ["auto_download_assets"] = s.AutoDownloadAssets,
+            ["minimize_to_tray"] = s.MinimizeToTray,
         };
+        if (s.DismissedUpdate is not null)
+            t["dismissed_update"] = s.DismissedUpdate;
         if (s.Language is not null)
             t["language"] = s.Language;
         t["thumbwheel_sensitivity"] = (long)s.ThumbwheelSensitivity;
@@ -240,8 +243,10 @@ public static class ConfigCodec
         LaunchAtLogin = GetBool(t, "launch_at_login", false),
         CheckForUpdates = GetBool(t, "check_for_updates", false),
         UpdatePromptSeen = GetBool(t, "update_prompt_seen", false),
+        DismissedUpdate = GetString(t, "dismissed_update"),
         ShowInMenuBar = GetBool(t, "show_in_menu_bar", true),
         AutoDownloadAssets = GetBool(t, "auto_download_assets", true),
+        MinimizeToTray = GetBool(t, "minimize_to_tray", false),
         Language = GetString(t, "language"),
         ThumbwheelSensitivity = (int)GetLong(t, "thumbwheel_sensitivity", AppSettings.DefaultThumbwheelSensitivity),
     };
