@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using Avalonia.Input;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -20,20 +18,53 @@ public sealed partial class PerKeyColorViewModel : ObservableObject
 {
     private readonly DeviceSession _session;
     private readonly Dictionary<byte, Color> _painted = [];
+    // Persist the editor's state (painted keys, base color, paint color) on change.
+    private readonly Action<IReadOnlyDictionary<byte, Color>, Color, Color>? _save;
 
     [ObservableProperty] private Color _selectedColor = Colors.Red;
     [ObservableProperty] private Color _baseColor = Colors.White;
     [ObservableProperty] private string _status = "Pick a color, then press a key to paint it. Press it again to reset.";
 
-    public PerKeyColorViewModel(DeviceSession session) => _session = session;
+    public PerKeyColorViewModel(
+        DeviceSession session,
+        Color? baseColor = null,
+        Color? paintColor = null,
+        IReadOnlyDictionary<byte, Color>? initialPainted = null,
+        Action<IReadOnlyDictionary<byte, Color>, Color, Color>? save = null)
+    {
+        _session = session;
+        if (baseColor is { } b) _baseColor = b;
+        if (paintColor is { } p) _selectedColor = p;
+        if (initialPainted is not null)
+            foreach (var (zone, color) in initialPainted) _painted[zone] = color;
+        _save = save;
+    }
 
-    /// <summary>Keys the OS swallows (so they can't be pressed into the window) — click to paint. Zones = usage − 3.</summary>
-    public IReadOnlyList<SpecialKey> SpecialKeys { get; } =
+    /// <summary>Persist the current state (painted keys + both colors). No-op until wired by the host.</summary>
+    private void Persist() => _save?.Invoke(_painted, BaseColor, SelectedColor);
+
+    // Remember the chosen colors across restarts, too (not just painted keys).
+    partial void OnBaseColorChanged(Color value) => Persist();
+    partial void OnSelectedColorChanged(Color value) => Persist();
+
+    /// <summary>
+    /// Keys that can't be pressed into the window (OS-swallowed) or have no key code
+    /// (G-keys, media, logo) — click to paint. Zones are hardware-mapped on the G915
+    /// (decimal in comments), confirmed by probing; most are NOT usage−3.
+    /// </summary>
+    // Grouped into rows that roughly follow the physical keyboard layout.
+    public IReadOnlyList<IReadOnlyList<SpecialKey>> SpecialKeyRows { get; } =
     [
-        // Hardware-mapped zones (modifiers are NOT at usage-3 on the G915).
-        new("PrtSc", 0x43), new("Menu", 0x62),
-        new("L Ctrl", 0x68), new("L Shift", 0x69), new("L Alt", 0x66),
-        // Win + right-side modifiers: still to be probed.
+        // Logo + brightness + system keys.
+        [new("Logo", 0xd2), new("☀︎", 0x99), new("PrtSc", 0x43), new("ScrLk", 0x44), new("Pause", 0x45)], // 210, 153, 67–69
+        // G-keys.
+        [new("G1", 0xb4), new("G2", 0xb5), new("G3", 0xb6), new("G4", 0xb7), new("G5", 0xb8)], // 180–184
+        // Left modifiers.
+        [new("L Shift", 0x69), new("L Ctrl", 0x68), new("L Alt", 0x6a), new("L Win", 0x6b)],  // 105,104,106,107
+        // Right modifiers + menu.
+        [new("R Shift", 0x6d), new("R Ctrl", 0x6c), new("R Win", 0x6f), new("R Alt", 0x6e), new("Menu", 0x62)], // 109,108,111,110,98
+        // Media keys.
+        [new("Prev", 0x9e), new("Play/Pause", 0x9b), new("Next", 0x9d), new("Mute", 0x9c)],   // 158,155,157,156
     ];
 
     [RelayCommand]
@@ -42,8 +73,21 @@ public sealed partial class PerKeyColorViewModel : ObservableObject
         if (key is not null) await PaintZoneAsync(key.Zone, key.Label);
     }
 
-    /// <summary>Set the whole keyboard to the base color (enters host mode) when the window opens.</summary>
-    public async Task InitAsync() => await _session.ApplyPerKeyColorAsync(BaseColor.R, BaseColor.G, BaseColor.B);
+    public async Task<bool> SetZoneAsync(byte zone, Color color)
+        => await _session.SetZoneAsync(zone, color.R, color.G, color.B);
+
+    /// <summary>
+    /// Prepare the keyboard for editing when the window opens: enter host mode so
+    /// 0x8081 writes take effect, then re-assert the saved painted keys on top of
+    /// whatever is already showing. Deliberately does NOT flood the board to the base
+    /// color — that would wipe the colors currently on the keyboard.
+    /// </summary>
+    public async Task InitAsync()
+    {
+        await _session.EnsureHostModeAsync();
+        foreach (var (zone, color) in _painted)
+            await SetZoneAsync(zone, color);
+    }
 
     /// <summary>Handle a physical key press: paint that key, or reset it if already painted with this color.</summary>
     public async Task PressAsync(PhysicalKey physical)
@@ -56,12 +100,17 @@ public sealed partial class PerKeyColorViewModel : ObservableObject
         await PaintZoneAsync(zone, physical.ToString());
     }
 
-    /// <summary>The LED zone for a physical key. Modifiers aren't at usage−3 on the G915, so they're explicit.</summary>
+    /// <summary>The LED zone for a physical key. Modifiers aren't at usage−3 on the G915, so they're explicit (probed: a contiguous 104–111 block).</summary>
     private static byte? PhysicalToZone(PhysicalKey k) => k switch
     {
-        PhysicalKey.ControlLeft => 0x68,
-        PhysicalKey.ShiftLeft => 0x69,
-        PhysicalKey.AltLeft => 0x66,
+        PhysicalKey.ControlLeft => 0x68,  // 104
+        PhysicalKey.ShiftLeft => 0x69,    // 105
+        PhysicalKey.AltLeft => 0x6a,      // 106
+        PhysicalKey.MetaLeft => 0x6b,     // 107
+        PhysicalKey.ControlRight => 0x6c, // 108
+        PhysicalKey.ShiftRight => 0x6d,   // 109
+        PhysicalKey.AltRight => 0x6e,     // 110
+        PhysicalKey.MetaRight => 0x6f,    // 111
         _ => PhysicalToUsage(k) is { } u && u >= 3 ? (byte)(u - 3) : null,
     };
 
@@ -71,23 +120,27 @@ public sealed partial class PerKeyColorViewModel : ObservableObject
         if (_painted.TryGetValue(zone, out var cur) && cur == SelectedColor)
         {
             _painted.Remove(zone);
-            await _session.SetZoneAsync(zone, BaseColor.R, BaseColor.G, BaseColor.B);
+            await SetZoneAsync(zone, BaseColor);
             Status = $"{label} reset.";
         }
         else
         {
             _painted[zone] = SelectedColor;
-            await _session.SetZoneAsync(zone, SelectedColor.R, SelectedColor.G, SelectedColor.B);
+            await SetZoneAsync(zone, SelectedColor);
             Status = $"{label} → #{SelectedColor.R:x2}{SelectedColor.G:x2}{SelectedColor.B:x2}";
         }
+        Persist();
     }
 
-    /// <summary>Reset every painted key back to the base color.</summary>
+    /// <summary>Reset every painted key back to the base color with a single range fill.</summary>
     public async Task ResetAllAsync()
     {
+        // One range write (zones 0x00–0xfe) + commit floods the whole board to the
+        // base color at once, instead of walking key by key.
         _painted.Clear();
         await _session.ApplyPerKeyColorAsync(BaseColor.R, BaseColor.G, BaseColor.B);
         Status = "All keys reset to base.";
+        Persist();
     }
 
     /// <summary>Map a physical key position to its HID keyboard usage (null = not paintable). Layout-independent.</summary>

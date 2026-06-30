@@ -30,6 +30,37 @@ public sealed record Lighting
         get => _brightness;
         init => _brightness = Math.Min(value, (byte)100);
     }
+
+    /// <summary>
+    /// Per-key color overrides for the press-to-color editor: LED zone → "RRGGBB"
+    /// hex. Empty when no keys are painted; only painted keys are stored.
+    /// </summary>
+    public IReadOnlyDictionary<byte, string> PerKey { get; init; } = EmptyPerKey;
+
+    /// <summary>The press-to-color editor's last-used brush color as "RRGGBB" hex; null until set.</summary>
+    public string? PaintColor { get; init; }
+
+    private static readonly IReadOnlyDictionary<byte, string> EmptyPerKey = new Dictionary<byte, string>();
+
+    // The compiler-generated record equality compares PerKey by reference; override
+    // so two equal maps (incl. two empty ones — see the roundtrip tests) compare equal.
+    public bool Equals(Lighting? other) =>
+        other is not null
+        && Enabled == other.Enabled
+        && Color == other.Color
+        && _brightness == other._brightness
+        && PaintColor == other.PaintColor
+        && PerKeyEquals(PerKey, other.PerKey);
+
+    public override int GetHashCode() => HashCode.Combine(Enabled, Color, _brightness, PaintColor, PerKey.Count);
+
+    private static bool PerKeyEquals(IReadOnlyDictionary<byte, string> a, IReadOnlyDictionary<byte, string> b)
+    {
+        if (a.Count != b.Count) return false;
+        foreach (var (zone, hex) in a)
+            if (!b.TryGetValue(zone, out var other) || other != hex) return false;
+        return true;
+    }
 }
 
 /// <summary>

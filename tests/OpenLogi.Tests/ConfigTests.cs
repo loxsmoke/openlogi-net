@@ -44,6 +44,30 @@ public class ConfigTests
     }
 
     [Fact]
+    public void PerKeyColorsRoundtripPerDevice()
+    {
+        var cfg = new Config();
+        var perKey = new Dictionary<byte, string> { [0x68] = "ff0000", [0x43] = "00ff00" };
+        cfg.SetLighting("g915", new Lighting { Color = "1e90ff", Brightness = 100, PaintColor = "abcdef", PerKey = perKey });
+        var restored = WriteAndRead(cfg);
+        var lighting = restored.Lighting("g915");
+        Assert.NotNull(lighting);
+        Assert.Equal(2, lighting!.PerKey.Count);
+        Assert.Equal("ff0000", lighting.PerKey[0x68]);
+        Assert.Equal("00ff00", lighting.PerKey[0x43]);
+        Assert.Equal("abcdef", lighting.PaintColor);
+    }
+
+    [Fact]
+    public void DefaultPerKeyIsOmittedFromToml()
+    {
+        var cfg = new Config();
+        cfg.SetLighting("g915", new Lighting { Color = "1e90ff", Brightness = 100 });
+        var body = ConfigCodec.Serialize(cfg);
+        Assert.DoesNotContain("per_key", body);
+    }
+
+    [Fact]
     public void DpiRoundtripsPerDevice()
     {
         var cfg = new Config();

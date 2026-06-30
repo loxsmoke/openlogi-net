@@ -78,12 +78,25 @@ public static class ConfigCodec
         if (d.Identity is { } identity)
             t["identity"] = SerializeIdentity(identity);
         if (d.Lighting is { } lighting)
-            t["lighting"] = new TomlTable
+        {
+            var lightingTable = new TomlTable
             {
                 ["enabled"] = lighting.Enabled,
                 ["color"] = lighting.Color,
                 ["brightness"] = (long)lighting.Brightness,
             };
+            if (lighting.PaintColor is { } paint)
+                lightingTable["paint_color"] = paint;
+            // Per-key overrides (zone → "RRGGBB") nest after the scalars; omitted when empty.
+            if (lighting.PerKey.Count > 0)
+            {
+                var perKey = new TomlTable();
+                foreach (var (zone, hex) in lighting.PerKey.OrderBy(p => p.Key))
+                    perKey[zone.ToString()] = hex;
+                lightingTable["per_key"] = perKey;
+            }
+            t["lighting"] = lightingTable;
+        }
         if (d.SmartShift is { } ss)
             t["smartshift"] = new TomlTable
             {
@@ -251,6 +264,8 @@ public static class ConfigCodec
                 Enabled = GetBool(lighting, "enabled", true),
                 Color = GetString(lighting, "color") ?? "ffffff",
                 Brightness = (byte)GetLong(lighting, "brightness", 100),
+                PaintColor = GetString(lighting, "paint_color"),
+                PerKey = ParsePerKey(lighting),
             };
         if (t.TryGetValue("smartshift", out var s) && s is TomlTable ss)
             d.SmartShift = new SmartShift
@@ -321,6 +336,17 @@ public static class ConfigCodec
                 : new ushort[3],
             ExtendedModelId = (byte)GetLong(t, "extended_model_id", 0),
         };
+    }
+
+    /// <summary>Parse a lighting table's optional <c>per_key</c> sub-table: decimal zone key → "RRGGBB".</summary>
+    private static IReadOnlyDictionary<byte, string> ParsePerKey(TomlTable lighting)
+    {
+        var map = new Dictionary<byte, string>();
+        if (lighting.TryGetValue("per_key", out var pk) && pk is TomlTable perKey)
+            foreach (var (key, value) in perKey)
+                if (byte.TryParse(key, out var zone) && value is string hex)
+                    map[zone] = hex;
+        return map;
     }
 
     /// <summary>Untagged routing, matching Rust: Single is tried before Gesture.</summary>

@@ -3,7 +3,6 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using OpenLogi.App.ViewModels;
-using OpenLogi.Hid;
 
 namespace OpenLogi.App.Views;
 
@@ -21,9 +20,9 @@ public partial class PerKeyColorWindow : Window
         AddHandler(KeyUpEvent, OnKeyUpTunnel, RoutingStrategies.Tunnel);
     }
 
-    public PerKeyColorWindow(DeviceSession session) : this()
+    public PerKeyColorWindow(PerKeyColorViewModel vm) : this()
     {
-        _vm = new PerKeyColorViewModel(session);
+        _vm = vm;
         DataContext = _vm;
         Opened += async (_, _) => await _vm.InitAsync();
     }
@@ -33,6 +32,9 @@ public partial class PerKeyColorWindow : Window
     private async void OnKeyDownTunnel(object? sender, KeyEventArgs e)
     {
         if (_vm is null) return;
+        // Let a focused text field (the color picker's hex input) receive keys
+        // normally instead of treating them as keys to paint.
+        if (FocusManager?.GetFocusedElement() is TextBox) return;
         e.Handled = true; // don't let the painted key type into the picker or hit a button
         // Alt+R resets every key to the base color (so the spacebar can be painted
         // without accidentally triggering the on-screen reset button).
@@ -44,8 +46,13 @@ public partial class PerKeyColorWindow : Window
         await _vm.PressAsync(e.PhysicalKey);
     }
 
-    // Swallow key releases so Space/Enter can never activate a focused button here.
-    private void OnKeyUpTunnel(object? sender, KeyEventArgs e) => e.Handled = true;
+    // Swallow key releases so Space/Enter can never activate a focused button here,
+    // except while typing into a text field (the color picker's hex input).
+    private void OnKeyUpTunnel(object? sender, KeyEventArgs e)
+    {
+        if (FocusManager?.GetFocusedElement() is TextBox) return;
+        e.Handled = true;
+    }
 
     private async void OnResetAll(object? sender, RoutedEventArgs e)
     {

@@ -32,6 +32,55 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     /// <summary>The open session if the current device supports per-key lighting (for the secret editor).</summary>
     public DeviceSession? PerKeySession => _session is { SupportsPerKey: true } s ? s : null;
+
+    /// <summary>
+    /// Create a per-key color editor bound to the device's <em>current</em> session.
+    /// A fresh instance each open (the session is replaced on every control reload,
+    /// so a cached editor would hold a disposed handle); painted keys persist via
+    /// config, seeded back in here, so nothing is lost by not caching.
+    /// </summary>
+    public PerKeyColorViewModel? CreatePerKeyEditor()
+    {
+        if (PerKeySession is not { } s) return null;
+        var ck = SelectedDevice?.ConfigKey;
+        var paint = ck is not null && _config.Lighting(ck)?.PaintColor is { } p
+            ? (Avalonia.Media.Color?)ParseHexColor(p) : null;
+        return new PerKeyColorViewModel(
+            s, LightingColor, paint, LoadPerKeyColors(ck),
+            (painted, baseColor, paintColor) => SavePerKeyColors(ck, painted, baseColor, paintColor));
+    }
+
+    /// <summary>Read a device's saved per-key colors (zone → color) from config; empty if none.</summary>
+    private IReadOnlyDictionary<byte, Avalonia.Media.Color> LoadPerKeyColors(string? configKey)
+    {
+        var map = new Dictionary<byte, Avalonia.Media.Color>();
+        if (configKey is not null && _config.Lighting(configKey)?.PerKey is { } stored)
+            foreach (var (zone, hex) in stored) map[zone] = ParseHexColor(hex);
+        return map;
+    }
+
+    private static string Hex(Avalonia.Media.Color c) => $"{c.R:x2}{c.G:x2}{c.B:x2}";
+
+    /// <summary>Persist the editor's painted keys plus its base and paint colors into the device's lighting config.</summary>
+    private void SavePerKeyColors(
+        string? configKey, IReadOnlyDictionary<byte, Avalonia.Media.Color> painted,
+        Avalonia.Media.Color baseColor, Avalonia.Media.Color paintColor)
+    {
+        if (configKey is null) return;
+        var perKey = new Dictionary<byte, string>();
+        foreach (var (zone, c) in painted) perKey[zone] = Hex(c);
+        var existing = _config.Lighting(configKey);
+        _config.SetLighting(configKey, new Lighting
+        {
+            Enabled = existing?.Enabled ?? LightingEnabled,
+            Color = Hex(baseColor),       // base color == the unpainted-key (solid) color
+            Brightness = existing?.Brightness ?? (byte)LightingBrightness,
+            PaintColor = Hex(paintColor), // the editor's brush color
+            PerKey = perKey,
+        });
+        SaveConfig();
+    }
+
     private Dictionary<ButtonId, ButtonBindingViewModel> _bindings = [];
 
     public ObservableCollection<DeviceViewModel> Devices { get; } = [];
@@ -66,7 +115,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private double _imageWidth;
 
     // DPI live controls (slider over the device's supported range + presets).
-    [ObservableProperty] private bool _showDpi;
+    [ObservableProperty][NotifyPropertyChangedFor(nameof(ShowPointerTuning))] private bool _showDpi;
+
+    /// <summary>The Pointer tuning card is shown when the device offers DPI control or native scroll-direction invert.</summary>
+    public bool ShowPointerTuning => ShowDpi || ShowScrollInvert;
     [ObservableProperty] private double _dpiMin;
     [ObservableProperty] private double _dpiMax;
     [ObservableProperty] private double _dpiStep = 50;
@@ -94,6 +146,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public bool IsSmartShift { get => WheelModeChoice == WheelModeChoice.SmartShift; set { if (value) WheelModeChoice = WheelModeChoice.SmartShift; } }
     public bool IsRatchet { get => WheelModeChoice == WheelModeChoice.Ratchet; set { if (value) WheelModeChoice = WheelModeChoice.Ratchet; } }
 
+    // Native scroll-direction invert (HiResWheel 0x2121).
+    [ObservableProperty][NotifyPropertyChangedFor(nameof(ShowPointerTuning))] private bool _showScrollInvert;
+    [ObservableProperty] private bool _invertScroll;
+
     // Hosts (EasySwitch / multi-host).
     [ObservableProperty] private bool _showHosts;
     /// <summary>Whether the selected device can clear/forget host slots (drives the host note + Forget buttons).</summary>
@@ -120,7 +176,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     // Onboard profiles (0x8100) — smooth device-side lighting that survives app close.
     [ObservableProperty] private bool _showProfiles;
-    [ObservableProperty][NotifyPropertyChangedFor(nameof(ShowLightingToggle), nameof(ShowEffect), nameof(ShowColor), nameof(ShowSpeed))] private bool _profileSelected;
+    [ObservableProperty][NotifyPropertyChangedFor(nameof(ShowLightingToggle), nameof(ShowEffect), nameof(ShowColor), nameof(ShowSpeed), nameof(ShowPerKeyButton))] private bool _profileSelected;
     [ObservableProperty] private int _selectedProfileForEdit;
     private byte _profileCount;
 
@@ -129,7 +185,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private ushort _gkeyProfileSector;
 
     // Per-key color editor (PerKeyLighting 0x8081) — shown when the device supports it.
-    [ObservableProperty] private bool _showPerKeyEditor;
+    [ObservableProperty][NotifyPropertyChangedFor(nameof(ShowPerKeyButton))] private bool _showPerKeyEditor;
+
+    /// <summary>
+    /// The per-key editor drives lighting live via host mode, which only applies in
+    /// "No profile" mode — with an onboard profile selected the keyboard replays its
+    /// own stored lighting, so the button is hidden there.
+    /// </summary>
+    public bool ShowPerKeyButton => ShowPerKeyEditor && !ProfileSelected;
 
     // Backlight brightness (BrightnessControl 0x8040) — hardware-verified.
     [ObservableProperty] private bool _showBacklight;
@@ -248,6 +311,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _bindings = [];
         ShowDpi = false;
         ShowSmartShift = false;
+        ShowScrollInvert = false;
         ShowHosts = false;
         ShowBacklight = false;
         ShowPerKeyEditor = false;
@@ -417,6 +481,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 var session = await DeviceSession.OpenAsync(route);
                 if (session is null) continue;
                 var ck = mouse.ConfigKey; // capture this mouse's bindings, not the global selection
+                // The native scroll-invert bit (0x2121) is volatile — restore the
+                // persisted preference whenever the mouse (re)connects. No-op if unsupported.
+                if (ck is not null) await session.ApplyScrollInvertAsync(_config.InvertScroll(ck));
                 var capture = await session.StartDpiButtonCaptureAsync(() => _agent.DispatchDivertedButton(ck, ButtonId.DpiToggle));
                 if (capture is null) { await session.DisposeAsync(); continue; } // no divertable DPI button
                 _mouseCaptures.Add(new MouseCapture(mouse, session, capture));
@@ -477,6 +544,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 AutoDisengage = ss.AutoDisengage is 0 or 0xFF ? 16 : ss.AutoDisengage;
                 ShowSmartShift = true;
             }
+            if (await session.ReadScrollInvertAsync() is { } inverted && ReferenceEquals(SelectedDevice, device))
+            {
+                // The device's live state reflects the persisted preference (reapplied
+                // on connect, since the 0x2121 invert bit is volatile).
+                InvertScroll = inverted;
+                ShowScrollInvert = true;
+            }
             if (await session.ReadHostsAsync() is { } hosts && ReferenceEquals(SelectedDevice, device))
                 RebuildHosts(hosts);
             if (await session.ReadBrightnessAsync() is { } bright && ReferenceEquals(SelectedDevice, device))
@@ -490,6 +564,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 _profileCount = prof.Info.ProfileCount;
                 RebuildProfiles(prof.Current);
                 ShowProfiles = prof.Info.ProfileCount >= 1;
+                if (prof.Current >= 1 && ReferenceEquals(SelectedDevice, device))
+                    await LoadProfileLightingAsync(prof.Current);
 
                 if (session.SupportsGKeys)
                 {
@@ -644,6 +720,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
+    partial void OnInvertScrollChanged(bool value) { if (!_loadingControls) _ = ApplyScrollInvertAsync(value); }
+
+    private async Task ApplyScrollInvertAsync(bool invert)
+    {
+        if (_session is not null) await _session.ApplyScrollInvertAsync(invert);
+        if (SelectedDevice?.ConfigKey is { } ck) { _config.SetInvertScroll(ck, invert); SaveConfig(); }
+    }
+
     partial void OnBacklightValueChanged(double value)
     {
         if (_loadingControls || _session is null) return;
@@ -666,6 +750,36 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             Profiles.Add(new ProfileSlotViewModel(i, i == current));
         SelectedProfileForEdit = current;
         ProfileSelected = current >= 1;
+    }
+
+    /// <summary>
+    /// Populate the effect/colour/speed/brightness controls from a profile's stored
+    /// lighting descriptor, so selecting a profile reflects what it's actually
+    /// configured to do. No-op for "No profile" (0) or unreadable profiles.
+    /// </summary>
+    private async Task LoadProfileLightingAsync(int profileNumber)
+    {
+        if (_session is null || profileNumber < 1) return;
+        if (await _session.ReadProfileEffectAsync((ushort)profileNumber) is not { } pl) return;
+        var prev = _loadingControls;
+        _loadingControls = true; // the partial handlers below would otherwise drive live lighting
+        try
+        {
+            SelectedEffect = pl.Effect switch
+            {
+                DeviceSession.EffectOff => LightingEffect.Off,
+                DeviceSession.EffectBreathing => LightingEffect.Breathing,
+                DeviceSession.EffectCycle => LightingEffect.Cycle,
+                _ => LightingEffect.Solid,
+            };
+            if (SelectedEffect is LightingEffect.Solid or LightingEffect.Breathing)
+                LightingColor = Avalonia.Media.Color.FromRgb(pl.R, pl.G, pl.B);
+            if (SelectedEffect == LightingEffect.Breathing && pl.PeriodMs > 0)
+                LightingSpeed = pl.PeriodMs;
+            if (SelectedEffect is LightingEffect.Breathing or LightingEffect.Cycle)
+                LightingBrightness = pl.Brightness;
+        }
+        finally { _loadingControls = prev; }
     }
 
     /// <summary>Write a remapped G-key into the active onboard profile (persists on-device).</summary>
@@ -727,7 +841,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         await _session.SwitchProfileAsync((byte)slot.Number); // ensures onboard mode internally
         if (await _session.ReadProfilesAsync() is { } prof)
+        {
             RebuildProfiles(prof.Current);
+            await LoadProfileLightingAsync(prof.Current);
+        }
     }
 
     // Live host-mode lighting only applies in "No profile" mode; with a real profile
@@ -764,11 +881,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         if (SelectedDevice?.ConfigKey is not { } ck) return;
         var c = LightingColor;
+        var existing = _config.Lighting(ck);
         _config.SetLighting(ck, new Lighting
         {
             Enabled = LightingEnabled,
             Color = $"{c.R:x2}{c.G:x2}{c.B:x2}",
             Brightness = (byte)LightingBrightness,
+            PaintColor = existing?.PaintColor,
+            PerKey = existing?.PerKey ?? new Dictionary<byte, string>(),
         });
         SaveConfig();
     }

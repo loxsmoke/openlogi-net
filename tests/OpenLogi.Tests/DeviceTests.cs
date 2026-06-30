@@ -28,6 +28,9 @@ public class DeviceTests
         var keyboard = Capabilities.FromFeatureIds([0x0001, 0x8080]);
         Assert.Equal(new Capabilities { Lighting = true }, keyboard);
 
+        var invertibleWheel = Capabilities.FromFeatureIds([0x0003, 0x1b04, 0x2202, 0x2121]);
+        Assert.Equal(new Capabilities { Buttons = true, Pointer = true, ScrollInversion = true }, invertibleWheel);
+
         Assert.Equal(new Capabilities(), Capabilities.FromFeatureIds([0x0000, 0x0003]));
     }
 

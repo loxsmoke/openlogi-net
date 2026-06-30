@@ -119,6 +119,35 @@ public class SmartShiftEnhancedTests
     }
 }
 
+public class HiResWheelTests
+{
+    [Fact]
+    public void InvertIsBit2()
+    {
+        Assert.True(HiResWheelMode.FromByte(0x04).Inverted);
+        Assert.False(HiResWheelMode.FromByte(0x03).Inverted); // target + resolution, no invert
+        Assert.Equal(0x04, new HiResWheelMode(false, false, true).ToByte());
+    }
+
+    [Fact]
+    public void ModeByteRoundTrips()
+    {
+        for (byte b = 0; b < 8; b++)
+            Assert.Equal(b, HiResWheelMode.FromByte(b).ToByte());
+    }
+
+    [Fact]
+    public void TogglingInvertPreservesResolutionAndTarget()
+    {
+        // high-res + diverted, currently not inverted (0x03)
+        var mode = HiResWheelMode.FromByte(0x03);
+        var inverted = mode with { Inverted = true };
+        Assert.Equal(0x07, inverted.ToByte());      // gained only the invert bit
+        Assert.True(inverted.HighResolution && inverted.Diverted);
+        Assert.Equal(0x03, (inverted with { Inverted = false }).ToByte());
+    }
+}
+
 public class HostFeatureTests
 {
     [Fact]

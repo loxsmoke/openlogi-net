@@ -66,8 +66,8 @@ public partial class MainWindow : Window
     // Opens the per-key color editor (keyboards with PerKeyLighting 0x8081).
     private void OnOpenPerKeyEditor(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is MainWindowViewModel { PerKeySession: { } session })
-            new PerKeyColorWindow(session).Show(this);
+        if (DataContext is MainWindowViewModel vm && vm.CreatePerKeyEditor() is { } editor)
+            new PerKeyColorWindow(editor).Show(this);
     }
 
     private void OnSettings(object? sender, RoutedEventArgs e)

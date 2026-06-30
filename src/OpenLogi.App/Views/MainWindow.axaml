@@ -203,48 +203,58 @@
                 <TabItem Header="Pointer" IsVisible="{Binding HasPointerTab}">
                     <ScrollViewer>
                         <WrapPanel Margin="8">
-                            <!-- Pointer tuning (DPI) -->
+                            <!-- Pointer tuning (DPI) + native scroll-direction invert (HiResWheel 0x2121) -->
                             <Border Margin="8" Padding="16" Background="#11000000" CornerRadius="8"
-                                    MinWidth="340" IsVisible="{Binding ShowDpi}">
+                                    MinWidth="340" MaxWidth="340" VerticalAlignment="Stretch"
+                                    IsVisible="{Binding ShowPointerTuning}">
                                 <StackPanel Spacing="10">
-                                    <TextBlock Text="Pointer tuning" FontSize="15" FontWeight="SemiBold"/>
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <TextBlock Grid.Column="0" Text="DPI" Opacity="0.7"/>
-                                        <TextBlock Grid.Column="1" Text="{Binding DpiText}" Foreground="#3B82F6" FontWeight="SemiBold"/>
-                                    </Grid>
-                                    <Slider Minimum="{Binding DpiMin}" Maximum="{Binding DpiMax}"
-                                            TickFrequency="{Binding DpiStep}" IsSnapToTickEnabled="True"
-                                            Value="{Binding DpiValue}"/>
-                                    <TextBlock Text="{Binding DpiRangeText}" Opacity="0.5" FontSize="11"/>
-                                    <TextBlock Text="PRESETS" Opacity="0.5" FontSize="11" Margin="0,4,0,0"/>
-                                    <WrapPanel>
-                                        <ItemsControl ItemsSource="{Binding DpiPresets}" x:CompileBindings="False">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border Margin="0,0,6,6" Padding="2" CornerRadius="6" Background="#18000000">
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <Button Content="{Binding}" Padding="8,4" Background="Transparent" BorderThickness="0"
-                                                                    Command="{Binding DataContext.ApplyDpiPresetCommand, ElementName=Root}"
-                                                                    CommandParameter="{Binding}"/>
-                                                            <Button Content="✕" Padding="6,4" Background="Transparent" BorderThickness="0" Opacity="0.6"
-                                                                    Command="{Binding DataContext.RemoveDpiPresetCommand, ElementName=Root}"
-                                                                    CommandParameter="{Binding}"/>
-                                                        </StackPanel>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                        <Button Content="+ Add" Padding="10,4" Command="{Binding AddDpiPresetCommand}"/>
-                                    </WrapPanel>
+                                    <!-- Scroll direction (extra bottom margin separates it from Pointer tuning below) -->
+                                    <StackPanel Spacing="6" Margin="0,0,0,8" IsVisible="{Binding ShowScrollInvert}">
+                                        <TextBlock Text="Scroll direction" FontSize="15" FontWeight="SemiBold"/>
+                                        <CheckBox Content="Invert scroll direction" IsChecked="{Binding InvertScroll}"/>
+                                        <TextBlock Text="Reverses the wheel in firmware (natural scrolling). Reapplied automatically when the mouse reconnects."
+                                                   Opacity="0.5" FontSize="11" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <StackPanel Spacing="10" IsVisible="{Binding ShowDpi}">
+                                        <TextBlock Text="Pointer tuning" FontSize="15" FontWeight="SemiBold"/>
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Grid.Column="0" Text="DPI" Opacity="0.7"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding DpiText}" Foreground="#3B82F6" FontWeight="SemiBold"/>
+                                        </Grid>
+                                        <Slider Minimum="{Binding DpiMin}" Maximum="{Binding DpiMax}"
+                                                TickFrequency="{Binding DpiStep}" IsSnapToTickEnabled="True"
+                                                Value="{Binding DpiValue}"/>
+                                        <TextBlock Text="{Binding DpiRangeText}" Opacity="0.5" FontSize="11"/>
+                                        <TextBlock Text="PRESETS" Opacity="0.5" FontSize="11" Margin="0,4,0,0"/>
+                                        <WrapPanel>
+                                            <ItemsControl ItemsSource="{Binding DpiPresets}" x:CompileBindings="False">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Margin="0,0,6,6" Padding="2" CornerRadius="6" Background="#18000000">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <Button Content="{Binding}" Padding="8,4" Background="Transparent" BorderThickness="0"
+                                                                        Command="{Binding DataContext.ApplyDpiPresetCommand, ElementName=Root}"
+                                                                        CommandParameter="{Binding}"/>
+                                                                <Button Content="✕" Padding="6,4" Background="Transparent" BorderThickness="0" Opacity="0.6"
+                                                                        Command="{Binding DataContext.RemoveDpiPresetCommand, ElementName=Root}"
+                                                                        CommandParameter="{Binding}"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <Button Content="+ Add" Padding="10,4" Command="{Binding AddDpiPresetCommand}"/>
+                                        </WrapPanel>
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
 
                             <!-- SmartShift -->
                             <Border Margin="8" Padding="16" Background="#11000000" CornerRadius="8"
-                                    MinWidth="340" IsVisible="{Binding ShowSmartShift}">
+                                    MinWidth="340" VerticalAlignment="Stretch" IsVisible="{Binding ShowSmartShift}">
                                 <StackPanel Spacing="12">
                                     <TextBlock Text="SmartShift / Smart Scrolling" FontSize="15" FontWeight="SemiBold"/>
                                     <StackPanel Spacing="8">
@@ -350,10 +360,11 @@
                                     </StackPanel>
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Button Content="Restore keyboard default" Command="{Binding RestoreKeyboardDefaultCommand}"/>
+                                    <Button Content="Restore keyboard default" IsVisible="{Binding !ProfileSelected}"
+                                            Command="{Binding RestoreKeyboardDefaultCommand}"/>
                                     <Button Content="Save lighting to this profile" IsVisible="{Binding ProfileSelected}"
                                             Command="{Binding SaveLightingToProfileCommand}"/>
-                                    <Button Content="Per-key colors…" IsVisible="{Binding ShowPerKeyEditor}"
+                                    <Button Content="Per-key colors…" IsVisible="{Binding ShowPerKeyButton}"
                                             Click="OnOpenPerKeyEditor"/>
                                 </StackPanel>
                                 <TextBlock TextWrapping="Wrap" Opacity="0.5" FontSize="12" IsVisible="{Binding !ProfileSelected}"

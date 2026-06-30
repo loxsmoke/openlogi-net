@@ -16,6 +16,9 @@ public sealed record SmartShiftSnapshot(bool Ratchet, byte AutoDisengage, byte T
 /// <summary>One host slot's detail.</summary>
 public sealed record HostDetail(int Index, bool IsCurrent, bool Paired, string BusType, string? Name);
 
+/// <summary>A profile's stored lighting descriptor (first LED zone): effect byte, colour, and Breathing/Cycle period+brightness.</summary>
+public readonly record struct ProfileLighting(byte Effect, byte R, byte G, byte B, ushort PeriodMs, byte Brightness);
+
 /// <summary>Host (EasySwitch) state: count, current slot (0-based), per-slot detail, and whether slots can be cleared.</summary>
 public sealed record HostSnapshot(byte HostCount, byte CurrentHost, IReadOnlyList<HostDetail> Hosts, bool SupportsDelete);
 
@@ -40,14 +43,25 @@ public sealed class DeviceSession : IAsyncDisposable
 
     /// <summary>
     /// Open a session for <paramref name="route"/>, or <c>null</c> if unreachable.
-    /// A composite device (e.g. the G915 keyboard) exposes several HID++
-    /// interfaces with different feature subsets; for a direct device we keep the
-    /// one that enumerates the most features (the main control interface).
+    /// A composite device (e.g. the G915 keyboard) exposes several HID++ interfaces
+    /// with different feature subsets; we keep the best-scoring one (preferring the
+    /// interface that carries the control features over a mere feature-count lead),
+    /// since enumeration order isn't stable and only one interface is the real
+    /// control interface.
     /// </summary>
     public static async Task<DeviceSession?> OpenAsync(DeviceRoute route)
     {
         DeviceSession? best = null;
-        var bestCount = -1;
+        var bestScore = -1;
+
+        // The interface carrying OnboardProfiles (0x8100) is the keyboard's real
+        // control interface — needed both to read profiles AND to enter host mode for
+        // per-key lighting. A composite device exposes several HID++ interfaces, so
+        // strongly prefer that one (then PerKeyLighting), then raw feature count.
+        static int Score(HidppDevice device, int featureCount) =>
+            (device.FeatureIndex(0x8100) is not null ? 1000 : 0)
+            + (device.FeatureIndex(0x8081) is not null ? 500 : 0)
+            + featureCount;
 
         foreach (var hid in HidDiscovery.EnumerateHidppDevices())
         {
@@ -65,12 +79,12 @@ public sealed class DeviceSession : IAsyncDisposable
             }
 
             HidppDevice device;
-            int featureCount;
+            int score;
             try
             {
                 device = await HidppDevice.NewAsync(channel, route.DeviceIndex()).ConfigureAwait(false);
                 var features = await device.EnumerateFeaturesAsync().ConfigureAwait(false);
-                featureCount = features?.Count ?? 0;
+                score = Score(device, features?.Count ?? 0);
             }
             catch
             {
@@ -78,16 +92,14 @@ public sealed class DeviceSession : IAsyncDisposable
                 continue;
             }
 
-            // A receiver match is unique — use it. For a direct device, keep the
-            // richest interface among the (possibly several) matching nodes.
-            if (route is not DeviceRoute.Direct)
-                return new DeviceSession(channel, device);
-
-            if (featureCount > bestCount)
+            // Keep the best-scoring interface among all matching nodes. (Both direct
+            // and receiver-routed composite devices can expose several interfaces;
+            // picking by score avoids landing on one missing 0x8100/0x8081.)
+            if (score > bestScore)
             {
                 if (best is not null) await best.DisposeAsync().ConfigureAwait(false);
                 best = new DeviceSession(channel, device);
-                bestCount = featureCount;
+                bestScore = score;
             }
             else
             {
@@ -183,6 +195,36 @@ public sealed class DeviceSession : IAsyncDisposable
         }
         catch { /* ignore */ }
         return false;
+    }
+
+    // ── Scroll direction (HiResWheel 0x2121) ─────────────────────────────────
+
+    /// <summary>
+    /// Read whether the wheel is currently inverted via HiResWheel (0x2121), or
+    /// <c>null</c> if the device has no native scroll-direction control.
+    /// </summary>
+    public async Task<bool?> ReadScrollInvertAsync()
+    {
+        if (_device.GetFeature<HiResWheelFeature>() is not { } wheel) return null;
+        try { return (await wheel.GetModeAsync().ConfigureAwait(false)).Inverted; }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Flip (or restore) the wheel's rotation direction natively in firmware,
+    /// preserving the device's current resolution/target bits. Writes to the
+    /// device; the bit is volatile, so reapply on connect. <c>false</c> if no 0x2121.
+    /// </summary>
+    public async Task<bool> ApplyScrollInvertAsync(bool invert)
+    {
+        if (_device.GetFeature<HiResWheelFeature>() is not { } wheel) return false;
+        try
+        {
+            var mode = await wheel.GetModeAsync().ConfigureAwait(false);
+            await wheel.SetModeAsync(mode with { Inverted = invert }).ConfigureAwait(false);
+            return true;
+        }
+        catch { return false; }
     }
 
     // ── Lighting ────────────────────────────────────────────────────────────
@@ -339,7 +381,44 @@ public sealed class DeviceSession : IAsyncDisposable
     public async Task<(OnboardProfilesInfo Info, byte Current)?> ReadProfilesAsync()
     {
         if (_device.GetFeature<OnboardProfilesFeature>() is not { } ob) return null;
-        try { return (await ob.GetInfoAsync().ConfigureAwait(false), await ob.GetCurrentProfileAsync().ConfigureAwait(false)); }
+
+        // getCurrentProfile only answers in onboard mode; default to 0 ("No profile")
+        // when it can't be read so it doesn't sink the whole read.
+        async Task<(OnboardProfilesInfo Info, byte Current)> ReadOnceAsync()
+        {
+            var info = await ob.GetInfoAsync().ConfigureAwait(false);
+            byte current;
+            try { current = await ob.GetCurrentProfileAsync().ConfigureAwait(false); }
+            catch { current = 0; }
+            return (info, current);
+        }
+
+        // Try in the current mode first (no side effects if it answers).
+        try
+        {
+            if (await ReadOnceAsync().ConfigureAwait(false) is { Info.ProfileCount: > 0 } ok)
+                return ok;
+        }
+        catch { /* fall through to the onboard retry */ }
+
+        // The device may be stuck in host mode (after the editor / solid lighting),
+        // where the profile read can fail or report nothing. Switch to onboard, read,
+        // then restore host mode so the lighting mode is left as it was.
+        try
+        {
+            byte mode;
+            try { mode = await ob.GetModeAsync().ConfigureAwait(false); }
+            catch { return null; }
+            if (mode != OnboardProfilesFeature.ModeHost) return null; // already onboard; nothing else to try
+
+            await ob.SetModeAsync(OnboardProfilesFeature.ModeOnboard).ConfigureAwait(false);
+            try { return await ReadOnceAsync().ConfigureAwait(false); }
+            finally
+            {
+                try { await ob.SetModeAsync(OnboardProfilesFeature.ModeHost).ConfigureAwait(false); }
+                catch { /* leave it onboard if the restore fails */ }
+            }
+        }
         catch { return null; }
     }
 
@@ -471,6 +550,26 @@ public sealed class DeviceSession : IAsyncDisposable
         foreach (var off in ProfileLedOffsets)
             Array.Copy(desc, 0, data, off, 11);
         return await WriteProfileSectorAsync(profileSector, data).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Read a profile's stored lighting descriptor (the first LED zone), the inverse
+    /// of <see cref="SetProfileEffectAsync"/>. <c>null</c> if no 0x8100 / unreadable.
+    /// Period/brightness are only meaningful for Breathing/Cycle (see the write layout).
+    /// </summary>
+    public async Task<ProfileLighting?> ReadProfileEffectAsync(ushort profileSector)
+    {
+        var data = await ReadFullSectorAsync(profileSector, 255).ConfigureAwait(false);
+        if (data is null) return null;
+        var off = ProfileLedOffsets[0];
+        var effect = data[off];
+        var (period, brightness) = effect switch
+        {
+            EffectBreathing => ((ushort)((data[off + 4] << 8) | data[off + 5]), data[off + 6]),
+            EffectCycle => ((ushort)((data[off + 6] << 8) | data[off + 7]), data[off + 8]),
+            _ => ((ushort)0, (byte)100),
+        };
+        return new ProfileLighting(effect, data[off + 1], data[off + 2], data[off + 3], period, brightness);
     }
 
     /// <summary>

@@ -79,7 +79,7 @@ public sealed record Capabilities
             Buttons = Has(buttons),
             Pointer = Has(pointer),
             Lighting = Has(lighting),
-            ScrollInversion = false,
+            ScrollInversion = ids.Contains((ushort)0x2121),
             GKeys = ids.Contains((ushort)0x8010),
         };
     }
