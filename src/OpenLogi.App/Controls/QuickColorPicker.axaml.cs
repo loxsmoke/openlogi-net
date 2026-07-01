@@ -20,6 +20,16 @@ public partial class QuickColorPicker : UserControl
         set => SetValue(ColorProperty, value);
     }
 
+    /// <summary>Show an "off" (black) swatch — used by the per-key editor, hidden on the Lighting page.</summary>
+    public static readonly StyledProperty<bool> ShowOffProperty =
+        AvaloniaProperty.Register<QuickColorPicker, bool>(nameof(ShowOff));
+
+    public bool ShowOff
+    {
+        get => GetValue(ShowOffProperty);
+        set => SetValue(ShowOffProperty, value);
+    }
+
     public QuickColorPicker() => InitializeComponent();
 
     private void InitializeComponent() => AvaloniaXamlLoader.Load(this);

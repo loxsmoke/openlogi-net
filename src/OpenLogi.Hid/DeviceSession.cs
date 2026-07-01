@@ -421,7 +421,7 @@ public sealed class DeviceSession : IAsyncDisposable
             var info = await ob.GetInfoAsync().ConfigureAwait(false);
             byte current;
             try { current = await ob.GetCurrentProfileAsync().ConfigureAwait(false); }
-            catch { current = 0; }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"ReadProfiles: getCurrentProfile failed: {ex}"); current = 0; }
             return (info, current);
         }
 
@@ -431,7 +431,7 @@ public sealed class DeviceSession : IAsyncDisposable
             if (await ReadOnceAsync().ConfigureAwait(false) is { Info.ProfileCount: > 0 } ok)
                 return ok;
         }
-        catch { /* fall through to the onboard retry */ }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"ReadProfiles: read in current mode failed, trying onboard: {ex}"); }
 
         // The device may be stuck in host mode (after the editor / solid lighting),
         // where the profile read can fail or report nothing. Switch to onboard, read,
@@ -440,7 +440,7 @@ public sealed class DeviceSession : IAsyncDisposable
         {
             byte mode;
             try { mode = await ob.GetModeAsync().ConfigureAwait(false); }
-            catch { return null; }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"ReadProfiles: getMode failed: {ex}"); return null; }
             if (mode != OnboardProfilesFeature.ModeHost) return null; // already onboard; nothing else to try
 
             await ob.SetModeAsync(OnboardProfilesFeature.ModeOnboard).ConfigureAwait(false);
@@ -448,10 +448,10 @@ public sealed class DeviceSession : IAsyncDisposable
             finally
             {
                 try { await ob.SetModeAsync(OnboardProfilesFeature.ModeHost).ConfigureAwait(false); }
-                catch { /* leave it onboard if the restore fails */ }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"ReadProfiles: restore host mode failed: {ex}"); }
             }
         }
-        catch { return null; }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"ReadProfiles: onboard-mode read failed: {ex}"); return null; }
     }
 
     /// <summary>Read 16 bytes at sector/offset (OnboardProfiles readMemory), or <c>null</c> if no 0x8100.</summary>
@@ -764,6 +764,27 @@ public sealed class DeviceSession : IAsyncDisposable
         {
             await EnsureHostModeAsync().ConfigureAwait(false);
             await pk.SetRangeRgbZonesAsync([new RgbZoneRange(0x00, 0xfe, 0, 0, 0)]).ConfigureAwait(false); // clear to dark (awaited)
+            foreach (var (zone, c) in map)
+                await pk.SetSingleValueAsync(c.R, c.G, c.B, [zone]).ConfigureAwait(false);
+            await pk.FrameEndAsync(PerKeyLightingFeature.FramePersistenceVolatile).ConfigureAwait(false);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Apply a per-key color map over a solid base via 0x8081: host mode, fill every
+    /// zone with the base color, then set each mapped (painted) zone, then commit.
+    /// Restores the saved "No profile" per-key look (base = unpainted-key color)
+    /// without opening the editor. Returns false if no 0x8081.
+    /// </summary>
+    public async Task<bool> ApplyPerKeyMapAsync(byte baseR, byte baseG, byte baseB, IReadOnlyDictionary<byte, (byte R, byte G, byte B)> map)
+    {
+        if (_device.GetFeature<PerKeyLightingFeature>() is not { } pk) return false;
+        try
+        {
+            await EnsureHostModeAsync().ConfigureAwait(false);
+            await pk.SetRangeRgbZonesAsync([new RgbZoneRange(0x00, 0xfe, baseR, baseG, baseB)]).ConfigureAwait(false); // base fill
             foreach (var (zone, c) in map)
                 await pk.SetSingleValueAsync(c.R, c.G, c.B, [zone]).ConfigureAwait(false);
             await pk.FrameEndAsync(PerKeyLightingFeature.FramePersistenceVolatile).ConfigureAwait(false);

@@ -959,8 +959,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         if (slot.Number == 0)
         {
-            RebuildProfiles(0);          // "No profile" selected
-            await ApplySolidAsync();     // custom colour via host mode
+            RebuildProfiles(0);                  // "No profile" selected
+            await ApplyNoProfileLightingAsync(); // saved per-key colors, else solid
             return;
         }
 
@@ -985,6 +985,35 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         SaveLightingConfig();
         ClearProfileSelection(); // a live custom colour means no onboard profile is active
         _ = ApplySolidAsync();
+    }
+
+    /// <summary>
+    /// Apply the "No profile" lighting: the saved per-key colors (base fill + painted
+    /// keys) when the device supports per-key and any are saved, else the solid custom
+    /// colour. Lets selecting "No profile" restore custom key colors without opening
+    /// the editor. Per-key colors are applied at full value (matching the editor), so
+    /// the Intensity slider doesn't scale them.
+    /// </summary>
+    private async Task ApplyNoProfileLightingAsync()
+    {
+        if (_session is null) return;
+        var ck = SelectedDevice?.ConfigKey;
+        var perKey = ck is not null ? _config.Lighting(ck)?.PerKey : null;
+        if (LightingEnabled && _session.SupportsPerKey && perKey is { Count: > 0 })
+        {
+            var b = LightingColor; // base = the unpainted-key colour
+            var map = new Dictionary<byte, (byte R, byte G, byte B)>(perKey.Count);
+            foreach (var (zone, hex) in perKey)
+            {
+                var c = ParseHexColor(hex);
+                map[zone] = (c.R, c.G, c.B);
+            }
+            await _session.ApplyPerKeyMapAsync(b.R, b.G, b.B, map);
+        }
+        else
+        {
+            await ApplySolidAsync();
+        }
     }
 
     private async Task ApplySolidAsync()

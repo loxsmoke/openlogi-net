@@ -25,5 +25,11 @@
         <Border Classes="swatch" Background="#1E88E5" Tag="#1E88E5" PointerPressed="OnSwatch"/>
         <Border Classes="swatch" Background="#8E24AA" Tag="#8E24AA" PointerPressed="OnSwatch"/>
         <Border Classes="swatch" Background="#FFFFFF" Tag="#FFFFFF" PointerPressed="OnSwatch"/>
+        <!-- "Off" — paints the key/base dark. Only shown when ShowOff is set (per-key editor). -->
+        <Border Classes="swatch" Tag="#000000" PointerPressed="OnSwatch" Background="#1A1A1A"
+                IsVisible="{Binding ShowOff, ElementName=Root}" ToolTip.Tip="Off (turns the key off)">
+            <Path Stretch="Fill" Margin="5" Stroke="#E53935" StrokeThickness="2"
+                  StrokeLineCap="Round" Data="M0,0 L1,1"/>
+        </Border>
     </StackPanel>
 </UserControl>

@@ -13,9 +13,9 @@
         <TextBlock TextWrapping="Wrap"
                    Text="Press a physical key on the keyboard to paint it with the color below. Press the same key again to reset it to the base color."/>
         <TextBlock Text="Paint color" FontWeight="SemiBold"/>
-        <ctrl:QuickColorPicker Color="{Binding SelectedColor}" HorizontalAlignment="Left"/>
+        <ctrl:QuickColorPicker Color="{Binding SelectedColor}" ShowOff="True" HorizontalAlignment="Left"/>
         <TextBlock Text="Base color" FontWeight="SemiBold"/>
-        <ctrl:QuickColorPicker Color="{Binding BaseColor}" HorizontalAlignment="Left"/>
+        <ctrl:QuickColorPicker Color="{Binding BaseColor}" ShowOff="True" HorizontalAlignment="Left"/>
         <Button Content="Reset all keys to base (Alt+R)" Click="OnResetAll"
                 Focusable="False" IsTabStop="False"/>
         <TextBlock Text="Special keys (OS swallows these — click to paint)" FontWeight="SemiBold"/>
