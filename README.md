@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/loxsmoke/openlogi-net/actions/workflows/ci.yml/badge.svg)](https://github.com/loxsmoke/openlogi-net/actions/workflows/ci.yml)
 [![Download – Releases](https://img.shields.io/github/v/release/loxsmoke/openlogi-net?label=Download%20%E2%80%93%20Releases&logo=github)](https://github.com/loxsmoke/openlogi-net/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/loxsmoke/openlogi-net/total?label=Downloads&logo=github)](https://github.com/loxsmoke/openlogi-net/releases)
 
 📥 **[Download the latest release](https://github.com/loxsmoke/openlogi-net/releases/latest)** — installer or portable build.
 
