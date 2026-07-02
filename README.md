@@ -43,7 +43,6 @@ It ships two binaries:
 - **Remap buttons** to a catalog of actions and custom keyboard shortcuts.
 - **DPI control** — read and set sensitivity, with presets.
 - **SmartShift** — toggle the wheel ratchet mode and tune sensitivity.
-- **Gestures** — assign per-direction actions to a gesture button.
 - **RGB lighting** — solid colors, per-key colors, brightness, and built-in
   effects on supported keyboards.
 - **Onboard profiles** — read, switch, and write the device's onboard
