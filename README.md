@@ -7,8 +7,9 @@
 📥 **[Download the latest release](https://github.com/loxsmoke/openlogi-net/releases/latest)** — installer or portable build.
 
 **A native, local-first alternative to Logitech Options+ for Windows.** Remap
-buttons, drive DPI and SmartShift, control RGB lighting, and switch profiles over
-HID++ — without a Logitech account, telemetry, or the Options+ install.
+buttons, set up hold-and-swipe mouse gestures, drive DPI and SmartShift, control
+RGB lighting, and switch profiles over HID++ — without a Logitech account,
+telemetry, or the Options+ install.
 
 This is a C# / .NET 10 / [Avalonia](https://avaloniaui.net/) rewrite of
 [AprilNEA/OpenLogi](https://github.com/AprilNEA/OpenLogi) (originally written in
@@ -30,9 +31,9 @@ sync, and no telemetry.
 It ships two binaries:
 
 - **OpenLogi.App** — an Avalonia desktop app with an interactive device view,
-  a per-button action picker, DPI and SmartShift controls, RGB lighting
-  (per-key colors and effects), per-application profiles, and a system-tray
-  presence.
+  a per-button action picker, a gesture editor with per-direction actions and
+  presets, DPI and SmartShift controls, RGB lighting (per-key colors and
+  effects), per-application profiles, and a system-tray presence.
 - **OpenLogi.Cli** — a headless command-line tool for device inventory,
   on-device HID++ diagnostics, asset prefetch, and lighting/profile probes.
 
@@ -41,6 +42,12 @@ It ships two binaries:
 - **Discover devices** behind Bolt / Unifying receivers and direct
   Bluetooth / wired connections, with per-device online state and battery level.
 - **Remap buttons** to a catalog of actions and custom keyboard shortcuts.
+- **Mouse gestures** — hold a button and swipe up / down / left / right for four
+  actions, with a plain tap as a fifth. Works with the dedicated MX gesture
+  button *or* any capable button (Middle, Back, Forward, the wheel-mode button) —
+  several at once — with Options+-style presets (Windows & Desktops, Media &
+  Volume, Arrange Windows…) or fully custom per-direction actions. See
+  [docs/MOUSE_GESTURES.md](docs/MOUSE_GESTURES.md).
 - **DPI control** — read and set sensitivity, with presets.
 - **SmartShift** — toggle the wheel ratchet mode and tune sensitivity.
 - **RGB lighting** — solid colors, per-key colors, brightness, and built-in
@@ -65,6 +72,7 @@ Windows only as an early, untested preview. openlogi-net flips that priority:
 | Language / UI | Rust + GPUI | C# / .NET 10 + Avalonia |
 | Primary platform | macOS + Linux | **Windows** |
 | HID++ transport | macOS/Linux HID stacks | Windows raw HID |
+| Mouse gestures | One gesture button per device (MX gesture button, or OS-hook capture) | **Any capable button, several at once**, all over HID++, with gesture-set presets |
 | Distribution | `.dmg`, Homebrew, `.deb`/`.rpm` | Windows installer + portable zip |
 
 This is an independent rewrite, not a fork of the Rust code — the core logic

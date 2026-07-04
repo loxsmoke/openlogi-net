@@ -37,24 +37,28 @@ public static class BindingMaps
     }
 
     /// <summary>
-    /// Effective gesture bindings for the dedicated HID++ gesture button on
-    /// <paramref name="configKey"/>; empty unless that button owns gestures.
+    /// Effective gesture bindings for one gesture-configured <paramref name="button"/>
+    /// on <paramref name="configKey"/> — the dedicated gesture button or any physical
+    /// button (Middle/Back/Forward, DPI/wheel) with a gesture map. Several buttons may
+    /// gesture at once; empty when this button has none or gestures are globally off.
+    /// The dedicated gesture button falls back to the built-in per-direction defaults;
+    /// other buttons only do what was explicitly configured. On Windows every gesture
+    /// button is captured over HID++ (the WH_MOUSE_LL hook has no per-hold move
+    /// deltas); <see cref="OsHookGesturesFor"/> exists for the macOS/Linux hook model
+    /// and is unused on Windows.
     /// </summary>
-    public static SortedDictionary<GestureDirection, Action> GestureBindingsFor(Config config, string? configKey)
+    public static SortedDictionary<GestureDirection, Action> GestureBindingsFor(
+        Config config, string? configKey, ButtonId button)
     {
-        var owner = configKey is not null ? config.GestureOwner(configKey) : null;
-        if (owner != ButtonId.GestureButton)
-            return new SortedDictionary<GestureDirection, Action>();
-
-        var stored = configKey is not null
-            ? config.GestureBindingsFor(configKey)
-            : new SortedDictionary<GestureDirection, Action>();
-
         var bindings = new SortedDictionary<GestureDirection, Action>();
+        if (configKey is null || !config.GestureButtons(configKey).Contains(button))
+            return bindings;
+
+        var stored = config.GestureBindingsFor(configKey, button);
         foreach (var d in GestureDirectionExtensions.All)
-            bindings[d] = Core.Bindings.DefaultGestureBinding(d);
-        foreach (var (k, v) in stored)
-            bindings[k] = v;
+            bindings[d] = stored.TryGetValue(d, out var a) ? a
+                : button == ButtonId.GestureButton ? Core.Bindings.DefaultGestureBinding(d)
+                : Action.None;
         return bindings;
     }
 

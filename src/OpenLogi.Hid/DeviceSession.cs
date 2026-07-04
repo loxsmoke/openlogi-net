@@ -4,6 +4,9 @@ using OpenLogi.HidPP.Device;
 using OpenLogi.HidPP.Feature;
 using OpenLogi.HidPP.Protocol;
 using OpenLogi.HidPP.Receiver;
+// Alias only ButtonId from Core: a blanket `using OpenLogi.Core` would make the
+// unqualified `Action` (used by StartDpiButtonCaptureAsync) ambiguous with System.Action.
+using ButtonId = OpenLogi.Core.ButtonId;
 
 namespace OpenLogi.Hid;
 
@@ -979,6 +982,169 @@ public sealed class DeviceSession : IAsyncDisposable
 
         if (diverted.Count == 0) { rc.Dispose(); return null; }
         return new DpiButtonCapture(rc, diverted, onPressed);
+    }
+
+    /// <summary>
+    /// Control-ID candidates for each button that can drive HID++ gestures, in the
+    /// order they are offered as gesture owners. A device rarely exposes more than
+    /// one candidate per button, so the first that is present and raw-XY-capable is
+    /// used. <see cref="ButtonId.GestureButton"/> is the dedicated MX gesture button
+    /// ("App Switch Gesture", 0x00c3); any other divertable raw-XY button — Middle /
+    /// Back / Forward or the DPI/wheel-mode button — can be repurposed the same way:
+    /// the swipe mechanism is identical, only the diverted control differs. (On
+    /// Windows even the OS-hook buttons gesture over HID++, since the WH_MOUSE_LL
+    /// hook carries no per-hold move deltas.)
+    /// </summary>
+    private static readonly (ButtonId Button, ushort[] Cids)[] GestureCandidates =
+    [
+        (ButtonId.GestureButton, [0x00c3]),
+        (ButtonId.MiddleClick, [0x0052]),
+        (ButtonId.Back, [0x0053]),
+        (ButtonId.Forward, [0x0056]),
+        (ButtonId.DpiToggle, [0x00c4, 0x00ed, 0x00fd]),
+    ];
+
+    /// <summary>
+    /// Which of the gesture-capable buttons this device actually exposes as a
+    /// present, raw-XY-capable, divertable control — the set offered as gesture
+    /// owners in the UI, in <see cref="GestureCandidates"/> order. Empty when the
+    /// device has no 0x1b04 feature or no eligible control.
+    /// </summary>
+    public async Task<IReadOnlyList<ButtonId>> GestureCapableButtonsAsync()
+    {
+        if (_device.GetFeature<ReprogControlsFeature>() is not { } rc) return [];
+        using (rc)
+        {
+            var eligible = new List<ButtonId>();
+            try
+            {
+                var count = await rc.GetCountAsync().ConfigureAwait(false);
+                var present = new Dictionary<ushort, CidFlags>();
+                for (byte i = 0; i < count; i++)
+                {
+                    var info = await rc.GetCidInfoAsync(i).ConfigureAwait(false);
+                    present[info.Cid.Value] = info.Flags;
+                }
+                foreach (var (button, cids) in GestureCandidates)
+                    if (cids.Any(c => present.TryGetValue(c, out var f) && f.SupportsRawXy() && f.IsDivertable()))
+                        eligible.Add(button);
+            }
+            catch { /* device went away mid-scan — return what we have */ }
+            return eligible;
+        }
+    }
+
+    /// <summary>
+    /// Divert the control behind <paramref name="owner"/> (see <see cref="GestureCandidates"/>)
+    /// over 0x1b04 with raw-XY reporting, so a hold-and-swipe on that button is
+    /// captured instead of moving the cursor. <paramref name="onGesture"/> fires once
+    /// per committed swipe — the instant the direction commits mid-motion — and once
+    /// with <see cref="OpenLogi.Core.GestureDirection.Click"/> for a plain press that
+    /// never swiped. Returns a handle that restores the control's native behaviour
+    /// when disposed, or <c>null</c> if the device exposes no raw-XY-capable control
+    /// for that button. Mirrors the DPI-button capture; ported from the Rust gesture
+    /// path in <c>openlogi-hid::gesture</c>.
+    /// </summary>
+    public async Task<IAsyncDisposable?> StartGestureCaptureAsync(
+        ButtonId owner, System.Action<OpenLogi.Core.GestureDirection> onGesture)
+    {
+        var candidates = GestureCandidates.FirstOrDefault(gc => gc.Button == owner).Cids;
+        if (candidates is null) return null;
+        if (_device.GetFeature<ReprogControlsFeature>() is not { } rc) return null;
+
+        ushort? cid = null;
+        try
+        {
+            var count = await rc.GetCountAsync().ConfigureAwait(false);
+            for (byte i = 0; i < count && cid is null; i++)
+            {
+                var info = await rc.GetCidInfoAsync(i).ConfigureAwait(false);
+                // Only divert a control that actually reports raw-XY — without it
+                // there is no swipe travel to read, only a plain click.
+                if (candidates.Contains(info.Cid.Value) && info.Flags.SupportsRawXy())
+                    cid = info.Cid.Value;
+            }
+            if (cid is { } c)
+                await rc.SetCidReportingAsync(new ControlId(c),
+                    CidReportingChange.TemporaryDiversion(diverted: true, rawXy: true)).ConfigureAwait(false);
+        }
+        catch { cid = null; }
+
+        if (cid is not { } gestureCid) { rc.Dispose(); return null; }
+        return new GestureCapture(rc, gestureCid, onGesture);
+    }
+
+    /// <summary>
+    /// Listens for diverted gesture-button events, runs the shared mid-swipe state
+    /// machine, and restores the control on dispose. The device streams raw-XY
+    /// deltas only while the button is held (raw-XY divert), so ordinary pointer
+    /// motion never reaches the accumulator.
+    /// </summary>
+    private sealed class GestureCapture : IAsyncDisposable
+    {
+        private readonly ReprogControlsFeature _rc;
+        private readonly ushort _cid;
+        private readonly CancellationTokenSource _cts = new();
+        private readonly Task _pump;
+
+        public GestureCapture(ReprogControlsFeature rc, ushort cid, System.Action<OpenLogi.Core.GestureDirection> onGesture)
+        {
+            _rc = rc;
+            _cid = cid;
+            _pump = PumpAsync(rc.Listen(), onGesture, _cts.Token);
+        }
+
+        private async Task PumpAsync(
+            ChannelReader<ReprogControlsEvent> reader,
+            System.Action<OpenLogi.Core.GestureDirection> onGesture,
+            CancellationToken ct)
+        {
+            var swipe = new OpenLogi.Core.SwipeAccumulator();
+            try
+            {
+                await foreach (var ev in reader.ReadAllAsync(ct).ConfigureAwait(false))
+                {
+                    switch (ev)
+                    {
+                        case ReprogControlsEvent.DivertedButtons db:
+                        {
+                            // Begin a hold on the rising edge of the gesture button, and on
+                            // the falling edge fire a plain Click when no swipe committed.
+                            var held = db.Controls.Any(c => c.Value == _cid);
+                            if (held && !swipe.IsHolding)
+                                swipe.Begin();
+                            else if (!held && swipe.IsHolding && swipe.End())
+                                onGesture(OpenLogi.Core.GestureDirection.Click);
+                            break;
+                        }
+                        case ReprogControlsEvent.DivertedRawMouseXy xy:
+                        {
+                            // Commit the instant a clean direction emerges (mid-swipe, once
+                            // per hold); the accumulator gates on hold duration internally.
+                            if (swipe.Accumulate(xy.Dx, xy.Dy) is { } dir)
+                                onGesture(dir);
+                            break;
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException) { /* shutting down */ }
+            catch { /* listener torn down with the channel */ }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            _cts.Cancel();
+            try { await _pump.ConfigureAwait(false); } catch { /* already faulted/cancelled */ }
+            try
+            {
+                await _rc.SetCidReportingAsync(new ControlId(_cid),
+                    CidReportingChange.TemporaryDiversion(diverted: false, rawXy: false)).ConfigureAwait(false);
+            }
+            catch { /* device gone — nothing to restore */ }
+            _rc.Dispose();
+            _cts.Dispose();
+        }
     }
 
     /// <summary>Listens for diverted DPI/ModeShift presses and restores the controls on dispose.</summary>

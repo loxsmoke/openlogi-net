@@ -381,6 +381,9 @@ public static class ConfigCodec
             // Legacy macOS action names that collapsed onto TaskView on Windows.
             if (name is "MissionControl" or "AppExpose")
                 name = nameof(ActionKind.TaskView);
+            // Renamed to the Windows term (it injects the Win key → Start menu).
+            if (name is "LaunchpadShow")
+                name = nameof(ActionKind.StartMenu);
             if (Enum.TryParse<ActionKind>(name, out var kind)
                 && kind is not (ActionKind.SetDpiPreset or ActionKind.CustomShortcut))
                 return Action.Unit(kind);

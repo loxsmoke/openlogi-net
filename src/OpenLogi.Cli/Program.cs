@@ -15,6 +15,12 @@ switch (command)
     case "diag":
         await DiagAsync();
         break;
+    case "controls":
+        await ControlsAsync();
+        break;
+    case "gestureprobe":
+        await GestureProbeAsync(args.Length > 1 ? Convert.ToUInt16(args[1], 16) : (ushort)0x00c4);
+        break;
     case "assets":
         await AssetsAsync();
         break;
@@ -68,7 +74,7 @@ switch (command)
         await AnimAsync(args.Length > 1 ? args[1] : "breathing", args.Length > 2 ? args[2] : "00ff00");
         break;
     default:
-        Console.Error.WriteLine($"unknown command '{command}'. Available: list, diag, assets, light <RRGGBB>, hosts, kbinfo, bright <0-100>, kbmode <onboard|host>, effect <idx> [params hex...]");
+        Console.Error.WriteLine($"unknown command '{command}'. Available: list, diag, controls, assets, light <RRGGBB>, hosts, kbinfo, bright <0-100>, kbmode <onboard|host>, effect <idx> [params hex...]");
         return 1;
 }
 
@@ -141,6 +147,123 @@ static async Task DiagAsync()
                 Console.WriteLine($"    0x{f.Id:x4} v{f.Version}");
         }
     }
+}
+
+// Dump the 0x1b04 reprogrammable-controls table for each direct device, so we can
+// see which control IDs a mouse exposes and whether the gesture button (0x00c3)
+// is present and raw-XY capable (required for hold-and-swipe gestures).
+static async Task ControlsAsync()
+{
+    foreach (var hid in HidDiscovery.EnumerateHidppDevices())
+    {
+        Console.WriteLine($"{hid.GetFriendlyName()} ({hid.VendorID:x4}:{hid.ProductID:x4})");
+        HidppChannel channel;
+        try { channel = await HidppChannel.FromRawChannelAsync(WindowsRawHidChannel.Open(hid)); }
+        catch (Exception e) { Console.WriteLine($"  cannot open: {e.Message}"); continue; }
+
+        await using (channel)
+        {
+            HidppDevice device;
+            try { device = await HidppDevice.NewAsync(channel, DeviceRoute.DirectDeviceIndex); }
+            catch { Console.WriteLine("  not a direct HID++2.0 device (likely a receiver)"); continue; }
+
+            if (await device.EnumerateFeaturesAsync() is null)
+            {
+                Console.WriteLine("  FeatureSet unsupported");
+                continue;
+            }
+
+            if (device.GetFeature<OpenLogi.HidPP.Feature.ReprogControlsFeature>() is not { } rc)
+            {
+                Console.WriteLine("  no 0x1b04 (reprogrammable controls) feature");
+                continue;
+            }
+
+            using (rc)
+            {
+                var count = await rc.GetCountAsync();
+                Console.WriteLine($"  0x1b04: {count} controls");
+                for (byte i = 0; i < count; i++)
+                {
+                    var info = await rc.GetCidInfoAsync(i);
+                    var tags = new List<string>();
+                    if (OpenLogi.HidPP.Feature.CidFlagsExtensions.IsDivertable(info.Flags)) tags.Add("divertable");
+                    if (OpenLogi.HidPP.Feature.CidFlagsExtensions.SupportsRawXy(info.Flags)) tags.Add("raw-xy");
+                    if (OpenLogi.HidPP.Feature.CidFlagsExtensions.IsVirtualControl(info.Flags)) tags.Add("virtual");
+                    if (OpenLogi.HidPP.Feature.CidFlagsExtensions.IsMouse(info.Flags)) tags.Add("mouse");
+                    var gesture = info.Cid.Value is 0x00c3 or 0x00d0 or 0x00d7 ? "  <-- gesture control" : "";
+                    var report = await rc.GetCidReportingAsync(info.Cid);
+                    var state = new List<string>();
+                    if (report.Diverted) state.Add("diverted");
+                    if (report.RawXy) state.Add("raw-xy-on");
+                    if (report.Remap is { } r) state.Add($"remap->0x{r.Value:x4}");
+                    var stateStr = state.Count > 0 ? $" {{{string.Join(", ", state)}}}" : "";
+                    Console.WriteLine($"    cid 0x{info.Cid.Value:x4} task 0x{info.TaskId.Value:x4} " +
+                        $"flags 0x{(ushort)info.Flags:x4} [{string.Join(", ", tags)}]{stateStr}{gesture}");
+                }
+            }
+        }
+    }
+}
+
+// Divert one control with raw-XY (the exact mechanism the gesture capture uses) and
+// print its events for ~8 seconds so a gesture button + swipe can be confirmed live,
+// then restore the control. Defaults to 0x00c4 (wheel/DPI button on the MX Anywhere 3S).
+static async Task GestureProbeAsync(ushort cid)
+{
+    foreach (var hid in HidDiscovery.EnumerateHidppDevices())
+    {
+        HidppChannel channel;
+        try { channel = await HidppChannel.FromRawChannelAsync(WindowsRawHidChannel.Open(hid)); }
+        catch { continue; }
+
+        await using (channel)
+        {
+            HidppDevice device;
+            try { device = await HidppDevice.NewAsync(channel, DeviceRoute.DirectDeviceIndex); }
+            catch { continue; }
+            if (await device.EnumerateFeaturesAsync() is null) continue;
+            if (device.GetFeature<OpenLogi.HidPP.Feature.ReprogControlsFeature>() is not { } rc) continue;
+
+            using (rc)
+            {
+                Console.WriteLine($"{hid.GetFriendlyName()} ({hid.VendorID:x4}:{hid.ProductID:x4})");
+                Console.WriteLine($"Diverting cid 0x{cid:x4} with raw-XY. HOLD that button and swipe now…");
+                var control = new OpenLogi.HidPP.Feature.ControlId(cid);
+                await rc.SetCidReportingAsync(control,
+                    OpenLogi.HidPP.Feature.CidReportingChange.TemporaryDiversion(diverted: true, rawXy: true));
+
+                var reader = rc.Listen();
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+                var events = 0;
+                try
+                {
+                    await foreach (var ev in reader.ReadAllAsync(cts.Token))
+                    {
+                        events++;
+                        switch (ev)
+                        {
+                            case OpenLogi.HidPP.Feature.ReprogControlsEvent.DivertedButtons db:
+                                Console.WriteLine($"  buttons: [{string.Join(", ", db.Controls.Select(c => $"0x{c.Value:x4}"))}]");
+                                break;
+                            case OpenLogi.HidPP.Feature.ReprogControlsEvent.DivertedRawMouseXy xy:
+                                Console.WriteLine($"  raw-xy: dx={xy.Dx} dy={xy.Dy}");
+                                break;
+                        }
+                    }
+                }
+                catch (OperationCanceledException) { }
+
+                await rc.SetCidReportingAsync(control,
+                    OpenLogi.HidPP.Feature.CidReportingChange.TemporaryDiversion(diverted: false, rawXy: false));
+                Console.WriteLine(events > 0
+                    ? $"Restored. Captured {events} event(s) — gesture divert works on 0x{cid:x4}."
+                    : "Restored. No events — was the button held/swiped during the window?");
+            }
+            return;
+        }
+    }
+    Console.WriteLine("No direct HID++ device found.");
 }
 
 static async Task AssetsAsync()

@@ -228,13 +228,62 @@ public sealed class Config
     public void SetBinding(string deviceKey, ButtonId button, Binding binding) =>
         Device(deviceKey).Bindings[button] = binding;
 
-    /// <summary>The gesture sub-bindings for the device's gesture button, or an empty map.</summary>
-    public SortedDictionary<GestureDirection, Action> GestureBindingsFor(string deviceKey) =>
+    /// <summary>
+    /// The gesture sub-bindings stored under <paramref name="button"/>, or an empty
+    /// map when that button has no gesture binding. Purely the stored map — global
+    /// on/off and defaults are the caller's concern.
+    /// </summary>
+    public SortedDictionary<GestureDirection, Action> GestureBindingsFor(string deviceKey, ButtonId button) =>
         Devices.TryGetValue(deviceKey, out var d)
-            && d.Bindings.TryGetValue(ButtonId.GestureButton, out var b)
+            && d.Bindings.TryGetValue(button, out var b)
             && b is Binding.Gesture g
                 ? new SortedDictionary<GestureDirection, Action>(g.Map)
                 : new SortedDictionary<GestureDirection, Action>();
+
+    /// <summary>
+    /// Every button with gestures configured (its stored binding is a gesture map).
+    /// The dedicated gesture button counts even when unconfigured — its default
+    /// binding is a full gesture map. Empty when gestures are globally off
+    /// (<see cref="DisableGestures"/>); several buttons may gesture at once.
+    /// </summary>
+    public IReadOnlyList<ButtonId> GestureButtons(string deviceKey)
+    {
+        if (Devices.TryGetValue(deviceKey, out var device)
+            && device.GestureOwner is OpenLogi.Core.GestureOwner.Off)
+            return [];
+        var result = new List<ButtonId>();
+        var bindings = Devices.TryGetValue(deviceKey, out var d) ? d.Bindings : null;
+        if (bindings is not null)
+            foreach (var (id, b) in bindings)
+                if (b.IsGesture())
+                    result.Add(id);
+        if (bindings is null || !bindings.ContainsKey(ButtonId.GestureButton))
+            result.Add(ButtonId.GestureButton);
+        return result;
+    }
+
+    /// <summary>
+    /// Record <paramref name="button"/> as the gesture-editing selection and turn
+    /// gestures globally back on, without touching any button's bindings — unlike
+    /// <see cref="SetGestureOwner"/>, merely selecting a button must not create a
+    /// gesture map on it.
+    /// </summary>
+    public void SetGestureSelection(string deviceKey, ButtonId button) =>
+        Device(deviceKey).GestureOwner = new OpenLogi.Core.GestureOwner.Button(button);
+
+    /// <summary>Whether gestures are globally enabled (i.e. not explicitly Off).</summary>
+    public bool GesturesEnabled(string deviceKey) =>
+        !(Devices.TryGetValue(deviceKey, out var d) && d.GestureOwner is OpenLogi.Core.GestureOwner.Off);
+
+    /// <summary>
+    /// Turn gestures globally back on by clearing an explicit Off (leaving any
+    /// recorded button selection or inference untouched otherwise).
+    /// </summary>
+    public void EnableGestures(string deviceKey)
+    {
+        if (Devices.TryGetValue(deviceKey, out var d) && d.GestureOwner is OpenLogi.Core.GestureOwner.Off)
+            d.GestureOwner = null;
+    }
 
     /// <summary>Record <paramref name="action"/> for one <paramref name="direction"/> of a button's gesture binding.</summary>
     public void SetGestureDirection(string deviceKey, ButtonId button, GestureDirection direction, Action action)

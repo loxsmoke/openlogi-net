@@ -67,6 +67,21 @@ public sealed class AgentRuntime : IDisposable
             ActionInjector.Execute(action);
     }
 
+    /// <summary>
+    /// Fire the action bound to a committed gesture <paramref name="direction"/> on
+    /// <paramref name="button"/> of the device identified by <paramref name="configKey"/>.
+    /// Resolves that button's per-direction gesture map (empty unless it has gestures
+    /// configured, so a stray call is a no-op) and injects the bound action. Like the
+    /// diverted DPI button, the gesture is already captured at the device, so there
+    /// is no native input to suppress.
+    /// </summary>
+    public void DispatchGesture(string? configKey, ButtonId button, GestureDirection direction)
+    {
+        var bindings = BindingMaps.GestureBindingsFor(_config, configKey, button);
+        if (bindings.TryGetValue(direction, out var action) && action.Kind != ActionKind.None)
+            ActionInjector.Execute(action);
+    }
+
     public void Dispose()
     {
         lock (_gate)

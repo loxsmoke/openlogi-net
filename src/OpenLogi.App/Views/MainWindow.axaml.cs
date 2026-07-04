@@ -111,6 +111,17 @@ public partial class MainWindow : Window
         if (confirmed) await vm.ForgetHostAsync(slot);
     }
 
+    /// <summary>
+    /// Clicking a button's diagram label (which also opens its picker flyout)
+    /// selects that button in the Gestures panel, when it can gesture.
+    /// </summary>
+    private void OnAnnotationLabelClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control { DataContext: DiagramAnnotationViewModel annotation }
+            && DataContext is MainWindowViewModel vm)
+            vm.SelectGestureOwnerFor(annotation.Binding.Button);
+    }
+
     private async void OnPickGKey(object? sender, RoutedEventArgs e)
     {
         if (sender is not Control { DataContext: GKeyViewModel gkey }) return;

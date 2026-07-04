@@ -92,6 +92,67 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public ObservableCollection<ProfileSlotViewModel> Profiles { get; } = [];
     public ObservableCollection<GKeyViewModel> GKeys { get; } = [];
 
+    // Gestures section (Buttons tab): choose which button drives gestures, its
+    // plain-tap Click action, whether the four swipes are active, and a category
+    // preset (or per-direction custom actions). Shown for mice that expose a
+    // HID++-capturable gesture control, even without a gesture-button hotspot.
+    public ObservableCollection<GestureOwnerChoice> GestureOwnerChoices { get; } = [];
+    public ObservableCollection<GestureDirectionBindingViewModel> GestureDirections { get; } = [];
+    [ObservableProperty] private bool _showGestures;
+    [ObservableProperty] private GestureOwnerChoice? _selectedGestureOwner;
+    /// <summary>The Click (plain tap) editor row; null while no button is selected.</summary>
+    [ObservableProperty] private GestureDirectionBindingViewModel? _gestureClick;
+    /// <summary>Whether a button is selected for editing (shows Click + Category rows).</summary>
+    [ObservableProperty][NotifyPropertyChangedFor(nameof(GestureSwipesVisible))]
+    private bool _gestureOwnerSelected;
+    /// <summary>The panel-header checkbox: gestures on/off for ALL buttons of this device.</summary>
+    [ObservableProperty] private bool _gesturesEnabled;
+    [ObservableProperty][NotifyPropertyChangedFor(nameof(GestureSwipesVisible))]
+    private GesturePreset? _selectedGestureCategory;
+
+    /// <summary>The four swipe rows show only for a selected button whose category isn't Disabled.</summary>
+    public bool GestureSwipesVisible =>
+        GestureOwnerSelected && SelectedGestureCategory is { } p && !ReferenceEquals(p, DisabledGesturePreset);
+
+    // Suppresses the owner-changed handler while the section is populated programmatically.
+    private bool _suppressGestureOwner;
+    // Suppresses the checkbox/category/direction handlers during programmatic fills.
+    private bool _suppressGesturePanel;
+
+    // Ctrl+Z history for the gesture editors (click, category, and the four swipes).
+    // Each entry is the full five-action state before one user edit; a category fill
+    // is a single entry. Cleared whenever the edited button changes.
+    private readonly Stack<(ButtonId Owner, OpenLogi.Core.Action[] Actions)> _gestureUndo = new();
+    private (ButtonId Owner, OpenLogi.Core.Action[] Actions)? _lastGestureState;
+
+    /// <summary>The Custom sentinel: selected when the swipes match no preset; applies nothing.</summary>
+    private static readonly GesturePreset CustomGesturePreset = new("Custom", null, null, null, null);
+
+    /// <summary>
+    /// "Disabled": all four swipes Do Nothing — the default for an unconfigured
+    /// button, and the way to turn one button's swipes off (its Click keeps working).
+    /// </summary>
+    private static readonly GesturePreset DisabledGesturePreset = new("Disabled",
+        OpenLogi.Core.Action.None, OpenLogi.Core.Action.None,
+        OpenLogi.Core.Action.None, OpenLogi.Core.Action.None);
+
+    /// <summary>Category presets for the four swipes (mirrors the Options+ gesture sets).</summary>
+    public IReadOnlyList<GesturePreset> GestureCategories { get; } =
+    [
+        DisabledGesturePreset,
+        new("Windows & Desktops", OpenLogi.Core.Action.TaskView, OpenLogi.Core.Action.ShowDesktop,
+            OpenLogi.Core.Action.PreviousDesktop, OpenLogi.Core.Action.NextDesktop),
+        new("Media & Volume", OpenLogi.Core.Action.VolumeUp, OpenLogi.Core.Action.VolumeDown,
+            OpenLogi.Core.Action.PrevTrack, OpenLogi.Core.Action.NextTrack),
+        new("Arrange Windows", OpenLogi.Core.Action.MaximizeWindow, OpenLogi.Core.Action.MinimizeWindow,
+            OpenLogi.Core.Action.SnapWindowLeft, OpenLogi.Core.Action.SnapWindowRight),
+        new("Browser Tabs", OpenLogi.Core.Action.NewTab, OpenLogi.Core.Action.CloseTab,
+            OpenLogi.Core.Action.PrevTab, OpenLogi.Core.Action.NextTab),
+        new("Scrolling", OpenLogi.Core.Action.ScrollUp, OpenLogi.Core.Action.ScrollDown,
+            OpenLogi.Core.Action.HorizontalScrollLeft, OpenLogi.Core.Action.HorizontalScrollRight),
+        CustomGesturePreset,
+    ];
+
     [ObservableProperty] private DeviceViewModel? _selectedDevice;
     [ObservableProperty] private string _statusText = "Loading devices…";
 
@@ -219,6 +280,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private bool _loadingControls;
 
     private sealed record MouseCapture(DeviceViewModel Device, DeviceSession Session, IAsyncDisposable Capture);
+
+    /// <summary>Disposes several per-mouse captures (DPI button, gesture button) as one handle.</summary>
+    private sealed class CompositeCapture(IReadOnlyList<IAsyncDisposable> parts) : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync()
+        {
+            foreach (var part in parts)
+                await part.DisposeAsync();
+        }
+    }
 
     private bool IsPersistentSession(DeviceSession s) =>
         _mouseCaptures.Any(mc => ReferenceEquals(mc.Session, s));
@@ -372,6 +443,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         ShowDpi = false;
         ShowSmartShift = false;
         ShowScrollInvert = false;
+        ShowGestures = false;
         ShowHosts = false;
         ShowBacklight = false;
         ShowPerKeyEditor = false;
@@ -410,10 +482,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var current = BindingMaps.BindingsFor(_config, configKey, null);
         foreach (var button in ButtonIdExtensions.All)
         {
+            if (button == ButtonId.GestureButton)
+            {
+                _bindings[button] = BuildGestureBinding(configKey);
+                continue;
+            }
             var action = current.TryGetValue(button, out var a) ? a : Core.Bindings.DefaultBinding(button);
             _bindings[button] = new ButtonBindingViewModel(button, action, ButtonBindingViewModel.Catalog,
                 (b, act) => Persist(configKey, b, act));
         }
+        RefreshGestureSummaries(configKey);
 
         // Only surface the button pickers / diagram for devices that actually have
         // remappable buttons (a mouse), not e.g. a HID++ microphone or a keyboard.
@@ -459,6 +537,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Buttons.Clear();
         foreach (var id in buttonIds)
             Buttons.Add(BindingFor(id, configKey));
+
+        // Annotations may be (re)built after the gesture section chose its owner.
+        RefreshGestureHighlight();
     }
 
     // Leader-line layout: a left label column, a gap, then the render. Each
@@ -512,7 +593,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     /// <summary>
     /// Open a persistent session for every connected mouse and divert its
-    /// DPI/ModeShift button, so each mouse's HID++ overrides work whenever the app
+    /// DPI/ModeShift button — and its dedicated gesture button (0x00c3) when that
+    /// button owns gestures — so each mouse's HID++ overrides work whenever the app
     /// runs — independent of which page (if any) is open — and each dispatches its
     /// own bindings. The OS hook (Middle/Back/Forward) is global and can't tell mice
     /// apart, so it tracks the first mouse. Sessions are reused by
@@ -544,12 +626,60 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 // The native scroll-invert bit (0x2121) is volatile — restore the
                 // persisted preference whenever the mouse (re)connects. No-op if unsupported.
                 if (ck is not null) await session.ApplyScrollInvertAsync(_config.InvertScroll(ck));
-                var capture = await session.StartDpiButtonCaptureAsync(() => _agent.DispatchDivertedButton(ck, ButtonId.DpiToggle));
-                if (capture is null) { await session.DisposeAsync(); continue; } // no divertable DPI button
-                _mouseCaptures.Add(new MouseCapture(mouse, session, capture));
+
+                var captures = await StartMouseCapturesAsync(session, ck);
+                if (captures.Count == 0) { await session.DisposeAsync(); continue; } // nothing capturable
+                _mouseCaptures.Add(new MouseCapture(mouse, session, new CompositeCapture(captures)));
             }
             catch { /* mouse unreachable */ }
         }
+    }
+
+    /// <summary>
+    /// Start a mouse's HID++ captures on an open <paramref name="session"/>, honouring
+    /// its gesture owner: the DPI/ModeShift button (unless that button is itself the
+    /// gesture owner) plus the gesture owner's control diverted with raw-XY. Shared by
+    /// the initial activation and the owner-change restart.
+    /// </summary>
+    private async Task<List<IAsyncDisposable>> StartMouseCapturesAsync(DeviceSession session, string? ck)
+    {
+        var gestureButtons = ck is not null ? _config.GestureButtons(ck) : [];
+        var captures = new List<IAsyncDisposable>();
+        // Capture the DPI/ModeShift button — unless it has gestures configured, in
+        // which case the gesture capture below diverts the same control instead.
+        if (!gestureButtons.Contains(ButtonId.DpiToggle)
+            && await session.StartDpiButtonCaptureAsync(() => _agent.DispatchDivertedButton(ck, ButtonId.DpiToggle)) is { } dpi)
+            captures.Add(dpi);
+        // Divert every gesture-configured button's control with raw-XY — several may
+        // gesture at once (including Middle/Back/Forward, which on Windows also
+        // gesture over HID++). A button the device can't divert is a null no-op.
+        if (ck is not null)
+            foreach (var button in gestureButtons)
+            {
+                var b = button; // each capture dispatches its own button's map
+                if (await session.StartGestureCaptureAsync(b, dir => _agent.DispatchGesture(ck, b, dir)) is { } gesture)
+                    captures.Add(gesture);
+            }
+        return captures;
+    }
+
+    /// <summary>
+    /// Re-arm the currently-viewed mouse's captures on its existing session after its
+    /// gesture owner changed — so the newly-chosen control gets diverted (and the old
+    /// one released). Runs on the persistent session the UI already holds, so no second
+    /// HID handle is opened. A no-op for a mouse with no persistent capture session.
+    /// </summary>
+    private async Task RestartGestureCaptureForSelectedAsync()
+    {
+        if (SelectedDevice is not { } device || device.ConfigKey is null) return;
+        var mc = _mouseCaptures.FirstOrDefault(m => ReferenceEquals(m.Device, device));
+        if (mc is null) return;
+
+        await mc.Capture.DisposeAsync();
+        _mouseCaptures.Remove(mc);
+        var captures = await StartMouseCapturesAsync(mc.Session, device.ConfigKey);
+        if (captures.Count > 0)
+            _mouseCaptures.Add(mc with { Capture = new CompositeCapture(captures) });
     }
 
     /// <summary>
@@ -670,6 +800,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 InvertScroll = inverted;
                 ShowScrollInvert = true;
             }
+            await BuildGestureSectionAsync(session, device);
             if (await session.ReadHostsAsync() is { } hosts && ReferenceEquals(SelectedDevice, device))
                 RebuildHosts(hosts);
             if (await session.ReadBrightnessAsync() is { } bright && ReferenceEquals(SelectedDevice, device))
@@ -1092,6 +1223,324 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _config.SetBinding(configKey, button, new Binding.Single(action));
         try { _config.SaveAtomic(); }
         catch { /* keep editing fluid */ }
+    }
+
+    /// <summary>
+    /// Build the gesture button's five-direction editor. Seeds each direction from
+    /// the device's stored gesture map (with built-in defaults filled in) so the
+    /// picker always shows the full ↑ ↓ ← → + Click set.
+    /// </summary>
+    private ButtonBindingViewModel BuildGestureBinding(string configKey)
+    {
+        var directions = BuildDirectionEditors(configKey, ButtonId.GestureButton);
+        return new ButtonBindingViewModel(ButtonId.GestureButton, directions, ButtonBindingViewModel.Catalog);
+    }
+
+    /// <summary>
+    /// One <see cref="GestureDirectionBindingViewModel"/> per direction for
+    /// <paramref name="owner"/>'s editor, persisting to that button. Seeds: the
+    /// button's stored gesture map; for an unconfigured button, Click shows its
+    /// current effective action and the swipes show Do Nothing (nothing is active
+    /// until the user actually configures something). The dedicated gesture button
+    /// falls back to the built-in defaults instead — it gestures out of the box.
+    /// </summary>
+    private List<GestureDirectionBindingViewModel> BuildDirectionEditors(string configKey, ButtonId owner)
+    {
+        var stored = _config.GestureBindingsFor(configKey, owner);
+        var clickSeed = BindingMaps.BindingsFor(_config, configKey, null).TryGetValue(owner, out var click)
+            ? click
+            : Core.Bindings.DefaultBinding(owner);
+        return GestureDirectionExtensions.All
+            .Select(d =>
+            {
+                var action = stored.TryGetValue(d, out var ga) ? ga
+                    : owner == ButtonId.GestureButton ? Core.Bindings.DefaultGestureBinding(d)
+                    : d == GestureDirection.Click ? clickSeed
+                    : OpenLogi.Core.Action.None;
+                return new GestureDirectionBindingViewModel(d, action, ButtonBindingViewModel.Catalog,
+                    (dir, act) => PersistGesture(configKey, owner, dir, act));
+            })
+            .ToList();
+    }
+
+    private void PersistGesture(string configKey, ButtonId owner, GestureDirection direction, OpenLogi.Core.Action action)
+    {
+        // Writes one direction into the owner button's gesture map (upgrading it to a
+        // gesture binding if needed). A button's FIRST gesture edit is what activates
+        // it, so re-arm the captures to divert its control.
+        var wasActive = _config.GestureButtons(configKey).Contains(owner);
+        _config.SetGestureDirection(configKey, owner, direction, action);
+        try { _config.SaveAtomic(); }
+        catch { /* keep editing fluid */ }
+        if (!wasActive)
+            _ = RestartGestureCaptureForSelectedAsync();
+        RefreshGestureSummaries(configKey);
+        if (!_suppressGesturePanel)
+        {
+            // One user edit (click or a single swipe) = one undo step.
+            PushGestureUndo();
+            // A hand-edited swipe leaves any preset it deviates from: reflect Custom
+            // (or the preset it happens to complete) in the Gestures dropdown.
+            if (direction != GestureDirection.Click)
+            {
+                _suppressGesturePanel = true;
+                SelectedGestureCategory = MatchGestureCategory();
+                _suppressGesturePanel = false;
+            }
+        }
+    }
+
+    /// <summary>Friendly label for a button offered as a gesture trigger.</summary>
+    private static string GestureOwnerLabel(ButtonId button) => button switch
+    {
+        ButtonId.GestureButton => "Gesture button",
+        ButtonId.DpiToggle => "Wheel / DPI button",
+        _ => button.Label(),
+    };
+
+    /// <summary>
+    /// Populate the Gestures section for the selected mouse: the owner dropdown (Off +
+    /// the device's HID++-capturable gesture buttons) and the five-direction editor.
+    /// Hidden when the device exposes no eligible gesture control.
+    /// </summary>
+    private async Task BuildGestureSectionAsync(DeviceSession session, DeviceViewModel device)
+    {
+        var eligible = await session.GestureCapableButtonsAsync();
+        if (!ReferenceEquals(SelectedDevice, device)) return;
+        if (device.ConfigKey is not { } ck || eligible.Count == 0)
+        {
+            ShowGestures = false;
+            return;
+        }
+
+        _suppressGestureOwner = true;
+        _suppressGesturePanel = true;
+        GestureOwnerChoices.Clear();
+        foreach (var b in eligible)
+            GestureOwnerChoices.Add(new GestureOwnerChoice(b, GestureOwnerLabel(b)));
+
+        GesturesEnabled = _config.GesturesEnabled(ck);
+        var owner = _config.GestureOwner(ck);
+        SelectedGestureOwner = GesturesEnabled && owner is { } o && eligible.Contains(o)
+            ? GestureOwnerChoices.First(c => c.Button == o)
+            : null;
+        _suppressGesturePanel = false;
+        RebuildGestureDirections(ck);
+        ShowGestures = true;
+        _suppressGestureOwner = false;
+        RefreshGestureHighlight();
+    }
+
+    private void RebuildGestureDirections(string configKey)
+    {
+        _suppressGesturePanel = true;
+        GestureDirections.Clear();
+        // A (re)built editor edits a different button (or none): undo starts fresh.
+        _gestureUndo.Clear();
+        _lastGestureState = null;
+        if (SelectedGestureOwner?.Button is not { } owner)
+        {
+            // No button selected — no click editor, no category, no swipes.
+            GestureClick = null;
+            GestureOwnerSelected = false;
+            SelectedGestureCategory = null;
+            _suppressGesturePanel = false;
+            return;
+        }
+        GestureOwnerSelected = true;
+        var editors = BuildDirectionEditors(configKey, owner);
+        // Click (the plain tap) is its own row under the owner dropdown; the four
+        // swipes live in the list below the Gestures (category) dropdown.
+        GestureClick = editors.First(v => v.Direction == GestureDirection.Click);
+        foreach (var vm in editors.Where(v => v.Direction != GestureDirection.Click))
+            GestureDirections.Add(vm);
+        SelectedGestureCategory = MatchGestureCategory();
+        _suppressGesturePanel = false;
+        _lastGestureState = CurrentGestureSnapshot();
+    }
+
+    /// <summary>The five current editor actions (click first, then ↑↓←→), or null with no editor.</summary>
+    private (ButtonId Owner, OpenLogi.Core.Action[] Actions)? CurrentGestureSnapshot()
+    {
+        if (SelectedGestureOwner?.Button is not { } owner || GestureClick is null) return null;
+        var actions = new List<OpenLogi.Core.Action> { GestureClick.Selected.Action };
+        actions.AddRange(GestureDirections.Select(v => v.Selected.Action));
+        return (owner, [.. actions]);
+    }
+
+    /// <summary>Record the pre-edit state as one undo step (no-op during programmatic fills).</summary>
+    private void PushGestureUndo()
+    {
+        if (_lastGestureState is { } previous)
+            _gestureUndo.Push(previous);
+        _lastGestureState = CurrentGestureSnapshot();
+    }
+
+    /// <summary>
+    /// Ctrl+Z in the Gestures panel: restore the five editor actions to the state
+    /// before the most recent click / category / swipe edit. History is cleared
+    /// whenever a different button is selected.
+    /// </summary>
+    [RelayCommand]
+    private void UndoGestureEdit()
+    {
+        if (_gestureUndo.Count == 0) return;
+        var (owner, actions) = _gestureUndo.Pop();
+        if (SelectedGestureOwner?.Button != owner || GestureClick is null)
+        {
+            _gestureUndo.Clear(); // stale entries for a previously edited button
+            return;
+        }
+        _suppressGesturePanel = true;
+        var editors = new List<GestureDirectionBindingViewModel> { GestureClick };
+        editors.AddRange(GestureDirections);
+        for (var i = 0; i < editors.Count && i < actions.Length; i++)
+        {
+            var choice = ButtonBindingViewModel.Catalog.FirstOrDefault(c => c.Action.Equals(actions[i]));
+            if (choice is not null)
+                editors[i].Selected = choice; // persists via the editor's own callback
+        }
+        SelectedGestureCategory = MatchGestureCategory();
+        _suppressGesturePanel = false;
+        _lastGestureState = CurrentGestureSnapshot();
+    }
+
+    partial void OnSelectedGestureOwnerChanged(GestureOwnerChoice? value)
+    {
+        RefreshGestureHighlight();
+        if (_suppressGestureOwner || SelectedDevice?.ConfigKey is not { } ck) return;
+        // Selecting a button only retargets the editor — it must not create or
+        // clear any button's gesture map. Global on/off is the checkbox's job.
+        if (value?.Button is { } button)
+        {
+            _config.SetGestureSelection(ck, button);
+            try { _config.SaveAtomic(); } catch { /* keep editing fluid */ }
+        }
+        RebuildGestureDirections(ck);
+        RefreshGestureSummaries(ck);
+    }
+
+    partial void OnGesturesEnabledChanged(bool value)
+    {
+        if (_suppressGesturePanel || SelectedDevice?.ConfigKey is not { } ck) return;
+        if (value)
+        {
+            // Globally back on: every configured button's map comes back to life.
+            _config.EnableGestures(ck);
+        }
+        else
+        {
+            // Globally off: silence every button, keep all maps, and clear the
+            // editing selection so the per-button rows collapse.
+            _config.DisableGestures(ck);
+            _suppressGestureOwner = true;
+            SelectedGestureOwner = null;
+            _suppressGestureOwner = false;
+            RebuildGestureDirections(ck);
+            RefreshGestureHighlight();
+        }
+        try { _config.SaveAtomic(); } catch { /* keep editing fluid */ }
+        RefreshGestureSummaries(ck);
+        _ = RestartGestureCaptureForSelectedAsync(); // arm or release every gesture divert
+    }
+
+    partial void OnSelectedGestureCategoryChanged(GesturePreset? value)
+    {
+        if (_suppressGesturePanel || value is null || value.IsCustom) return;
+        // Applies Disabled (all swipes → Do Nothing) exactly like any other preset.
+        // The whole fill is one undo step.
+        ApplyGesturePreset(value);
+        PushGestureUndo();
+    }
+
+    /// <summary>
+    /// Fill the four swipe dropdowns from <paramref name="preset"/> (persisting via
+    /// each editor's own path) and, unless <paramref name="updateCategory"/> is off,
+    /// reflect the preset in the Category dropdown.
+    /// </summary>
+    private void ApplyGesturePreset(GesturePreset preset, bool updateCategory = true)
+    {
+        _suppressGesturePanel = true;
+        foreach (var vm in GestureDirections)
+        {
+            if (preset.For(vm.Direction) is not { } action) continue;
+            var choice = ButtonBindingViewModel.Catalog.FirstOrDefault(c => c.Action.Equals(action));
+            if (choice is not null)
+                vm.Selected = choice; // fires the editor's persist callback
+        }
+        if (updateCategory)
+            SelectedGestureCategory = preset;
+        _suppressGesturePanel = false;
+    }
+
+    /// <summary>The preset the current four swipe selections equal, else Custom.</summary>
+    private GesturePreset MatchGestureCategory() =>
+        GestureCategories.FirstOrDefault(p =>
+            !p.IsCustom && GestureDirections.All(vm => vm.Selected.Action.Equals(p.For(vm.Direction))))
+        ?? CustomGesturePreset;
+
+    /// <summary>Accent the gesture owner's label + leader line on the mouse diagram.</summary>
+    private void RefreshGestureHighlight()
+    {
+        var owner = SelectedGestureOwner?.Button;
+        foreach (var a in Annotations)
+            a.Highlighted = owner is { } o && a.Binding.Button == o;
+    }
+
+    /// <summary>
+    /// Select <paramref name="button"/> in the Gestures panel (clicking its diagram
+    /// label). A no-op for buttons that can't gesture — selection alone never
+    /// creates or clears a gesture map, so this is always safe.
+    /// </summary>
+    public void SelectGestureOwnerFor(ButtonId button)
+    {
+        var choice = GestureOwnerChoices.FirstOrDefault(c => c.Button == button);
+        if (choice is not null)
+            SelectedGestureOwner = choice;
+    }
+
+    /// <summary>Longest "Gestures: …" detail the diagram label column can carry.</summary>
+    private const int GestureSummaryBudget = 20;
+
+    /// <summary>
+    /// The "Gestures: …" line for <paramref name="button"/>'s diagram label, or
+    /// <c>null</c> when it is not the gesture owner. The detail is the shared
+    /// category name when all swipe actions belong to one category, else as many
+    /// action names as fit <see cref="GestureSummaryBudget"/> characters.
+    /// </summary>
+    private string? GestureSummaryText(string configKey, ButtonId button)
+    {
+        if (!_config.GestureButtons(configKey).Contains(button)) return null;
+        var map = BindingMaps.GestureBindingsFor(_config, configKey, button);
+        var actions = new[] { GestureDirection.Up, GestureDirection.Down, GestureDirection.Left, GestureDirection.Right }
+            .Select(d => map.TryGetValue(d, out var a) ? a : Core.Bindings.DefaultGestureBinding(d))
+            .Where(a => a.Kind != ActionKind.None)
+            .ToList();
+        if (actions.Count == 0) return null; // swipes disabled — no label line
+
+        var categories = actions.Select(a => a.Category()).Distinct().ToList();
+        if (categories.Count == 1)
+            return $"Gestures: {categories[0].Label()}";
+
+        var detail = "";
+        foreach (var label in actions.Select(a => a.Label()).Distinct())
+        {
+            var candidate = detail.Length == 0 ? label : $"{detail}, {label}";
+            if (candidate.Length > GestureSummaryBudget)
+            {
+                detail += "…";
+                break;
+            }
+            detail = candidate;
+        }
+        return $"Gestures: {detail}";
+    }
+
+    /// <summary>Recompute every button's "Gestures: …" label line (owner or map changed).</summary>
+    private void RefreshGestureSummaries(string configKey)
+    {
+        foreach (var (button, vm) in _bindings)
+            vm.GestureSummary = GestureSummaryText(configKey, button);
     }
 
     private static Config LoadConfig()

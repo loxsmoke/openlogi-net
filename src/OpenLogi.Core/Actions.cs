@@ -86,8 +86,8 @@ public static class GestureDirectionExtensions
         GestureDirection.Down => "↓",
         GestureDirection.Left => "←",
         GestureDirection.Right => "→",
-        GestureDirection.Click => "·",
-        _ => "·",
+        GestureDirection.Click => "", // plain text, no glyph
+        _ => "",
     };
 }
 
@@ -96,18 +96,25 @@ public enum Category { Editing, Browser, Media, Mouse, Dpi, Scroll, Navigation, 
 
 public static class CategoryExtensions
 {
-    /// <summary>Short, already-uppercase label for popover section headers.</summary>
+    /// <summary>Display order of the groups in the action picker.</summary>
+    public static readonly Category[] PickerOrder =
+    [
+        Category.Mouse, Category.Scroll, Category.Navigation, Category.Browser,
+        Category.Editing, Category.Media, Category.Dpi, Category.System,
+    ];
+
+    /// <summary>Group-header label for the action picker.</summary>
     public static string Label(this Category c) => c switch
     {
-        Category.Editing => "EDITING",
-        Category.Browser => "BROWSER",
-        Category.Media => "MEDIA",
-        Category.Mouse => "MOUSE",
-        Category.Dpi => "DPI",
-        Category.Scroll => "SCROLL",
-        Category.Navigation => "NAVIGATION",
-        Category.System => "SYSTEM",
-        _ => c.ToString().ToUpperInvariant(),
+        Category.Editing => "Editing",
+        Category.Browser => "Browser & Tabs",
+        Category.Media => "Media & Volume",
+        Category.Mouse => "Mouse Buttons",
+        Category.Dpi => "DPI & Wheel",
+        Category.Scroll => "Scrolling",
+        Category.Navigation => "Windows & Desktops",
+        Category.System => "System",
+        _ => c.ToString(),
     };
 }
 
@@ -162,7 +169,8 @@ public enum ActionKind
     LeftClick, RightClick, MiddleClick, MouseBack, MouseForward,
     Copy, Paste, Cut, Undo, Redo, SelectAll, Find, Save,
     BrowserBack, BrowserForward, NewTab, CloseTab, ReopenTab, NextTab, PrevTab, ReloadPage,
-    TaskView, PreviousDesktop, NextDesktop, ShowDesktop, LaunchpadShow,
+    TaskView, PreviousDesktop, NextDesktop, ShowDesktop, StartMenu,
+    MaximizeWindow, MinimizeWindow, SnapWindowLeft, SnapWindowRight,
     LockScreen, Screenshot, CaptureRegion,
     PlayPause, NextTrack, PrevTrack, VolumeUp, VolumeDown, MuteVolume,
     CycleDpiPresets, SetDpiPreset, ToggleSmartShift,
@@ -230,7 +238,11 @@ public sealed record Action
     public static Action PreviousDesktop => Unit(ActionKind.PreviousDesktop);
     public static Action NextDesktop => Unit(ActionKind.NextDesktop);
     public static Action ShowDesktop => Unit(ActionKind.ShowDesktop);
-    public static Action LaunchpadShow => Unit(ActionKind.LaunchpadShow);
+    public static Action StartMenu => Unit(ActionKind.StartMenu);
+    public static Action MaximizeWindow => Unit(ActionKind.MaximizeWindow);
+    public static Action MinimizeWindow => Unit(ActionKind.MinimizeWindow);
+    public static Action SnapWindowLeft => Unit(ActionKind.SnapWindowLeft);
+    public static Action SnapWindowRight => Unit(ActionKind.SnapWindowRight);
     public static Action LockScreen => Unit(ActionKind.LockScreen);
     public static Action Screenshot => Unit(ActionKind.Screenshot);
     public static Action CaptureRegion => Unit(ActionKind.CaptureRegion);
@@ -276,7 +288,11 @@ public sealed record Action
         ActionKind.PreviousDesktop => "Previous Desktop",
         ActionKind.NextDesktop => "Next Desktop",
         ActionKind.ShowDesktop => "Show Desktop",
-        ActionKind.LaunchpadShow => "Launchpad",
+        ActionKind.StartMenu => "Start Menu",
+        ActionKind.MaximizeWindow => "Maximize Window",
+        ActionKind.MinimizeWindow => "Minimize Window",
+        ActionKind.SnapWindowLeft => "Snap Window Left",
+        ActionKind.SnapWindowRight => "Snap Window Right",
         ActionKind.LockScreen => "Lock Screen",
         ActionKind.Screenshot => "Screenshot",
         ActionKind.CaptureRegion => "Capture Region",
@@ -310,7 +326,8 @@ public sealed record Action
             or ActionKind.ReloadPage => OpenLogi.Core.Category.Browser,
         ActionKind.TaskView or ActionKind.PreviousDesktop
             or ActionKind.NextDesktop or ActionKind.ShowDesktop
-            or ActionKind.LaunchpadShow => OpenLogi.Core.Category.Navigation,
+            or ActionKind.StartMenu or ActionKind.MaximizeWindow or ActionKind.MinimizeWindow
+            or ActionKind.SnapWindowLeft or ActionKind.SnapWindowRight => OpenLogi.Core.Category.Navigation,
         ActionKind.None or ActionKind.LockScreen or ActionKind.Screenshot
             or ActionKind.CaptureRegion => OpenLogi.Core.Category.System,
         ActionKind.PlayPause or ActionKind.NextTrack or ActionKind.PrevTrack or ActionKind.VolumeUp
@@ -331,7 +348,8 @@ public sealed record Action
         LeftClick, RightClick, MiddleClick, MouseBack, MouseForward,
         Copy, Paste, Cut, Undo, Redo, SelectAll, Find, Save,
         BrowserBack, BrowserForward, NewTab, CloseTab, ReopenTab, NextTab, PrevTab, ReloadPage,
-        TaskView, PreviousDesktop, NextDesktop, ShowDesktop, LaunchpadShow,
+        TaskView, PreviousDesktop, NextDesktop, ShowDesktop, StartMenu,
+        MaximizeWindow, MinimizeWindow, SnapWindowLeft, SnapWindowRight,
         None, LockScreen, Screenshot, CaptureRegion,
         PlayPause, NextTrack, PrevTrack, VolumeUp, VolumeDown, MuteVolume,
         CycleDpiPresets, ToggleSmartShift,

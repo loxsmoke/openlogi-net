@@ -55,15 +55,39 @@ public class BindingMapsTests
     }
 
     [Fact]
-    public void GestureBindingsSilentWhenHidppButtonIsNotOwner()
+    public void GestureBindingsArePerButton()
     {
         var cfg = new Config();
+        // The dedicated gesture button gestures by default; an unconfigured
+        // physical button does not.
         Assert.Equal(
             Core.Bindings.DefaultGestureBinding(GestureDirection.Up),
-            BindingMaps.GestureBindingsFor(cfg, "2b042")[GestureDirection.Up]);
+            BindingMaps.GestureBindingsFor(cfg, "2b042", ButtonId.GestureButton)[GestureDirection.Up]);
+        Assert.Empty(BindingMaps.GestureBindingsFor(cfg, "2b042", ButtonId.Back));
 
-        cfg.SetGestureOwner("2b042", ButtonId.Back);
-        Assert.Empty(BindingMaps.GestureBindingsFor(cfg, "2b042"));
+        // Configuring Back gives it its own live map — without clearing the
+        // dedicated button's (several buttons may gesture at once).
+        cfg.SetGestureOwner("2b042", ButtonId.Back); // fills Back's five defaults
+        cfg.SetGestureDirection("2b042", ButtonId.Back, GestureDirection.Up, Action.Copy);
+        var map = BindingMaps.GestureBindingsFor(cfg, "2b042", ButtonId.Back);
+        Assert.Equal(Action.Copy, map[GestureDirection.Up]);
+        Assert.Equal(
+            Core.Bindings.DefaultGestureBinding(GestureDirection.Down),
+            map[GestureDirection.Down]);
+        Assert.NotEmpty(BindingMaps.GestureBindingsFor(cfg, "2b042", ButtonId.GestureButton));
+
+        // Selecting another button in the editor must not clear Back's map.
+        cfg.SetGestureSelection("2b042", ButtonId.MiddleClick);
+        Assert.Equal(Action.Copy,
+            BindingMaps.GestureBindingsFor(cfg, "2b042", ButtonId.Back)[GestureDirection.Up]);
+
+        // Only "All off" silences everything — and re-selecting restores it.
+        cfg.DisableGestures("2b042");
+        Assert.Empty(BindingMaps.GestureBindingsFor(cfg, "2b042", ButtonId.Back));
+        Assert.Empty(BindingMaps.GestureBindingsFor(cfg, "2b042", ButtonId.GestureButton));
+        cfg.SetGestureSelection("2b042", ButtonId.Back);
+        Assert.Equal(Action.Copy,
+            BindingMaps.GestureBindingsFor(cfg, "2b042", ButtonId.Back)[GestureDirection.Up]);
     }
 }
 

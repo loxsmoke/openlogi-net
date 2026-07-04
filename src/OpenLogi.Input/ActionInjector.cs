@@ -18,7 +18,8 @@ public static class ActionInjector
     // Windows virtual-key codes.
     private const ushort VK_A = 0x41, VK_C = 0x43, VK_D = 0x44, VK_F = 0x46,
         VK_R = 0x52, VK_S = 0x53, VK_T = 0x54, VK_V = 0x56, VK_W = 0x57, VK_X = 0x58, VK_Y = 0x59, VK_Z = 0x5A,
-        VK_TAB = 0x09, VK_LEFT = 0x25, VK_RIGHT = 0x27, VK_SHIFT = 0x10, VK_CONTROL = 0x11, VK_MENU = 0x12,
+        VK_TAB = 0x09, VK_LEFT = 0x25, VK_UP = 0x26, VK_RIGHT = 0x27, VK_DOWN = 0x28,
+        VK_SHIFT = 0x10, VK_CONTROL = 0x11, VK_MENU = 0x12,
         VK_LWIN = 0x5B, VK_BROWSER_BACK = 0xA6, VK_BROWSER_FORWARD = 0xA7, VK_VOLUME_MUTE = 0xAD,
         VK_VOLUME_DOWN = 0xAE, VK_VOLUME_UP = 0xAF, VK_MEDIA_NEXT_TRACK = 0xB0, VK_MEDIA_PREV_TRACK = 0xB1,
         VK_MEDIA_PLAY_PAUSE = 0xB3;
@@ -55,7 +56,11 @@ public static class ActionInjector
             case ActionKind.PreviousDesktop: PostKey(VK_LEFT, VK_LWIN, VK_CONTROL); break;
             case ActionKind.NextDesktop: PostKey(VK_RIGHT, VK_LWIN, VK_CONTROL); break;
             case ActionKind.ShowDesktop: PostKey(VK_D, VK_LWIN); break;
-            case ActionKind.LaunchpadShow: PostKey(VK_LWIN); break;
+            case ActionKind.StartMenu: PostKey(VK_LWIN); break;
+            case ActionKind.MaximizeWindow: PostKey(VK_UP, VK_LWIN); break;
+            case ActionKind.MinimizeWindow: PostKey(VK_DOWN, VK_LWIN); break;
+            case ActionKind.SnapWindowLeft: PostKey(VK_LEFT, VK_LWIN); break;
+            case ActionKind.SnapWindowRight: PostKey(VK_RIGHT, VK_LWIN); break;
             case ActionKind.LockScreen: Native.LockWorkStation(); break;
             case ActionKind.Screenshot:
             case ActionKind.CaptureRegion: PostKey(VK_S, VK_LWIN, VK_SHIFT); break;

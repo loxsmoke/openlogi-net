@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Collections;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace OpenLogi.App.ViewModels;
 
@@ -8,9 +9,16 @@ namespace OpenLogi.App.ViewModels;
 /// render, a side label (button name + current action), and the leader-line
 /// polyline connecting them. Mirrors the original's leader-line layout.
 /// </summary>
-public sealed class DiagramAnnotationViewModel
+public sealed partial class DiagramAnnotationViewModel : ObservableObject
 {
     public ButtonBindingViewModel Binding { get; }
+
+    /// <summary>
+    /// Accent-highlights this annotation's label frame and leader line while its
+    /// button is the selected gesture owner.
+    /// </summary>
+    [ObservableProperty]
+    private bool _highlighted;
 
     // Marker rect over the render (canvas coords).
     public double MarkerX { get; }
