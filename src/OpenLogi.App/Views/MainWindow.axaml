@@ -449,6 +449,13 @@
                                         <TextBlock Text="Reverses the wheel in firmware (natural scrolling). Reapplied automatically when the mouse reconnects."
                                                    Opacity="0.5" FontSize="11" TextWrapping="Wrap"/>
                                     </StackPanel>
+                                    <!-- Hi-res smooth scrolling (HiResWheel 0x2121, diverted + re-injected) -->
+                                    <StackPanel Spacing="6" Margin="0,0,0,8" IsVisible="{Binding ShowSmoothScroll}">
+                                        <TextBlock Text="Smooth scrolling" FontSize="15" FontWeight="SemiBold"/>
+                                        <CheckBox Content="High-resolution smooth scrolling" IsChecked="{Binding SmoothScroll}"/>
+                                        <TextBlock Text="Scrolls in fine sub-line steps instead of whole lines. The app translates the wheel while it runs; standard scrolling returns when it quits."
+                                                   Opacity="0.5" FontSize="11" TextWrapping="Wrap"/>
+                                    </StackPanel>
                                     <StackPanel Spacing="10" IsVisible="{Binding ShowDpi}">
                                         <TextBlock Text="Pointer tuning" FontSize="15" FontWeight="SemiBold"/>
                                         <Grid ColumnDefinitions="*,Auto">

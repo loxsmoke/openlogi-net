@@ -108,6 +108,8 @@ public sealed class DeviceConfig
     public Lighting? Lighting { get; set; }
     public SmartShift? SmartShift { get; set; }
     public bool InvertScroll { get; set; }
+    /// <summary>Hi-res smooth scrolling (HiResWheel 0x2121 diverted + re-injected while the agent runs).</summary>
+    public bool SmoothScroll { get; set; }
 }
 
 /// <summary>App-wide preferences not tied to any device.</summary>
@@ -412,6 +414,12 @@ public sealed class Config
 
     public void SetInvertScroll(string deviceKey, bool invert) =>
         Device(deviceKey).InvertScroll = invert;
+
+    public bool SmoothScroll(string deviceKey) =>
+        Devices.TryGetValue(deviceKey, out var d) && d.SmoothScroll;
+
+    public void SetSmoothScroll(string deviceKey, bool enabled) =>
+        Device(deviceKey).SmoothScroll = enabled;
 
     private DeviceConfig Device(string deviceKey)
     {

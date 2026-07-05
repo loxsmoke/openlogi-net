@@ -82,6 +82,14 @@ public sealed class AgentRuntime : IDisposable
             ActionInjector.Execute(action);
     }
 
+    /// <summary>
+    /// Re-inject diverted hi-res wheel motion as OS scrolling. <paramref name="wheelData"/>
+    /// is raw Windows wheel data (±120 = one physical notch; smaller values are the
+    /// smooth sub-notch steps). The wheel is already diverted at the device, so
+    /// there is no native scroll to suppress.
+    /// </summary>
+    public void DispatchSmoothScroll(int wheelData) => ActionInjector.PostVerticalScroll(wheelData);
+
     public void Dispose()
     {
         lock (_gate)

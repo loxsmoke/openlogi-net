@@ -80,6 +80,13 @@ public static class ActionInjector
         }
     }
 
+    /// <summary>Synthesise a vertical scroll of raw wheel data (hi-res wheel re-injection; ±120 = one notch).</summary>
+    public static void PostVerticalScroll(int wheelData)
+    {
+        if (wheelData == 0) return;
+        PostScroll(Native.MOUSEEVENTF_WHEEL, wheelData);
+    }
+
     /// <summary>Synthesise a horizontal scroll of <paramref name="delta"/> wheel lines (thumbwheel re-injection).</summary>
     public static void PostHorizontalScroll(int delta)
     {

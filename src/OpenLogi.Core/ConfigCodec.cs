@@ -76,6 +76,8 @@ public static class ConfigCodec
             t["dpi"] = (long)dpi;
         if (d.InvertScroll)
             t["invert_scroll"] = true;
+        if (d.SmoothScroll)
+            t["smooth_scroll"] = true;
 
         // Sub-tables.
         if (d.Identity is { } identity)
@@ -258,6 +260,7 @@ public static class ConfigCodec
             GestureOwner = ParseGestureOwner(GetString(t, "gesture_owner")),
             Dpi = t.TryGetValue("dpi", out var dpi) ? (uint)Convert.ToInt64(dpi) : null,
             InvertScroll = GetBool(t, "invert_scroll", false),
+            SmoothScroll = GetBool(t, "smooth_scroll", false),
         };
         if (t.TryGetValue("dpi_presets", out var dp) && dp is TomlArray presets)
             d.DpiPresets = [.. presets.Select(p => (uint)Convert.ToInt64(p!))];

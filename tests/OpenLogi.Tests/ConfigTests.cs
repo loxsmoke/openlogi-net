@@ -109,6 +109,27 @@ public class ConfigTests
     }
 
     [Fact]
+    public void SmoothScrollRoundtripsPerDevice()
+    {
+        var cfg = new Config();
+        Assert.False(cfg.SmoothScroll("2b042"));
+        cfg.SetSmoothScroll("2b042", true);
+        var restored = WriteAndRead(cfg);
+        Assert.True(restored.SmoothScroll("2b042"));
+        Assert.False(restored.SmoothScroll("absent"));
+    }
+
+    [Fact]
+    public void DefaultSmoothScrollIsOmittedFromToml()
+    {
+        var cfg = new Config();
+        cfg.SetBinding("2b042", ButtonId.Back, new Binding.Single(Action.Copy));
+        cfg.SetSmoothScroll("2b042", false);
+        var body = ConfigCodec.Serialize(cfg);
+        Assert.DoesNotContain("smooth_scroll", body);
+    }
+
+    [Fact]
     public void BindingsRoundtripPerDevice()
     {
         var cfg = new Config();

@@ -221,6 +221,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty][NotifyPropertyChangedFor(nameof(ShowPointerTuning))] private bool _showScrollInvert;
     [ObservableProperty] private bool _invertScroll;
 
+    // Hi-res smooth scrolling (also HiResWheel 0x2121): the wheel is diverted to
+    // HID++ events and re-injected as fine-grained OS scrolling while the app runs.
+    [ObservableProperty] private bool _showSmoothScroll;
+    [ObservableProperty] private bool _smoothScroll;
+
     // Hosts (EasySwitch / multi-host).
     [ObservableProperty] private bool _showHosts;
     /// <summary>Whether the selected device can clear/forget host slots (drives the host note + Forget buttons).</summary>
@@ -443,6 +448,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         ShowDpi = false;
         ShowSmartShift = false;
         ShowScrollInvert = false;
+        ShowSmoothScroll = false;
         ShowGestures = false;
         ShowHosts = false;
         ShowBacklight = false;
@@ -660,20 +666,36 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 if (await session.StartGestureCaptureAsync(b, dir => _agent.DispatchGesture(ck, b, dir)) is { } gesture)
                     captures.Add(gesture);
             }
+        // Divert the wheel into hi-res mode and re-inject its motion as smooth OS
+        // scrolling when the user turned it on (a null capture = no 0x2121).
+        if (ck is not null && _config.SmoothScroll(ck)
+            && await session.StartSmoothScrollCaptureAsync(w => _agent.DispatchSmoothScroll(w)) is { } smooth)
+            captures.Add(smooth);
         return captures;
     }
 
     /// <summary>
-    /// Re-arm the currently-viewed mouse's captures on its existing session after its
-    /// gesture owner changed — so the newly-chosen control gets diverted (and the old
-    /// one released). Runs on the persistent session the UI already holds, so no second
-    /// HID handle is opened. A no-op for a mouse with no persistent capture session.
+    /// Re-arm the currently-viewed mouse's captures on its existing session after a
+    /// divert-affecting setting changed (gesture owner, smooth scrolling) — so the
+    /// newly-chosen control gets diverted (and the old one released). Runs on the
+    /// persistent session the UI already holds, so no second HID handle is opened.
+    /// A no-op for a mouse with no persistent capture session.
     /// </summary>
     private async Task RestartGestureCaptureForSelectedAsync()
     {
         if (SelectedDevice is not { } device || device.ConfigKey is null) return;
         var mc = _mouseCaptures.FirstOrDefault(m => ReferenceEquals(m.Device, device));
-        if (mc is null) return;
+        if (mc is null)
+        {
+            // No persistent capture yet (nothing was capturable at activation) — a
+            // newly-enabled capture can still ride the session the UI holds open;
+            // adding it to _mouseCaptures makes that session persistent.
+            if (_session is null) return;
+            var fresh = await StartMouseCapturesAsync(_session, device.ConfigKey);
+            if (fresh.Count > 0)
+                _mouseCaptures.Add(new MouseCapture(device, _session, new CompositeCapture(fresh)));
+            return;
+        }
 
         await mc.Capture.DisposeAsync();
         _mouseCaptures.Remove(mc);
@@ -799,6 +821,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 // on connect, since the 0x2121 invert bit is volatile).
                 InvertScroll = inverted;
                 ShowScrollInvert = true;
+                // Smooth scrolling rides the same 0x2121 feature; its on/off is the
+                // persisted choice (the capture applies it, so the config is the truth).
+                SmoothScroll = device.ConfigKey is { } sck && _config.SmoothScroll(sck);
+                ShowSmoothScroll = true;
             }
             await BuildGestureSectionAsync(session, device);
             if (await session.ReadHostsAsync() is { } hosts && ReferenceEquals(SelectedDevice, device))
@@ -982,6 +1008,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         if (_session is not null) await _session.ApplyScrollInvertAsync(invert);
         if (SelectedDevice?.ConfigKey is { } ck) { _config.SetInvertScroll(ck, invert); SaveConfig(); }
+    }
+
+    partial void OnSmoothScrollChanged(bool value) { if (!_loadingControls) _ = ApplySmoothScrollAsync(value); }
+
+    private async Task ApplySmoothScrollAsync(bool enabled)
+    {
+        if (SelectedDevice?.ConfigKey is { } ck) { _config.SetSmoothScroll(ck, enabled); SaveConfig(); }
+        // Re-arm the persistent captures so the wheel is diverted (or released) now,
+        // not on the next reconnect.
+        await RestartGestureCaptureForSelectedAsync();
     }
 
     partial void OnBacklightValueChanged(double value)

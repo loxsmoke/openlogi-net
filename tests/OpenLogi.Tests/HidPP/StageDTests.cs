@@ -146,6 +146,39 @@ public class HiResWheelTests
         Assert.True(inverted.HighResolution && inverted.Diverted);
         Assert.Equal(0x03, (inverted with { Inverted = false }).ToByte());
     }
+
+    [Fact]
+    public void CapabilityParsesMultiplierFlagsAndV1Fields()
+    {
+        // multiplier 8; flags = has_switch (0x02) + has_invert (0x04); 24 ratchets; 30 mm
+        var caps = HiResWheelCapability.FromPayload([0x08, 0x06, 0x18, 0x1e]);
+        Assert.Equal(new HiResWheelCapability(8, true, true, 24, 30), caps);
+        // v0 device: flag-less, trailing bytes zero
+        Assert.Equal(new HiResWheelCapability(8, false, false, 0, 0),
+            HiResWheelCapability.FromPayload([0x08, 0x00, 0x00, 0x00]));
+    }
+
+    [Fact]
+    public void MovementEventDecodesResolutionPeriodsAndSignedDelta()
+    {
+        // 0x12 = high-res flag (0x10) + 2 periods; delta 0xfff8 = -8
+        var ev = HiResWheelFeature.DecodeEventPayload(0, [0x12, 0xff, 0xf8]);
+        Assert.Equal(new HiResWheelEvent.Movement(true, 2, -8), ev);
+        // low-res movement, positive delta
+        Assert.Equal(new HiResWheelEvent.Movement(false, 1, 3),
+            HiResWheelFeature.DecodeEventPayload(0, [0x01, 0x00, 0x03]));
+    }
+
+    [Fact]
+    public void RatchetSwitchEventDecodesBit0()
+    {
+        Assert.Equal(new HiResWheelEvent.RatchetSwitch(true), HiResWheelFeature.DecodeEventPayload(1, [0x01, 0, 0]));
+        Assert.Equal(new HiResWheelEvent.RatchetSwitch(false), HiResWheelFeature.DecodeEventPayload(1, [0x00, 0, 0]));
+    }
+
+    [Fact]
+    public void UnknownEventSubIdDecodesToNull() =>
+        Assert.Null(HiResWheelFeature.DecodeEventPayload(2, [0x01, 0, 0]));
 }
 
 public class HostFeatureTests

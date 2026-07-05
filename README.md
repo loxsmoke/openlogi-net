@@ -50,6 +50,11 @@ It ships two binaries:
   [docs/MOUSE_GESTURES.md](docs/MOUSE_GESTURES.md).
 - **DPI control** — read and set sensitivity, with presets.
 - **SmartShift** — toggle the wheel ratchet mode and tune sensitivity.
+- **Smooth scrolling** — divert the wheel into high-resolution HID++ reporting
+  and re-inject it as fine sub-line OS scrolling (Options+-style), per device.
+  Note: running Logitech software (Options+, G HUB, Logi Bolt app) alongside
+  may interfere with this setting — both sides write the same volatile wheel
+  mode on the device, so whichever wrote last wins.
 - **RGB lighting** — solid colors, per-key colors, brightness, and built-in
   effects on supported keyboards.
 - **Onboard profiles** — read, switch, and write the device's onboard
@@ -89,7 +94,10 @@ Grab the latest installer or portable build from the
 
 > [!IMPORTANT]
 > Quit **Logi Options+** first — the two applications fight over HID++ access,
-> and only one can own a given receiver at a time.
+> and only one can own a given receiver at a time. Leaving Logitech software
+> running can also silently undo device-side settings this app applies (smooth
+> scrolling in particular, since the wheel mode is volatile and both apps
+> rewrite it).
 
 - **Installer** — download `OpenLogi.net-<version>-setup.exe` from the latest
   release and run it. It installs to `Program Files`, adds Start-menu (and
