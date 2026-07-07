@@ -1,5 +1,5 @@
 using OpenLogi.Assets;
-using OpenLogi.Core;
+using OpenLogi.Core.Config;
 
 namespace OpenLogi.App;
 

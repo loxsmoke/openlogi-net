@@ -1,13 +1,16 @@
+using OpenLogi.Core.Actions;
+using OpenLogi.Core.DeviceInfo;
+using OpenLogi.Core.Gestures;
 using Tomlyn;
 using Tomlyn.Model;
 
-namespace OpenLogi.Core;
+namespace OpenLogi.Core.Config;
 
 /// <summary>
 /// Reads and writes <see cref="Config"/> as TOML, reproducing the on-disk format
 /// the Rust <c>openlogi-core</c> produced: enum variant names as keys, lowercase
 /// <see cref="DeviceKind"/> / snake_case <see cref="WheelMode"/> scalars, tagged-union
-/// <see cref="Action"/> values (bare string for unit variants, single-key table for
+/// <see cref="MouseAction"/> values (bare string for unit variants, single-key table for
 /// payload variants), and untagged <see cref="Binding"/> (a string/payload-table for
 /// <see cref="Binding.Single"/>, a direction-keyed table for <see cref="Binding.Gesture"/>).
 /// Built on Tomlyn's DOM for exact control over the output.
@@ -46,6 +49,7 @@ public static class ConfigCodec
             ["show_in_menu_bar"] = s.ShowInMenuBar,
             ["auto_download_assets"] = s.AutoDownloadAssets,
             ["minimize_to_tray"] = s.MinimizeToTray,
+            ["suppress_logging"] = s.SuppressLogging,
         };
         if (s.DismissedUpdate is not null)
             t["dismissed_update"] = s.DismissedUpdate;
@@ -181,7 +185,7 @@ public static class ConfigCodec
         _ => throw new ConfigException("unknown binding variant"),
     };
 
-    private static TomlTable SerializeGestureMap(SortedDictionary<GestureDirection, Action> map)
+    private static TomlTable SerializeGestureMap(SortedDictionary<GestureDirection, Actions.MouseAction> map)
     {
         var t = new TomlTable();
         foreach (var (dir, action) in map)
@@ -189,8 +193,8 @@ public static class ConfigCodec
         return t;
     }
 
-    /// <summary>An <see cref="Action"/>: a bare string for unit variants, a single-key table for payloads.</summary>
-    private static object SerializeAction(Action action) => action.Kind switch
+    /// <summary>An <see cref="Actions.MouseAction"/>: a bare string for unit variants, a single-key table for payloads.</summary>
+    private static object SerializeAction(Actions.MouseAction action) => action.Kind switch
     {
         ActionKind.SetDpiPreset => new TomlTable { ["SetDpiPreset"] = (long)action.DpiPreset },
         ActionKind.CustomShortcut => new TomlTable
@@ -249,6 +253,7 @@ public static class ConfigCodec
         ShowInMenuBar = GetBool(t, "show_in_menu_bar", true),
         AutoDownloadAssets = GetBool(t, "auto_download_assets", true),
         MinimizeToTray = GetBool(t, "minimize_to_tray", false),
+        SuppressLogging = GetBool(t, "suppress_logging", false),
         Language = GetString(t, "language"),
         ThumbwheelSensitivity = (int)GetLong(t, "thumbwheel_sensitivity", AppSettings.DefaultThumbwheelSensitivity),
     };
@@ -290,7 +295,7 @@ public static class ConfigCodec
             foreach (var (bundle, value) in perApp)
                 if (value is TomlTable inner)
                 {
-                    var map = new SortedDictionary<ButtonId, Action>();
+                    var map = new SortedDictionary<ButtonId, Actions.MouseAction>();
                     foreach (var (bk, bv) in inner)
                         if (Enum.TryParse<ButtonId>(bk, out var button))
                             map[button] = ParseAction(bv!);
@@ -368,7 +373,7 @@ public static class ConfigCodec
             if (table.Count == 1 && (table.ContainsKey("SetDpiPreset") || table.ContainsKey("CustomShortcut")))
                 return new Binding.Single(ParseAction(table));
             // Otherwise a direction-keyed table is a Gesture.
-            var map = new SortedDictionary<GestureDirection, Action>();
+            var map = new SortedDictionary<GestureDirection, Actions.MouseAction>();
             foreach (var (key, v) in table)
                 if (Enum.TryParse<GestureDirection>(key, out var dir))
                     map[dir] = ParseAction(v!);
@@ -377,7 +382,7 @@ public static class ConfigCodec
         throw new ConfigException("unexpected binding value shape");
     }
 
-    private static Action ParseAction(object value)
+    private static Actions.MouseAction ParseAction(object value)
     {
         if (value is string name)
         {
@@ -389,15 +394,15 @@ public static class ConfigCodec
                 name = nameof(ActionKind.StartMenu);
             if (Enum.TryParse<ActionKind>(name, out var kind)
                 && kind is not (ActionKind.SetDpiPreset or ActionKind.CustomShortcut))
-                return Action.Unit(kind);
+                return Actions.MouseAction.Unit(kind);
             throw new ConfigException($"unknown action '{name}'");
         }
         if (value is TomlTable table)
         {
             if (table.TryGetValue("SetDpiPreset", out var idx))
-                return Action.SetDpiPreset((byte)Convert.ToInt64(idx));
+                return Actions.MouseAction.SetDpiPreset((byte)Convert.ToInt64(idx));
             if (table.TryGetValue("CustomShortcut", out var cs) && cs is TomlTable combo)
-                return Action.CustomShortcut(new KeyCombo
+                return Actions.MouseAction.CustomShortcut(new KeyCombo
                 {
                     Modifiers = (byte)GetLong(combo, "modifiers", 0),
                     KeyCode = (ushort)GetLong(combo, "key_code", 0),

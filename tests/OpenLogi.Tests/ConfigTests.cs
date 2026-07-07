@@ -1,4 +1,7 @@
 using OpenLogi.Core;
+using OpenLogi.Core.Actions;
+using OpenLogi.Core.Config;
+using OpenLogi.Core.DeviceInfo;
 
 namespace OpenLogi.Tests;
 
@@ -102,7 +105,7 @@ public class ConfigTests
     public void DefaultInvertScrollIsOmittedFromToml()
     {
         var cfg = new Config();
-        cfg.SetBinding("2b042", ButtonId.Back, new Binding.Single(Action.Copy));
+        cfg.SetBinding("2b042", ButtonId.Back, new Binding.Single(MouseAction.Copy));
         cfg.SetInvertScroll("2b042", false);
         var body = ConfigCodec.Serialize(cfg);
         Assert.DoesNotContain("invert_scroll", body);
@@ -123,7 +126,7 @@ public class ConfigTests
     public void DefaultSmoothScrollIsOmittedFromToml()
     {
         var cfg = new Config();
-        cfg.SetBinding("2b042", ButtonId.Back, new Binding.Single(Action.Copy));
+        cfg.SetBinding("2b042", ButtonId.Back, new Binding.Single(MouseAction.Copy));
         cfg.SetSmoothScroll("2b042", false);
         var body = ConfigCodec.Serialize(cfg);
         Assert.DoesNotContain("smooth_scroll", body);
@@ -133,25 +136,25 @@ public class ConfigTests
     public void BindingsRoundtripPerDevice()
     {
         var cfg = new Config();
-        cfg.SetBinding("2b042", ButtonId.Back, new Binding.Single(Action.Copy));
-        cfg.SetBinding("2b042", ButtonId.DpiToggle, new Binding.Single(Action.CustomShortcut(new KeyCombo
+        cfg.SetBinding("2b042", ButtonId.Back, new Binding.Single(MouseAction.Copy));
+        cfg.SetBinding("2b042", ButtonId.DpiToggle, new Binding.Single(MouseAction.CustomShortcut(new KeyCombo
         {
             Modifiers = KeyCombo.ModCmd,
             KeyCode = 0x23,
             Display = "⌘P",
         })));
-        cfg.SetBinding("4082d", ButtonId.Back, new Binding.Single(Action.Paste));
+        cfg.SetBinding("4082d", ButtonId.Back, new Binding.Single(MouseAction.Paste));
 
         var parsed = WriteAndRead(cfg);
 
         var a = parsed.BindingsFor("2b042");
-        Assert.Equal(new Binding.Single(Action.Copy), a[ButtonId.Back]);
+        Assert.Equal(new Binding.Single(MouseAction.Copy), a[ButtonId.Back]);
         Assert.Equal(
-            new Binding.Single(Action.CustomShortcut(new KeyCombo { Modifiers = KeyCombo.ModCmd, KeyCode = 0x23, Display = "⌘P" })),
+            new Binding.Single(MouseAction.CustomShortcut(new KeyCombo { Modifiers = KeyCombo.ModCmd, KeyCode = 0x23, Display = "⌘P" })),
             a[ButtonId.DpiToggle]);
 
         var b = parsed.BindingsFor("4082d");
-        Assert.Equal(new Binding.Single(Action.Paste), b[ButtonId.Back]);
+        Assert.Equal(new Binding.Single(MouseAction.Paste), b[ButtonId.Back]);
         Assert.Single(b);
 
         Assert.Empty(parsed.BindingsFor("deadbeef"));
@@ -161,7 +164,7 @@ public class ConfigTests
     public void HumanReadableTomlLayout()
     {
         var cfg = new Config();
-        cfg.SetBinding("2b042", ButtonId.Back, new Binding.Single(Action.BrowserBack));
+        cfg.SetBinding("2b042", ButtonId.Back, new Binding.Single(MouseAction.BrowserBack));
         var body = ConfigCodec.Serialize(cfg);
         Assert.Contains("schema_version = 3", body);
         Assert.Contains("[devices.2b042.bindings]", body);
@@ -184,7 +187,7 @@ public class ConfigTests
     public void EmptyDpiPresetsSkipSerialization()
     {
         var cfg = new Config();
-        cfg.SetBinding("2b042", ButtonId.Back, new Binding.Single(Action.Copy));
+        cfg.SetBinding("2b042", ButtonId.Back, new Binding.Single(MouseAction.Copy));
         cfg.SetDpiPresets("2b042", [800]);
         cfg.SetDpiPresets("2b042", []);
         var body = ConfigCodec.Serialize(cfg);
@@ -202,12 +205,12 @@ public class ConfigTests
             Capabilities = new Capabilities { Buttons = true, Pointer = true },
         };
         cfg.SetDeviceIdentity("2b034", mouse);
-        cfg.SetBinding("2b034", ButtonId.Back, new Binding.Single(Action.BrowserBack));
+        cfg.SetBinding("2b034", ButtonId.Back, new Binding.Single(MouseAction.BrowserBack));
 
         var parsed = WriteAndRead(cfg);
         Assert.Equal(mouse, parsed.DeviceIdentity("2b034"));
         Assert.Null(parsed.DeviceIdentity("absent"));
-        Assert.Equal(new Binding.Single(Action.BrowserBack), parsed.BindingsFor("2b034")[ButtonId.Back]);
+        Assert.Equal(new Binding.Single(MouseAction.BrowserBack), parsed.BindingsFor("2b034")[ButtonId.Back]);
         Assert.Equal([("2b034", mouse)], parsed.KnownIdentities().ToArray());
     }
 
@@ -260,27 +263,27 @@ public class ConfigTests
     public void PerAppOverlayTakesPrecedence()
     {
         var cfg = new Config();
-        cfg.SetBinding("2b042", ButtonId.Back, new Binding.Single(Action.BrowserBack));
-        cfg.SetBinding("2b042", ButtonId.Forward, new Binding.Single(Action.BrowserForward));
-        cfg.SetPerAppBinding("2b042", "com.microsoft.VSCode", ButtonId.Back, Action.Undo);
+        cfg.SetBinding("2b042", ButtonId.Back, new Binding.Single(MouseAction.BrowserBack));
+        cfg.SetBinding("2b042", ButtonId.Forward, new Binding.Single(MouseAction.BrowserForward));
+        cfg.SetPerAppBinding("2b042", "com.microsoft.VSCode", ButtonId.Back, MouseAction.Undo);
 
         var global = cfg.EffectiveBindings("2b042", null);
-        Assert.Equal(new Binding.Single(Action.BrowserBack), global[ButtonId.Back]);
-        Assert.Equal(new Binding.Single(Action.BrowserForward), global[ButtonId.Forward]);
+        Assert.Equal(new Binding.Single(MouseAction.BrowserBack), global[ButtonId.Back]);
+        Assert.Equal(new Binding.Single(MouseAction.BrowserForward), global[ButtonId.Forward]);
 
         var vscode = cfg.EffectiveBindings("2b042", "com.microsoft.VSCode");
-        Assert.Equal(new Binding.Single(Action.Undo), vscode[ButtonId.Back]);
-        Assert.Equal(new Binding.Single(Action.BrowserForward), vscode[ButtonId.Forward]);
+        Assert.Equal(new Binding.Single(MouseAction.Undo), vscode[ButtonId.Back]);
+        Assert.Equal(new Binding.Single(MouseAction.BrowserForward), vscode[ButtonId.Forward]);
 
         var other = cfg.EffectiveBindings("2b042", "com.apple.Safari");
-        Assert.Equal(new Binding.Single(Action.BrowserBack), other[ButtonId.Back]);
+        Assert.Equal(new Binding.Single(MouseAction.BrowserBack), other[ButtonId.Back]);
     }
 
     [Fact]
     public void PerAppBindingRemovalPrunesEmptyApp()
     {
         var cfg = new Config();
-        cfg.SetPerAppBinding("2b042", "com.example.App", ButtonId.Back, Action.Copy);
+        cfg.SetPerAppBinding("2b042", "com.example.App", ButtonId.Back, MouseAction.Copy);
         cfg.SetPerAppBinding("2b042", "com.example.App", ButtonId.Back, null);
         Assert.Empty(cfg.Devices["2b042"].PerAppBindings);
     }

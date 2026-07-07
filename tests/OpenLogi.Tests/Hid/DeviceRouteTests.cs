@@ -1,4 +1,4 @@
-using OpenLogi.Core;
+using OpenLogi.Core.DeviceInfo;
 using OpenLogi.Hid;
 
 namespace OpenLogi.Tests.Hid;

@@ -10,7 +10,6 @@ public static class Brand
     /// <summary>The product display name.</summary>
     public const string AppName = "OpenLogi.net";
 
-    // TODO: point these at the real openlogi-net repo owner before release.
     /// <summary>The OpenLogi.net GitHub repository.</summary>
     public const string RepoUrl = "https://github.com/LoxSmoke/openlogi-net";
 

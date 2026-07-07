@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using OpenLogi.Core;
+using OpenLogi.Core.Config;
+using OpenLogi.Core.Logging;
 
 namespace OpenLogi.App.ViewModels;
 
@@ -17,6 +18,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _checkForUpdates;
     [ObservableProperty] private bool _autoDownloadAssets;
     [ObservableProperty] private bool _minimizeToTray;
+    [ObservableProperty] private bool _suppressLogging;
 
     public SettingsViewModel(Config config)
     {
@@ -27,6 +29,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         CheckForUpdates = config.AppSettings.CheckForUpdates;
         AutoDownloadAssets = config.AppSettings.AutoDownloadAssets;
         MinimizeToTray = config.AppSettings.MinimizeToTray;
+        SuppressLogging = config.AppSettings.SuppressLogging;
         _loading = false;
     }
 
@@ -58,6 +61,18 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         if (_loading) return;
         _config.AppSettings.MinimizeToTray = value;
+        Save();
+    }
+
+    partial void OnSuppressLoggingChanged(bool value)
+    {
+        if (_loading) return;
+        // Order matters so the transition itself is recorded on the enabled side:
+        // note the stop before suppressing, resume logging before the note.
+        if (value) DiagnosticLog.Info("env", "logging suppressed in settings");
+        DiagnosticLog.Suppressed = value;
+        if (!value) DiagnosticLog.Info("env", "logging re-enabled in settings");
+        _config.AppSettings.SuppressLogging = value;
         Save();
     }
 

@@ -1,4 +1,4 @@
-using OpenLogi.Core;
+using OpenLogi.Core.Config;
 using OpenLogi.Input;
 
 namespace OpenLogi.Tests.Input;

@@ -1,4 +1,5 @@
-using OpenLogi.Core;
+using OpenLogi.Core.Actions;
+using OpenLogi.Core.Config;
 
 namespace OpenLogi.Tests;
 
@@ -7,13 +8,13 @@ public class ActionTests
     [Fact]
     public void CatalogHasAtLeast29Entries()
     {
-        Assert.True(Action.Catalog().Count >= 29);
+        Assert.True(MouseAction.Catalog().Count >= 29);
     }
 
     [Fact]
     public void CatalogExcludesCustomShortcut()
     {
-        Assert.DoesNotContain(Action.Catalog(), a => a.Kind == ActionKind.CustomShortcut);
+        Assert.DoesNotContain(MouseAction.Catalog(), a => a.Kind == ActionKind.CustomShortcut);
     }
 
     [Fact]
@@ -38,13 +39,13 @@ public class ActionTests
     [Fact]
     public void DpiToggleDefaultIsCycleDpiPresets()
     {
-        Assert.Equal(Action.CycleDpiPresets, Bindings.DefaultBinding(ButtonId.DpiToggle));
+        Assert.Equal(MouseAction.CycleDpiPresets, Bindings.DefaultBinding(ButtonId.DpiToggle));
     }
 
     [Fact]
     public void SetDpiPresetLabelIsOneBased()
     {
-        Assert.Equal("DPI Preset 3", Action.SetDpiPreset(2).Label());
+        Assert.Equal("DPI Preset 3", MouseAction.SetDpiPreset(2).Label());
     }
 
     [Theory]
@@ -58,7 +59,7 @@ public class ActionTests
     [InlineData(ActionKind.LockScreen, Category.System)]
     public void CategoryAssignment(ActionKind kind, Category expected)
     {
-        Assert.Equal(expected, Action.Unit(kind).Category());
+        Assert.Equal(expected, MouseAction.Unit(kind).Category());
     }
 
     [Fact]
@@ -71,7 +72,7 @@ public class ActionTests
     [Fact]
     public void UnitFactoryRejectsPayloadKinds()
     {
-        Assert.Throws<ArgumentException>(() => Action.Unit(ActionKind.SetDpiPreset));
-        Assert.Throws<ArgumentException>(() => Action.Unit(ActionKind.CustomShortcut));
+        Assert.Throws<ArgumentException>(() => MouseAction.Unit(ActionKind.SetDpiPreset));
+        Assert.Throws<ArgumentException>(() => MouseAction.Unit(ActionKind.CustomShortcut));
     }
 }

@@ -1,5 +1,7 @@
 using OpenLogi.Agent;
-using OpenLogi.Core;
+using OpenLogi.Core.Actions;
+using OpenLogi.Core.Config;
+using OpenLogi.Core.Gestures;
 using OpenLogi.Input;
 
 namespace OpenLogi.Tests.Agent;
@@ -11,21 +13,21 @@ public class BindingMapsTests
     public void ClickLessGestureKeepsDefaultClickInProjection()
     {
         var cfg = new Config();
-        var map = new SortedDictionary<GestureDirection, Action> { [GestureDirection.Up] = Action.Copy };
+        var map = new SortedDictionary<GestureDirection, MouseAction> { [GestureDirection.Up] = MouseAction.Copy };
         cfg.SetBinding("2b042", ButtonId.GestureButton, new Binding.Gesture(map));
 
         var projected = BindingMaps.BindingsFor(cfg, "2b042", null);
-        Assert.Equal(Core.Bindings.DefaultBinding(ButtonId.GestureButton), projected[ButtonId.GestureButton]);
+        Assert.Equal(Bindings.DefaultBinding(ButtonId.GestureButton), projected[ButtonId.GestureButton]);
     }
 
     [Fact]
     public void ExplicitGestureClickOverridesDefaultInProjection()
     {
         var cfg = new Config();
-        var map = new SortedDictionary<GestureDirection, Action> { [GestureDirection.Click] = Action.Paste };
+        var map = new SortedDictionary<GestureDirection, MouseAction> { [GestureDirection.Click] = MouseAction.Paste };
         cfg.SetBinding("2b042", ButtonId.GestureButton, new Binding.Gesture(map));
 
-        Assert.Equal(Action.Paste, BindingMaps.BindingsFor(cfg, "2b042", null)[ButtonId.GestureButton]);
+        Assert.Equal(MouseAction.Paste, BindingMaps.BindingsFor(cfg, "2b042", null)[ButtonId.GestureButton]);
     }
 
     [Fact]
@@ -33,7 +35,7 @@ public class BindingMapsTests
     {
         var cfg = new Config();
         cfg.SetGestureOwner("2b042", ButtonId.Back); // makes Back an OS-hook gesture owner
-        cfg.SetBinding("2b042", ButtonId.MiddleClick, new Binding.Single(Action.MiddleClick));
+        cfg.SetBinding("2b042", ButtonId.MiddleClick, new Binding.Single(MouseAction.MiddleClick));
 
         var oshook = BindingMaps.OsHookGesturesFor(cfg, "2b042", null);
         Assert.Single(oshook);
@@ -49,7 +51,7 @@ public class BindingMapsTests
         cfg.SetGestureOwner("2b042", ButtonId.Back);
         Assert.True(BindingMaps.OsHookGesturesFor(cfg, "2b042", null).ContainsKey(ButtonId.Back));
 
-        cfg.SetPerAppBinding("2b042", "com.apple.Safari", ButtonId.Back, Action.NextTab);
+        cfg.SetPerAppBinding("2b042", "com.apple.Safari", ButtonId.Back, MouseAction.NextTab);
         Assert.Empty(BindingMaps.OsHookGesturesFor(cfg, "2b042", "com.apple.Safari"));
         Assert.True(BindingMaps.OsHookGesturesFor(cfg, "2b042", "com.other.App").ContainsKey(ButtonId.Back));
     }
@@ -61,24 +63,24 @@ public class BindingMapsTests
         // The dedicated gesture button gestures by default; an unconfigured
         // physical button does not.
         Assert.Equal(
-            Core.Bindings.DefaultGestureBinding(GestureDirection.Up),
+            Bindings.DefaultGestureBinding(GestureDirection.Up),
             BindingMaps.GestureBindingsFor(cfg, "2b042", ButtonId.GestureButton)[GestureDirection.Up]);
         Assert.Empty(BindingMaps.GestureBindingsFor(cfg, "2b042", ButtonId.Back));
 
         // Configuring Back gives it its own live map — without clearing the
         // dedicated button's (several buttons may gesture at once).
         cfg.SetGestureOwner("2b042", ButtonId.Back); // fills Back's five defaults
-        cfg.SetGestureDirection("2b042", ButtonId.Back, GestureDirection.Up, Action.Copy);
+        cfg.SetGestureDirection("2b042", ButtonId.Back, GestureDirection.Up, MouseAction.Copy);
         var map = BindingMaps.GestureBindingsFor(cfg, "2b042", ButtonId.Back);
-        Assert.Equal(Action.Copy, map[GestureDirection.Up]);
+        Assert.Equal(MouseAction.Copy, map[GestureDirection.Up]);
         Assert.Equal(
-            Core.Bindings.DefaultGestureBinding(GestureDirection.Down),
+            Bindings.DefaultGestureBinding(GestureDirection.Down),
             map[GestureDirection.Down]);
         Assert.NotEmpty(BindingMaps.GestureBindingsFor(cfg, "2b042", ButtonId.GestureButton));
 
         // Selecting another button in the editor must not clear Back's map.
         cfg.SetGestureSelection("2b042", ButtonId.MiddleClick);
-        Assert.Equal(Action.Copy,
+        Assert.Equal(MouseAction.Copy,
             BindingMaps.GestureBindingsFor(cfg, "2b042", ButtonId.Back)[GestureDirection.Up]);
 
         // Only "All off" silences everything — and re-selecting restores it.
@@ -86,16 +88,16 @@ public class BindingMapsTests
         Assert.Empty(BindingMaps.GestureBindingsFor(cfg, "2b042", ButtonId.Back));
         Assert.Empty(BindingMaps.GestureBindingsFor(cfg, "2b042", ButtonId.GestureButton));
         cfg.SetGestureSelection("2b042", ButtonId.Back);
-        Assert.Equal(Action.Copy,
+        Assert.Equal(MouseAction.Copy,
             BindingMaps.GestureBindingsFor(cfg, "2b042", ButtonId.Back)[GestureDirection.Up]);
     }
 }
 
 public class ButtonDispatchTests
 {
-    private static SortedDictionary<ButtonId, Action> Bindings(params (ButtonId, Action)[] entries)
+    private static SortedDictionary<ButtonId, MouseAction> Bindings(params (ButtonId, MouseAction)[] entries)
     {
-        var d = new SortedDictionary<ButtonId, Action>();
+        var d = new SortedDictionary<ButtonId, MouseAction>();
         foreach (var (b, a) in entries) d[b] = a;
         return d;
     }
@@ -103,7 +105,7 @@ public class ButtonDispatchTests
     [Fact]
     public void NonOsHookButtonsPassThrough()
     {
-        var (disp, inject) = ButtonDispatch.Resolve(ButtonId.LeftClick, true, Bindings((ButtonId.LeftClick, Action.Copy)));
+        var (disp, inject) = ButtonDispatch.Resolve(ButtonId.LeftClick, true, Bindings((ButtonId.LeftClick, MouseAction.Copy)));
         Assert.Equal(EventDisposition.PassThrough, disp);
         Assert.Null(inject);
     }
@@ -111,7 +113,7 @@ public class ButtonDispatchTests
     [Fact]
     public void NativeIdentityPassesThrough()
     {
-        var (disp, inject) = ButtonDispatch.Resolve(ButtonId.Back, true, Bindings((ButtonId.Back, Action.MouseBack)));
+        var (disp, inject) = ButtonDispatch.Resolve(ButtonId.Back, true, Bindings((ButtonId.Back, MouseAction.MouseBack)));
         Assert.Equal(EventDisposition.PassThrough, disp);
         Assert.Null(inject);
     }
@@ -119,15 +121,15 @@ public class ButtonDispatchTests
     [Fact]
     public void RemappedPressSuppressesAndInjects()
     {
-        var (disp, inject) = ButtonDispatch.Resolve(ButtonId.Back, true, Bindings((ButtonId.Back, Action.Copy)));
+        var (disp, inject) = ButtonDispatch.Resolve(ButtonId.Back, true, Bindings((ButtonId.Back, MouseAction.Copy)));
         Assert.Equal(EventDisposition.Suppress, disp);
-        Assert.Equal(Action.Copy, inject);
+        Assert.Equal(MouseAction.Copy, inject);
     }
 
     [Fact]
     public void RemappedReleaseSuppressesWithoutInjecting()
     {
-        var (disp, inject) = ButtonDispatch.Resolve(ButtonId.Back, false, Bindings((ButtonId.Back, Action.Copy)));
+        var (disp, inject) = ButtonDispatch.Resolve(ButtonId.Back, false, Bindings((ButtonId.Back, MouseAction.Copy)));
         Assert.Equal(EventDisposition.Suppress, disp);
         Assert.Null(inject);
     }

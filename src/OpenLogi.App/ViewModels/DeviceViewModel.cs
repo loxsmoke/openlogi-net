@@ -1,6 +1,6 @@
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
-using OpenLogi.Core;
+using OpenLogi.Core.DeviceInfo;
 using OpenLogi.Hid;
 
 namespace OpenLogi.App.ViewModels;
@@ -16,7 +16,18 @@ public sealed partial class DeviceViewModel(string receiverName, PairedDevice de
 
     public string Name => Device.Codename ?? Device.Kind.ToString();
     public string Kind => Device.Kind.ToString();
-    public string Status => Device.Online ? "Online" : "Offline";
+    public string Status => Device.Online ? "Online" : "Asleep";
+
+    /// <summary>
+    /// True when the device is paired but not currently on its wireless link — a
+    /// receiver reports a sleeping (or powered-off / out-of-range) device this way.
+    /// Directly-attached USB/Bluetooth devices are always enumerated online, so this
+    /// only ever flags a wireless device that's dropped off, i.e. asleep.
+    /// </summary>
+    public bool IsAsleep => !Device.Online;
+
+    /// <summary>Dims the render on the gallery tile while the device is asleep.</summary>
+    public double TileImageOpacity => IsAsleep ? 0.4 : 1.0;
 
     /// <summary>Live battery from the open session (0x1004/0x1001), overriding the scan-time snapshot when present.</summary>
     [ObservableProperty]

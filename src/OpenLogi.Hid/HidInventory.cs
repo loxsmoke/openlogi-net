@@ -1,4 +1,5 @@
-using OpenLogi.Core;
+using OpenLogi.Core.DeviceInfo;
+using OpenLogi.Core.Logging;
 using OpenLogi.HidPP.Channel;
 using OpenLogi.HidPP.Device;
 using OpenLogi.HidPP.Feature;
@@ -21,37 +22,143 @@ public static class HidInventory
     public static async Task<IReadOnlyList<DeviceInventory>> EnumerateAsync()
     {
         var result = new List<DeviceInventory>();
-        foreach (var hidDevice in HidDiscovery.EnumerateHidppDevices())
+        var nodes = HidDiscovery.EnumerateHidppDevices();
+        DiagnosticLog.Info("sweep", $"{nodes.Count} Logitech HID++ node(s)");
+        foreach (var hidDevice in nodes)
         {
+            var node = NodeTag(hidDevice);
             HidppChannel channel;
             try
             {
                 channel = await HidppChannel.FromRawChannelAsync(WindowsRawHidChannel.Open(hidDevice)).ConfigureAwait(false);
             }
-            catch
+            catch (Exception ex)
             {
-                continue; // node we can't open / doesn't speak HID++
+                // Node we can't open / doesn't speak HID++.
+                DiagnosticLog.Warn("sweep", $"{node}: open failed: {ex.Message}");
+                continue;
             }
 
             await using (channel)
             {
+                // Receiver registers ride the short (7-byte) HID++ reports; a
+                // receiver's long-only interface answers pings but times out on
+                // every register op (3×5 s — HARDWARE-VERIFIED on 046d:c547).
+                if (Receivers.IsReceiverPid(channel.VendorId, channel.ProductId) && !channel.SupportsShort)
+                {
+                    DiagnosticLog.Info("sweep", $"{node}: receiver interface without short reports — skipped");
+                    continue;
+                }
                 try
                 {
-                    var inventory = Receivers.Detect(channel) switch
+                    var detected = Receivers.Detect(channel);
+                    var inventory = detected switch
                     {
                         DetectedReceiver.Bolt b => await BuildBoltInventoryAsync(channel, b.Receiver).ConfigureAwait(false),
-                        // LIGHTSPEED shares Unifying's register set; only the reported name differs.
+                        // LIGHTSPEED shares Unifying's register set; only the name and
+                        // the uid differ (no serial register → synthetic uid, no read).
                         DetectedReceiver.Unifying u => await BuildUnifyingInventoryAsync(channel, u.Receiver, u.Name).ConfigureAwait(false),
-                        DetectedReceiver.Lightspeed l => await BuildUnifyingInventoryAsync(channel, l.Receiver, l.Name).ConfigureAwait(false),
+                        DetectedReceiver.Lightspeed l => await BuildUnifyingInventoryAsync(channel, l.Receiver, l.Name,
+                            Receivers.LightspeedSyntheticUid(channel), DeviceInterfaceFor(nodes, channel)).ConfigureAwait(false),
                         _ => await BuildDirectInventoryAsync(channel).ConfigureAwait(false),
                     };
-                    if (inventory is not null) result.Add(inventory);
+                    if (inventory is not null)
+                    {
+                        DiagnosticLog.Info("sweep",
+                            $"{node} → {inventory.Receiver.Name}, {inventory.Paired.Count} device(s)");
+                        foreach (var p in inventory.Paired)
+                            DiagnosticLog.Info("sweep",
+                                $"  slot {p.Slot}: {p.Codename ?? "(unnamed)"} ({p.Kind}, {(p.Online ? "online" : "offline")}"
+                                + $"{(p.Wpid is { } w ? $", wpid {w:x4}" : "")}"
+                                + $"{(p.Battery?.Percentage is { } b ? $", batt {b}%" : "")})");
+                        result.Add(inventory);
+                    }
+                    else
+                    {
+                        DiagnosticLog.Info("sweep", $"{node}: no receiver match, no HID++ 2.0 device at 0xff");
+                    }
                 }
-                catch
+                catch (Exception ex)
                 {
                     // A single unresponsive node must not abort the whole sweep.
+                    DiagnosticLog.Error("sweep", $"{node}: sweep failed", ex);
                 }
             }
+        }
+        var deduped = Deduplicate(result);
+        DiagnosticLog.Info("sweep", $"done: {deduped.Count} receiver(s)/device(s) usable");
+        return deduped;
+    }
+
+    /// <summary>
+    /// Collapse entries that are the same physical unit seen over several paths.
+    /// A device connected both through its receiver and directly (Bluetooth or
+    /// USB cable), or one exposing several HID++ collections, answers on every
+    /// path and would be listed once per path. The unit id from DeviceInformation
+    /// (0x0003) identifies the physical unit; receiver-paired entries win over
+    /// direct nodes, and only devices reporting a non-zero unit id participate.
+    ///
+    /// The exception where a receiver-paired entry loses: a slot the receiver
+    /// reports <em>offline</em> while the same model is online over another
+    /// transport (e.g. a G915 paired to its LIGHTSPEED dongle but currently on
+    /// Bluetooth). An offline slot has no readable unit id, so it is matched by
+    /// wpid against the per-transport model ids (0x0003) of online devices. A
+    /// model id can't tell two identical units apart, so with twin devices the
+    /// second unit's dormant pairing is hidden while its twin is online —
+    /// benign, since the dormant slot offers nothing to configure.
+    /// </summary>
+    public static IReadOnlyList<DeviceInventory> Deduplicate(IReadOnlyList<DeviceInventory> inventories)
+    {
+        static string? UnitKey(PairedDevice d) =>
+            d.ModelInfo is { UnitId: { } uid } && uid.Any(b => b != 0) ? Convert.ToHexString(uid) : null;
+
+        static bool IsDirect(DeviceInventory inv) =>
+            inv.Receiver.UniqueId is null
+            && inv.Paired.All(d => d.Slot == DeviceRoute.DirectDeviceIndex);
+
+        var seen = new HashSet<string>();
+        foreach (var inv in inventories.Where(i => !IsDirect(i)))
+            foreach (var d in inv.Paired)
+                if (UnitKey(d) is { } key)
+                    seen.Add(key);
+
+        var onlineModelIds = inventories
+            .SelectMany(i => i.Paired)
+            .Where(d => d.Online)
+            .SelectMany(d => d.ModelInfo?.ModelIds ?? [])
+            .Where(id => id != 0)
+            .ToHashSet();
+
+        var result = new List<DeviceInventory>();
+        foreach (var inv in inventories)
+        {
+            if (!IsDirect(inv))
+            {
+                var live = inv.Paired.Where(d =>
+                {
+                    if (d.Online || d.Wpid is not { } w || !onlineModelIds.Contains(w)) return true;
+                    DiagnosticLog.Info("sweep",
+                        $"dedup: dropped offline slot {d.Slot} (wpid {w:x4}) on {inv.Receiver.Name}"
+                        + " — same model is online via another transport");
+                    return false;
+                }).ToList();
+                result.Add(live.Count == inv.Paired.Count ? inv : inv with { Paired = live });
+                continue;
+            }
+
+            var kept = inv.Paired.Where(d =>
+            {
+                if (UnitKey(d) is not { } key || seen.Add(key)) return true;
+                DiagnosticLog.Info("sweep",
+                    $"dedup: dropped direct {inv.Receiver.VendorId:x4}:{inv.Receiver.ProductId:x4}"
+                    + $" {d.Codename ?? "(unnamed)"} — same unit as an already-listed device");
+                return false;
+            }).ToList();
+
+            if (kept.Count == inv.Paired.Count)
+                result.Add(inv);
+            else if (kept.Count > 0)
+                result.Add(inv with { Paired = kept });
         }
         return result;
     }
@@ -59,7 +166,10 @@ public static class HidInventory
     private static async Task<DeviceInventory> BuildBoltInventoryAsync(HidppChannel channel, BoltReceiver receiver)
     {
         var uid = await TryAsync(receiver.GetUniqueIdAsync).ConfigureAwait(false);
-        try { await receiver.SetWirelessNotificationsAsync(true).ConfigureAwait(false); } catch { /* best effort */ }
+        if (uid is null)
+            DiagnosticLog.Warn("sweep", "receiver uid read (0xfb) failed — devices will be visible but not controllable");
+        try { await receiver.SetWirelessNotificationsAsync(true).ConfigureAwait(false); }
+        catch (Exception ex) { DiagnosticLog.Warn("sweep", $"enable wireless notifications failed: {ex.Message}"); }
 
         var paired = new List<PairedDevice>();
         foreach (var conn in await receiver.CollectPairedDevicesAsync().ConfigureAwait(false))
@@ -75,22 +185,77 @@ public static class HidInventory
         };
     }
 
-    private static async Task<DeviceInventory> BuildUnifyingInventoryAsync(HidppChannel channel, UnifyingReceiver receiver, string name)
+    private static async Task<DeviceInventory> BuildUnifyingInventoryAsync(
+        HidppChannel channel, UnifyingReceiver receiver, string name, string? uidOverride = null,
+        HidSharp.HidDevice? deviceInterface = null)
     {
-        var uid = await TryAsync(receiver.GetUniqueIdAsync).ConfigureAwait(false);
+        var uid = uidOverride ?? await TryAsync(receiver.GetUniqueIdAsync).ConfigureAwait(false);
+        if (uid is null)
+            DiagnosticLog.Warn("sweep", "receiver uid read (0xb5/03) failed — devices will be visible but not controllable");
         // Without the wireless-notification flag the arrival trigger below stays
         // silent on a cold-booted receiver (same reason the Bolt path sets it).
-        try { await receiver.SetWirelessNotificationsAsync(true).ConfigureAwait(false); } catch { /* best effort */ }
+        try { await receiver.SetWirelessNotificationsAsync(true).ConfigureAwait(false); }
+        catch (Exception ex) { DiagnosticLog.Warn("sweep", $"enable wireless notifications failed: {ex.Message}"); }
 
-        var paired = new List<PairedDevice>();
-        foreach (var conn in await receiver.CollectPairedDevicesAsync().ConfigureAwait(false))
-            paired.Add(await ProbeAsync(channel, conn.Index, MapUnifying(conn.Kind), conn.Online, conn.Wpid, codename: null).ConfigureAwait(false));
-
-        return new DeviceInventory
+        // A LIGHTSPEED receiver carries device HID++ 2.0 on a long-only *device*
+        // interface (col02) that's separate from the short *control* interface
+        // (col01) we enumerate on — the paired device is unreachable via HID++ 2.0 at
+        // its slot on the control channel. Probe on the device interface when one was
+        // found, so the slot yields a real name/model/capabilities (and the tile isn't
+        // just a bare "Keyboard"). Falls back to the control channel when there's no
+        // separate device interface (the combined Bolt/Unifying case).
+        HidppChannel? deviceChannel = null;
+        if (deviceInterface is not null)
         {
-            Receiver = new ReceiverInfo { Name = name, VendorId = channel.VendorId, ProductId = channel.ProductId, UniqueId = uid },
-            Paired = paired,
-        };
+            try { deviceChannel = await HidppChannel.FromRawChannelAsync(WindowsRawHidChannel.Open(deviceInterface)).ConfigureAwait(false); }
+            catch (Exception ex) { DiagnosticLog.Warn("sweep", $"device interface open failed: {ex.Message} — probing on the control interface"); }
+        }
+        var probeChannel = deviceChannel ?? channel;
+
+        try
+        {
+            var paired = new List<PairedDevice>();
+            foreach (var conn in await receiver.CollectPairedDevicesAsync().ConfigureAwait(false))
+            {
+                // Name from the pairing registers, so offline slots aren't blank tiles;
+                // the online probe still supplies the marketing name as a fallback.
+                // (A G915 LIGHTSPEED dongle answers a fast ResourceError for its
+                // offline slot instead of a name — HARDWARE-VERIFIED on 046d:c547.)
+                string? codename = null;
+                try { codename = await receiver.GetDeviceCodenameAsync(conn.Index).ConfigureAwait(false); }
+                catch (Exception ex) { DiagnosticLog.Debug("sweep", $"  slot {conn.Index}: codename read (0xb5/0x4n) failed: {ex.Message}"); }
+                paired.Add(await ProbeAsync(probeChannel, conn.Index, MapUnifying(conn.Kind), conn.Online, conn.Wpid, codename).ConfigureAwait(false));
+            }
+
+            return new DeviceInventory
+            {
+                Receiver = new ReceiverInfo { Name = name, VendorId = channel.VendorId, ProductId = channel.ProductId, UniqueId = uid },
+                Paired = paired,
+            };
+        }
+        finally
+        {
+            if (deviceChannel is not null) await deviceChannel.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Find a receiver's long-only *device* interface — the sibling HID node that
+    /// carries device HID++ 2.0 traffic, separate from the short *control* interface
+    /// <paramref name="control"/> we enumerate on (LIGHTSPEED splits these; Bolt/Unifying
+    /// combine them into one interface, so there's no sibling to find). Matched by
+    /// VID/PID, consistent with the VID/PID-based LIGHTSPEED synthetic uid — two
+    /// identical dongles on one host aren't distinguished, which is already accepted.
+    /// </summary>
+    private static HidSharp.HidDevice? DeviceInterfaceFor(IReadOnlyList<HidSharp.HidDevice> nodes, HidppChannel control)
+    {
+        foreach (var n in nodes)
+        {
+            if (n.VendorID != control.VendorId || n.ProductID != control.ProductId) continue;
+            if (WindowsRawHidChannel.DetectSupport(n) is { SupportsShort: false, SupportsLong: true })
+                return n;
+        }
+        return null;
     }
 
     private static async Task<DeviceInventory?> BuildDirectInventoryAsync(HidppChannel channel)
@@ -117,8 +282,9 @@ public static class HidInventory
 
         HidppDevice device;
         try { device = await HidppDevice.NewAsync(channel, slot).ConfigureAwait(false); }
-        catch
+        catch (Exception ex)
         {
+            DiagnosticLog.Warn("sweep", $"  slot {slot}: HID++ 2.0 probe failed ({ex.Message}) — listed without capabilities");
             return new PairedDevice { Slot = slot, Codename = codename, Wpid = wpid, Kind = kind, Online = online };
         }
         return await ProbeOnDeviceAsync(device, slot, kind, online, wpid, codename).ConfigureAwait(false);
@@ -178,6 +344,31 @@ public static class HidInventory
             ModelInfo = modelInfo,
             Capabilities = capabilities ?? Capabilities.PresumedFromKind(kind),
         };
+    }
+
+    /// <summary>
+    /// Log tag for a HID node, with the interface/collection part of the device
+    /// path so a composite device's nodes are distinguishable in the log
+    /// (e.g. "node 046d:c547 [mi_02&amp;col01]" — without it, two interfaces of
+    /// the same receiver log identically).
+    /// </summary>
+    private static string NodeTag(HidSharp.HidDevice device)
+    {
+        var tag = $"node {device.VendorID:x4}:{device.ProductID:x4}";
+        try
+        {
+            // \\?\hid#vid_046d&pid_c547&mi_01&col02#8&2de4…#{guid} → "mi_01&col02"
+            var hw = device.DevicePath.Split('#');
+            if (hw.Length > 1)
+            {
+                var detail = string.Join("&", hw[1].Split('&')
+                    .Where(s => s.StartsWith("mi_", StringComparison.OrdinalIgnoreCase)
+                             || s.StartsWith("col", StringComparison.OrdinalIgnoreCase)));
+                if (detail.Length > 0) tag += $" [{detail}]";
+            }
+        }
+        catch { /* path shape unexpected — plain tag is fine */ }
+        return tag;
     }
 
     // ── Mapping helpers ──────────────────────────────────────────────────────

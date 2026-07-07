@@ -1,4 +1,6 @@
-using OpenLogi.Core;
+using OpenLogi.Core.Actions;
+using OpenLogi.Core.Config;
+using OpenLogi.Core.Gestures;
 using OpenLogi.Input;
 
 namespace OpenLogi.Agent;

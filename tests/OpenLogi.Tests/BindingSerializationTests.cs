@@ -1,10 +1,12 @@
-using OpenLogi.Core;
+using OpenLogi.Core.Actions;
+using OpenLogi.Core.Config;
+using OpenLogi.Core.Gestures;
 
 namespace OpenLogi.Tests;
 
 /// <summary>
 /// Guards the untagged <see cref="Binding"/> routing and tagged-union
-/// <see cref="Action"/> encoding through a full TOML round-trip via the config
+/// <see cref="MouseAction"/> encoding through a full TOML round-trip via the config
 /// codec. Mirrors the Rust <c>binding</c> serde tests.
 /// </summary>
 public class BindingSerializationTests
@@ -30,16 +32,16 @@ public class BindingSerializationTests
     {
         var bindings = new SortedDictionary<ButtonId, Binding>
         {
-            [ButtonId.Back] = new Binding.Single(Action.BrowserBack),
-            [ButtonId.DpiToggle] = new Binding.Single(Action.SetDpiPreset(2)),
-            [ButtonId.Forward] = new Binding.Single(Action.CustomShortcut(new KeyCombo
+            [ButtonId.Back] = new Binding.Single(MouseAction.BrowserBack),
+            [ButtonId.DpiToggle] = new Binding.Single(MouseAction.SetDpiPreset(2)),
+            [ButtonId.Forward] = new Binding.Single(MouseAction.CustomShortcut(new KeyCombo
             {
                 Modifiers = KeyCombo.ModCmd, KeyCode = 0x23, Display = "⌘P",
             })),
         };
         var back = Roundtrip(bindings);
-        Assert.Equal(new Binding.Single(Action.BrowserBack), back[ButtonId.Back]);
-        Assert.Equal(new Binding.Single(Action.SetDpiPreset(2)), back[ButtonId.DpiToggle]);
+        Assert.Equal(new Binding.Single(MouseAction.BrowserBack), back[ButtonId.Back]);
+        Assert.Equal(new Binding.Single(MouseAction.SetDpiPreset(2)), back[ButtonId.DpiToggle]);
         var forward = Assert.IsType<Binding.Single>(back[ButtonId.Forward]);
         Assert.Equal(ActionKind.CustomShortcut, forward.Action.Kind);
     }
@@ -47,10 +49,10 @@ public class BindingSerializationTests
     [Fact]
     public void GestureRoundtrips()
     {
-        var map = new SortedDictionary<GestureDirection, Action>
+        var map = new SortedDictionary<GestureDirection, MouseAction>
         {
-            [GestureDirection.Up] = Action.Copy,
-            [GestureDirection.Click] = Action.Paste,
+            [GestureDirection.Up] = MouseAction.Copy,
+            [GestureDirection.Click] = MouseAction.Paste,
         };
         var bindings = new SortedDictionary<ButtonId, Binding>
         {
@@ -88,7 +90,7 @@ public class BindingSerializationTests
             var path = Path.Combine(dir.FullName, "config.toml");
             File.WriteAllText(path, toml);
             var binding = Config.LoadFromPath(path).BindingsFor("dev")[ButtonId.DpiToggle];
-            Assert.Equal(new Binding.Single(Action.SetDpiPreset(2)), binding);
+            Assert.Equal(new Binding.Single(MouseAction.SetDpiPreset(2)), binding);
         }
         finally { dir.Delete(recursive: true); }
     }
@@ -103,13 +105,13 @@ public class BindingSerializationTests
             var path = Path.Combine(dir.FullName, "config.toml");
             File.WriteAllText(path, toml);
             var binding = Config.LoadFromPath(path).BindingsFor("dev")[ButtonId.Back];
-            Assert.Equal(new Binding.Single(Action.CaptureRegion), binding);
+            Assert.Equal(new Binding.Single(MouseAction.CaptureRegion), binding);
         }
         finally { dir.Delete(recursive: true); }
 
-        Assert.Equal("Capture Region", Action.CaptureRegion.Label());
-        Assert.Equal(Category.System, Action.CaptureRegion.Category());
-        Assert.Contains(Action.CaptureRegion, Action.Catalog());
+        Assert.Equal("Capture Region", MouseAction.CaptureRegion.Label());
+        Assert.Equal(Category.System, MouseAction.CaptureRegion.Category());
+        Assert.Contains(MouseAction.CaptureRegion, MouseAction.Catalog());
     }
 
     [Fact]
@@ -117,7 +119,7 @@ public class BindingSerializationTests
     {
         var bindings = new SortedDictionary<ButtonId, Binding>();
         // Map each catalog action onto Back, one at a time, and round-trip it.
-        foreach (var action in Action.Catalog())
+        foreach (var action in MouseAction.Catalog())
         {
             bindings[ButtonId.Back] = new Binding.Single(action);
             var back = Roundtrip(bindings);
@@ -128,7 +130,7 @@ public class BindingSerializationTests
     [Fact]
     public void CustomShortcutRoundtripsToml()
     {
-        var action = Action.CustomShortcut(new KeyCombo
+        var action = MouseAction.CustomShortcut(new KeyCombo
         {
             Modifiers = (byte)(KeyCombo.ModCmd | KeyCombo.ModShift),
             KeyCode = 0x23,

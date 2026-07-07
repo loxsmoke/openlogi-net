@@ -26,7 +26,13 @@ public sealed class WindowsRawHidChannel : IRawHidChannel, IDisposable
         _stream.ReadTimeout = 250;
         _stream.WriteTimeout = 1000;
         _maxInput = Math.Max(device.GetMaxInputReportLength(), HidppMessage.LongReportLength);
-        _maxOutput = Math.Max(device.GetMaxOutputReportLength(), HidppMessage.LongReportLength);
+        // Windows rejects HID writes that aren't exactly the interface's output
+        // report length (Win32 error 87). Do NOT floor this to the long-report
+        // size: LIGHTSPEED receivers expose a short-only interface (7-byte
+        // reports) where a padded 20-byte write fails — HARDWARE-VERIFIED on a
+        // G915 dongle (046d:c547). Combined Bolt/Unifying interfaces report 20
+        // here, so their behavior is unchanged.
+        _maxOutput = device.GetMaxOutputReportLength();
         _support = support;
         VendorId = (ushort)device.VendorID;
         ProductId = (ushort)device.ProductID;

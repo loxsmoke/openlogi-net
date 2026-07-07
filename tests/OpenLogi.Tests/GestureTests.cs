@@ -1,4 +1,4 @@
-using OpenLogi.Core;
+using OpenLogi.Core.Gestures;
 
 namespace OpenLogi.Tests;
 

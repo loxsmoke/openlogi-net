@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="OpenLogi.App.Views.AboutWindow"
-        Width="400" Height="330"
+        Width="400" SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         Icon="/Assets/icon.png"
@@ -17,6 +17,18 @@
             <HyperlinkButton Content="GitHub" Click="OnGitHub" HorizontalAlignment="Center"/>
             <HyperlinkButton Content="Releases" Click="OnReleases" HorizontalAlignment="Center"/>
         </StackPanel>
+        <TextBlock x:Name="SystemText" Opacity="0.55" FontSize="11" HorizontalAlignment="Center"
+                   TextAlignment="Center" TextWrapping="Wrap" MaxWidth="340"/>
+        <TextBlock x:Name="LogiWarningText" IsVisible="False" Foreground="#E3B341" FontSize="11"
+                   TextAlignment="Center" TextWrapping="Wrap" MaxWidth="340" HorizontalAlignment="Center"/>
         <TextBlock Text="Licensed under MIT" Opacity="0.5" FontSize="11" HorizontalAlignment="Center"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8" Margin="0,6,0,0">
+            <Button x:Name="CopyButton" Content="Copy info" Click="OnCopy" MinWidth="100"
+                    HorizontalContentAlignment="Center"/>
+            <Button Content="Open logs" Click="OnOpenLogs" MinWidth="100"
+                    HorizontalContentAlignment="Center"/>
+            <Button Content="Close" Click="OnClose" MinWidth="84"
+                    HorizontalContentAlignment="Center" IsDefault="True" IsCancel="True"/>
+        </StackPanel>
     </StackPanel>
 </Window>

@@ -61,4 +61,38 @@ public class ReceiverParseTests
         response[4] = 0xfe;
         Assert.Null(BoltReceiver.ParseCodename(response));
     }
+
+    // Unifying's 0xb5/0x4n layout differs from Bolt's: length at [1], name from [2].
+
+    [Fact]
+    public void UnifyingCodenameParses()
+    {
+        var response = new byte[16];
+        response[0] = 0x41;
+        response[1] = 4;
+        "G915"u8.CopyTo(response.AsSpan(2));
+        Assert.Equal("G915", UnifyingReceiver.ParseCodename(response));
+    }
+
+    [Fact]
+    public void UnifyingCodenameWithOversizedLengthClampsToPacket()
+    {
+        var response = new byte[16];
+        response[1] = 200;
+        "MX Vertical"u8.CopyTo(response.AsSpan(2));
+        Assert.Equal("MX Vertical", UnifyingReceiver.ParseCodename(response));
+    }
+
+    [Fact]
+    public void UnifyingCodenameEmptyOrInvalidYieldsNull()
+    {
+        Assert.Null(UnifyingReceiver.ParseCodename(new byte[16])); // zero length
+        Assert.Null(UnifyingReceiver.ParseCodename([0x41, 2])); // truncated packet
+
+        var bad = new byte[16];
+        bad[1] = 2;
+        bad[2] = 0xff;
+        bad[3] = 0xfe;
+        Assert.Null(UnifyingReceiver.ParseCodename(bad));
+    }
 }

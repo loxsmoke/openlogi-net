@@ -6,12 +6,17 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using OpenLogi.Agent;
 using OpenLogi.App.Services;
 using OpenLogi.Assets;
 using OpenLogi.Core;
+using OpenLogi.Core.Actions;
+using OpenLogi.Core.Config;
+using OpenLogi.Core.DeviceInfo;
+using OpenLogi.Core.Gestures;
 using OpenLogi.Hid;
 
 namespace OpenLogi.App.ViewModels;
@@ -122,8 +127,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     // Ctrl+Z history for the gesture editors (click, category, and the four swipes).
     // Each entry is the full five-action state before one user edit; a category fill
     // is a single entry. Cleared whenever the edited button changes.
-    private readonly Stack<(ButtonId Owner, OpenLogi.Core.Action[] Actions)> _gestureUndo = new();
-    private (ButtonId Owner, OpenLogi.Core.Action[] Actions)? _lastGestureState;
+    private readonly Stack<(ButtonId Owner, Core.Actions.MouseAction[] Actions)> _gestureUndo = new();
+    private (ButtonId Owner, Core.Actions.MouseAction[] Actions)? _lastGestureState;
 
     /// <summary>The Custom sentinel: selected when the swipes match no preset; applies nothing.</summary>
     private static readonly GesturePreset CustomGesturePreset = new("Custom", null, null, null, null);
@@ -133,23 +138,23 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// button, and the way to turn one button's swipes off (its Click keeps working).
     /// </summary>
     private static readonly GesturePreset DisabledGesturePreset = new("Disabled",
-        OpenLogi.Core.Action.None, OpenLogi.Core.Action.None,
-        OpenLogi.Core.Action.None, OpenLogi.Core.Action.None);
+        Core.Actions.MouseAction.None, Core.Actions.MouseAction.None,
+        Core.Actions.MouseAction.None, Core.Actions.MouseAction.None);
 
     /// <summary>Category presets for the four swipes (mirrors the Options+ gesture sets).</summary>
     public IReadOnlyList<GesturePreset> GestureCategories { get; } =
     [
         DisabledGesturePreset,
-        new("Windows & Desktops", OpenLogi.Core.Action.TaskView, OpenLogi.Core.Action.ShowDesktop,
-            OpenLogi.Core.Action.PreviousDesktop, OpenLogi.Core.Action.NextDesktop),
-        new("Media & Volume", OpenLogi.Core.Action.VolumeUp, OpenLogi.Core.Action.VolumeDown,
-            OpenLogi.Core.Action.PrevTrack, OpenLogi.Core.Action.NextTrack),
-        new("Arrange Windows", OpenLogi.Core.Action.MaximizeWindow, OpenLogi.Core.Action.MinimizeWindow,
-            OpenLogi.Core.Action.SnapWindowLeft, OpenLogi.Core.Action.SnapWindowRight),
-        new("Browser Tabs", OpenLogi.Core.Action.NewTab, OpenLogi.Core.Action.CloseTab,
-            OpenLogi.Core.Action.PrevTab, OpenLogi.Core.Action.NextTab),
-        new("Scrolling", OpenLogi.Core.Action.ScrollUp, OpenLogi.Core.Action.ScrollDown,
-            OpenLogi.Core.Action.HorizontalScrollLeft, OpenLogi.Core.Action.HorizontalScrollRight),
+        new("Windows & Desktops", Core.Actions.MouseAction.TaskView, Core.Actions.MouseAction.ShowDesktop,
+            Core.Actions.MouseAction.PreviousDesktop, Core.Actions.MouseAction.NextDesktop),
+        new("Media & Volume", Core.Actions.MouseAction.VolumeUp, Core.Actions.MouseAction.VolumeDown,
+            Core.Actions.MouseAction.PrevTrack, Core.Actions.MouseAction.NextTrack),
+        new("Arrange Windows", Core.Actions.MouseAction.MaximizeWindow, Core.Actions.MouseAction.MinimizeWindow,
+            Core.Actions.MouseAction.SnapWindowLeft, Core.Actions.MouseAction.SnapWindowRight),
+        new("Browser Tabs", Core.Actions.MouseAction.NewTab, Core.Actions.MouseAction.CloseTab,
+            Core.Actions.MouseAction.PrevTab, Core.Actions.MouseAction.NextTab),
+        new("Scrolling", Core.Actions.MouseAction.ScrollUp, Core.Actions.MouseAction.ScrollDown,
+            Core.Actions.MouseAction.HorizontalScrollLeft, Core.Actions.MouseAction.HorizontalScrollRight),
         CustomGesturePreset,
     ];
 
@@ -167,6 +172,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _updateAvailable;
     [ObservableProperty] private string _updateBannerText = "";
     private string? _latestUpdate;
+
+    // Receiver-contention banner: Logitech software running alongside us can take
+    // over the receiver (same warning the About window shows). Re-evaluated on each
+    // scan; the signature of the running set drives dismissal, mirroring updates.
+    [ObservableProperty] private bool _logiWarningVisible;
+    [ObservableProperty] private string _logiWarningText = "";
+    private string _logiWarningSignature = "";
+    private string? _dismissedLogiWarning;
 
     // Navigation: false = home gallery, true = device detail.
     [ObservableProperty] private bool _showingDevice;
@@ -303,6 +316,22 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     // injects keystrokes (e.g. Task View = Win+Tab). Runs for the app's lifetime.
     private readonly AgentRuntime _agent;
 
+    // Watches for Logitech HID nodes arriving/leaving (e.g. a Bluetooth mouse
+    // waking) and auto-rescans, so devices appear without a manual Refresh.
+    private HidDeviceWatcher? _deviceWatcher;
+    // Set when a device-set change lands while the user is mid-configuration on a
+    // device page (or a scan is already running); the rescan then runs when they
+    // return to the gallery, so the open page is never disturbed.
+    private bool _rescanPending;
+
+    // Last-known identity (marketing name + model render) per wireless product id,
+    // remembered from a sweep where the device was awake. A wireless keyboard that
+    // has gone to sleep is reported offline by its receiver with no readable name
+    // (a LIGHTSPEED-paired G915's codename register even ResourceErrors) — backfilling
+    // from here keeps its tile showing the real name/render instead of a bare
+    // "Keyboard" until the user presses a key. In-session only (not persisted).
+    private readonly Dictionary<ushort, (string? Codename, DeviceModelInfo? Model)> _identityCache = [];
+
     public MainWindowViewModel()
     {
         _agent = new AgentRuntime(_config);
@@ -313,7 +342,36 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             try { _agent.Start(); }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"mouse hook unavailable: {ex.Message}"); }
             _ = LoadAsync();
+
+            // A failed watcher (no HID stack) just means no auto-rescan; Refresh still works.
+            try
+            {
+                _deviceWatcher = new HidDeviceWatcher();
+                _deviceWatcher.Changed += OnHidDeviceSetChanged;
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"device watcher unavailable: {ex.Message}"); }
         }
+    }
+
+    /// <summary>
+    /// The Logitech HID node set changed (raised off the UI thread). Rescan now if
+    /// we're on the gallery and idle; otherwise defer until the user returns home,
+    /// so an open device page and its live session are left intact.
+    /// </summary>
+    private void OnHidDeviceSetChanged() => Dispatcher.UIThread.Post(() =>
+    {
+        if (ShowingDevice || IsScanning)
+        {
+            _rescanPending = true;
+            return;
+        }
+        _ = LoadAsync();
+    });
+
+    partial void OnShowingDeviceChanged(bool value)
+    {
+        if (!value && _rescanPending && !IsScanning)
+            _ = LoadAsync();
     }
 
     /// <summary>
@@ -394,19 +452,78 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         UpdateAvailable = false;
     }
 
+    /// <summary>
+    /// Hide the contention banner for the currently-detected set of running Logitech
+    /// apps. Session-only (not persisted): the warning reflects a live condition, so
+    /// starting a *different* Logitech app re-shows it, and a fresh launch reminds again.
+    /// </summary>
+    [RelayCommand]
+    private void DismissLogiWarning()
+    {
+        _dismissedLogiWarning = _logiWarningSignature;
+        LogiWarningVisible = false;
+    }
+
+    /// <summary>
+    /// Re-check which Logitech apps are running (off the UI thread — it enumerates
+    /// processes) and drive the contention banner. Shown whenever the running set is
+    /// non-empty and differs from what the user last dismissed.
+    /// </summary>
+    private async Task RefreshLogiWarningAsync()
+    {
+        var running = await Task.Run(SystemInfo.DetectRunningLogitechSoftware);
+        _logiWarningSignature = string.Join("|", running.OrderBy(n => n, StringComparer.Ordinal));
+        if (running.Count == 0)
+        {
+            LogiWarningVisible = false;
+            return;
+        }
+        LogiWarningText = BuildLogiWarningText(running);
+        LogiWarningVisible = _logiWarningSignature != _dismissedLogiWarning;
+    }
+
+    /// <summary>The banner sentence: names of the running apps + the shared receiver-contention caution.</summary>
+    private static string BuildLogiWarningText(IReadOnlyList<string> running) =>
+        $"{string.Join(", ", running)} {(running.Count == 1 ? "is" : "are")} running — Logitech software "
+        + "can take over the receiver; only one app at a time can reliably control your devices.";
+
+    /// <summary>
+    /// Cache a device's identity (name + model render) when it's seen with one, or
+    /// backfill it from the cache when a later sweep finds the same wireless unit
+    /// asleep/offline with none. Keyed by wpid (present in both the online and offline
+    /// receiver arrival notifications); model-level, so identical twins share a render
+    /// harmlessly. Fields already present on the fresh reading always win.
+    /// </summary>
+    private PairedDevice RememberIdentity(PairedDevice d)
+    {
+        if (d.Wpid is not { } wpid) return d;
+        if (d.Codename is not null || d.ModelInfo is not null)
+        {
+            var prev = _identityCache.TryGetValue(wpid, out var p) ? p : default;
+            _identityCache[wpid] = (d.Codename ?? prev.Codename, d.ModelInfo ?? prev.Model);
+            return d;
+        }
+        if (_identityCache.TryGetValue(wpid, out var cached))
+            return d with { Codename = cached.Codename, ModelInfo = cached.Model };
+        return d;
+    }
+
     private async Task LoadAsync()
     {
+        _rescanPending = false; // this scan reflects the current device set
         StatusText = "Scanning for Logitech devices…";
         IsScanning = true;
         NoDevices = false;
         Devices.Clear();
+        // Re-evaluate receiver contention alongside the scan (independent of its result).
+        _ = RefreshLogiWarningAsync();
         try
         {
             var inventories = await HidInventory.EnumerateAsync();
             foreach (var inv in inventories)
                 foreach (var paired in inv.Paired)
                     if (IsConfigurable(paired))
-                        Devices.Add(new DeviceViewModel(inv.Receiver.Name, paired, DeviceRoute.DeviceRouteFor(inv, paired.Slot)));
+                        Devices.Add(new DeviceViewModel(inv.Receiver.Name, RememberIdentity(paired), DeviceRoute.DeviceRouteFor(inv, paired.Slot)));
 
             // Stay on the home gallery; opening a card navigates to its detail.
             SelectedDevice = null;
@@ -493,7 +610,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 _bindings[button] = BuildGestureBinding(configKey);
                 continue;
             }
-            var action = current.TryGetValue(button, out var a) ? a : Core.Bindings.DefaultBinding(button);
+            var action = current.TryGetValue(button, out var a) ? a : Bindings.DefaultBinding(button);
             _bindings[button] = new ButtonBindingViewModel(button, action, ButtonBindingViewModel.Catalog,
                 (b, act) => Persist(configKey, b, act));
         }
@@ -590,7 +707,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         if (!_bindings.TryGetValue(id, out var binding))
         {
-            binding = new ButtonBindingViewModel(id, Core.Bindings.DefaultBinding(id), ButtonBindingViewModel.Catalog,
+            binding = new ButtonBindingViewModel(id, Bindings.DefaultBinding(id), ButtonBindingViewModel.Catalog,
                 (b, act) => Persist(configKey, b, act));
             _bindings[id] = binding;
         }
@@ -1233,6 +1350,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _agent.Dispose();
+        if (_deviceWatcher is not null)
+        {
+            _deviceWatcher.Changed -= OnHidDeviceSetChanged;
+            _deviceWatcher.Dispose();
+        }
         _ = _batteryMonitor?.DisposeAsync();
         foreach (var mc in _mouseCaptures)
         {
@@ -1254,7 +1376,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         catch { /* no render available — UI shows none */ }
     }
 
-    private void Persist(string configKey, ButtonId button, OpenLogi.Core.Action action)
+    private void Persist(string configKey, ButtonId button, Core.Actions.MouseAction action)
     {
         _config.SetBinding(configKey, button, new Binding.Single(action));
         try { _config.SaveAtomic(); }
@@ -1285,21 +1407,21 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var stored = _config.GestureBindingsFor(configKey, owner);
         var clickSeed = BindingMaps.BindingsFor(_config, configKey, null).TryGetValue(owner, out var click)
             ? click
-            : Core.Bindings.DefaultBinding(owner);
+            : Bindings.DefaultBinding(owner);
         return GestureDirectionExtensions.All
             .Select(d =>
             {
                 var action = stored.TryGetValue(d, out var ga) ? ga
-                    : owner == ButtonId.GestureButton ? Core.Bindings.DefaultGestureBinding(d)
+                    : owner == ButtonId.GestureButton ? Bindings.DefaultGestureBinding(d)
                     : d == GestureDirection.Click ? clickSeed
-                    : OpenLogi.Core.Action.None;
+                    : Core.Actions.MouseAction.None;
                 return new GestureDirectionBindingViewModel(d, action, ButtonBindingViewModel.Catalog,
                     (dir, act) => PersistGesture(configKey, owner, dir, act));
             })
             .ToList();
     }
 
-    private void PersistGesture(string configKey, ButtonId owner, GestureDirection direction, OpenLogi.Core.Action action)
+    private void PersistGesture(string configKey, ButtonId owner, GestureDirection direction, Core.Actions.MouseAction action)
     {
         // Writes one direction into the owner button's gesture map (upgrading it to a
         // gesture binding if needed). A button's FIRST gesture edit is what activates
@@ -1396,10 +1518,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>The five current editor actions (click first, then ↑↓←→), or null with no editor.</summary>
-    private (ButtonId Owner, OpenLogi.Core.Action[] Actions)? CurrentGestureSnapshot()
+    private (ButtonId Owner, Core.Actions.MouseAction[] Actions)? CurrentGestureSnapshot()
     {
         if (SelectedGestureOwner?.Button is not { } owner || GestureClick is null) return null;
-        var actions = new List<OpenLogi.Core.Action> { GestureClick.Selected.Action };
+        var actions = new List<Core.Actions.MouseAction> { GestureClick.Selected.Action };
         actions.AddRange(GestureDirections.Select(v => v.Selected.Action));
         return (owner, [.. actions]);
     }
@@ -1549,7 +1671,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (!_config.GestureButtons(configKey).Contains(button)) return null;
         var map = BindingMaps.GestureBindingsFor(_config, configKey, button);
         var actions = new[] { GestureDirection.Up, GestureDirection.Down, GestureDirection.Left, GestureDirection.Right }
-            .Select(d => map.TryGetValue(d, out var a) ? a : Core.Bindings.DefaultGestureBinding(d))
+            .Select(d => map.TryGetValue(d, out var a) ? a : Bindings.DefaultGestureBinding(d))
             .Where(a => a.Kind != ActionKind.None)
             .ToList();
         if (actions.Count == 0) return null; // swipes disabled — no label line

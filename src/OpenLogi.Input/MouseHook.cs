@@ -1,5 +1,5 @@
 using System.Runtime.InteropServices;
-using OpenLogi.Core;
+using OpenLogi.Core.Config;
 
 namespace OpenLogi.Input;
 

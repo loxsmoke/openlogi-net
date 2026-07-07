@@ -75,6 +75,20 @@
             </Grid>
         </Border>
 
+        <!-- Receiver-contention banner (Logitech software running alongside us; same
+             caution as the About window). Amber to read as a warning, not an update. -->
+        <Border DockPanel.Dock="Top" Padding="16,10" Background="#22E3B341"
+                IsVisible="{Binding LogiWarningVisible}">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <TextBlock Grid.Column="0" Text="⚠" FontSize="16" Foreground="#E3B341"
+                           VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <TextBlock Grid.Column="1" Text="{Binding LogiWarningText}" VerticalAlignment="Center"
+                           TextWrapping="Wrap"/>
+                <Button Grid.Column="2" Content="✕" Command="{Binding DismissLogiWarningCommand}"
+                        Background="Transparent" BorderThickness="0"/>
+            </Grid>
+        </Border>
+
         <!-- Header (switches between home and device detail) -->
         <Border DockPanel.Dock="Top" Padding="16,12" Background="#10000000">
             <Panel>
@@ -118,14 +132,18 @@
                                         <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
                                                    HorizontalAlignment="Center" TextAlignment="Center"
                                                    TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"/>
-                                        <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
+                                        <!-- Battery when awake; a sleep indicator when the receiver reports it off the link -->
+                                        <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center"
+                                                    IsVisible="{Binding !IsAsleep}">
                                             <ctrl:BatteryIcon Percent="{Binding BatteryPercent}" Charging="{Binding BatteryCharging}"
                                                               IsVisible="{Binding HasBattery}" VerticalAlignment="Center"/>
                                             <TextBlock Text="{Binding Battery}" Opacity="0.6" FontSize="11"
                                                        VerticalAlignment="Center"/>
                                         </StackPanel>
+                                        <TextBlock Text="☾ Asleep" IsVisible="{Binding IsAsleep}"
+                                                   Opacity="0.5" FontSize="11" HorizontalAlignment="Center"/>
                                     </StackPanel>
-                                    <Image Source="{Binding Image}" Stretch="Uniform"
+                                    <Image Source="{Binding Image}" Stretch="Uniform" Opacity="{Binding TileImageOpacity}"
                                            RenderOptions.BitmapInterpolationMode="HighQuality"/>
                                 </DockPanel>
                             </Button>

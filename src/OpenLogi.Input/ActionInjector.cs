@@ -1,10 +1,10 @@
-using OpenLogi.Core;
-using Action = OpenLogi.Core.Action;
+using OpenLogi.Core.Actions;
+using MouseAction = OpenLogi.Core.Actions.MouseAction;
 
 namespace OpenLogi.Input;
 
 /// <summary>
-/// Synthesises OS input for a bound <see cref="Action"/> via <c>SendInput</c>.
+/// Synthesises OS input for a bound <see cref="MouseAction"/> via <c>SendInput</c>.
 /// Ported from Rust <c>openlogi-inject</c> (Windows path). Device actions
 /// (DPI/SmartShift) are no-ops here — they're handled by the HID layer.
 ///
@@ -27,7 +27,7 @@ public static class ActionInjector
     private enum MouseButton { Left, Right, Middle, Back, Forward }
 
     /// <summary>Execute the OS effect of <paramref name="action"/>.</summary>
-    public static void Execute(Action action)
+    public static void Execute(MouseAction action)
     {
         switch (action.Kind)
         {

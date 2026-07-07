@@ -77,6 +77,21 @@ public partial class MainWindow : Window
             HideToTray();
     }
 
+    /// <summary>
+    /// F5 refreshes the device list — but only on the home gallery. While a device
+    /// page is open its live HID++ session must not be torn down by a stray keypress,
+    /// so F5 is ignored there (the "← Devices" back button returns home first).
+    /// </summary>
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        if (e.Key == Key.F5 && DataContext is MainWindowViewModel { ShowingDevice: false } vm)
+        {
+            if (vm.RefreshCommand.CanExecute(null)) vm.RefreshCommand.Execute(null);
+            e.Handled = true;
+        }
+        base.OnKeyDown(e);
+    }
+
     private void HideToTray()
     {
         if (_tray is not null) _tray.IsVisible = true;

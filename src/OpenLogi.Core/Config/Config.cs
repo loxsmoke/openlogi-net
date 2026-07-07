@@ -1,145 +1,8 @@
-namespace OpenLogi.Core;
+using OpenLogi.Core.Actions;
+using OpenLogi.Core.DeviceInfo;
+using OpenLogi.Core.Gestures;
 
-/// <summary>Scroll-wheel mode for <see cref="SmartShift"/>: free-spin or ratchet (clicky).</summary>
-public enum WheelMode { Free, Ratchet }
-
-/// <summary>
-/// Per-device SmartShift wheel config, re-applied on reconnect (values live in
-/// device RAM and reset on power cycle). Ported from Rust <c>config::SmartShift</c>.
-/// </summary>
-public sealed record SmartShift
-{
-    public required WheelMode Mode { get; init; }
-    /// <summary>Auto-disengage threshold (0x01–0xFE), or 0xFF for a permanent ratchet.</summary>
-    public required byte AutoDisengage { get; init; }
-    /// <summary>Tunable-torque force percent (1–100); 0 when unsupported.</summary>
-    public required byte TunableTorque { get; init; }
-}
-
-/// <summary>Per-device RGB lighting: a single static color, brightness, on/off.</summary>
-public sealed record Lighting
-{
-    public bool Enabled { get; init; } = true;
-    /// <summary>Static color as 6 hex digits "RRGGBB" (no leading '#').</summary>
-    public string Color { get; init; } = "ffffff";
-
-    private readonly byte _brightness = 100;
-    /// <summary>Brightness percent, clamped to 0–100.</summary>
-    public byte Brightness
-    {
-        get => _brightness;
-        init => _brightness = Math.Min(value, (byte)100);
-    }
-
-    /// <summary>
-    /// Per-key color overrides for the press-to-color editor: LED zone → "RRGGBB"
-    /// hex. Empty when no keys are painted; only painted keys are stored.
-    /// </summary>
-    public IReadOnlyDictionary<byte, string> PerKey { get; init; } = EmptyPerKey;
-
-    /// <summary>The press-to-color editor's last-used brush color as "RRGGBB" hex; null until set.</summary>
-    public string? PaintColor { get; init; }
-
-    private static readonly IReadOnlyDictionary<byte, string> EmptyPerKey = new Dictionary<byte, string>();
-
-    // The compiler-generated record equality compares PerKey by reference; override
-    // so two equal maps (incl. two empty ones — see the roundtrip tests) compare equal.
-    public bool Equals(Lighting? other) =>
-        other is not null
-        && Enabled == other.Enabled
-        && Color == other.Color
-        && _brightness == other._brightness
-        && PaintColor == other.PaintColor
-        && PerKeyEquals(PerKey, other.PerKey);
-
-    public override int GetHashCode() => HashCode.Combine(Enabled, Color, _brightness, PaintColor, PerKey.Count);
-
-    private static bool PerKeyEquals(IReadOnlyDictionary<byte, string> a, IReadOnlyDictionary<byte, string> b)
-    {
-        if (a.Count != b.Count) return false;
-        foreach (var (zone, hex) in a)
-            if (!b.TryGetValue(zone, out var other) || other != hex) return false;
-        return true;
-    }
-}
-
-/// <summary>
-/// Which control owns a device's single gesture role: explicitly off, or a named
-/// button. Serialized as a bare string ("Off" or a <see cref="ButtonId"/> name).
-/// Ported from Rust <c>config::GestureOwner</c>.
-/// </summary>
-public abstract record GestureOwner
-{
-    private GestureOwner() { }
-
-    /// <summary>Gestures explicitly turned off for this device.</summary>
-    public sealed record Off : GestureOwner;
-
-    /// <summary>The named button owns the gesture role.</summary>
-    public sealed record Button(ButtonId Id) : GestureOwner;
-
-    public static readonly Off OffValue = new();
-}
-
-/// <summary>
-/// Last-known identity of a device, captured while online so the UI can render
-/// the right panels before any live probe (or while the device sleeps). Every
-/// field is a static property of the <em>model</em>, so it never goes stale.
-/// Ported from Rust <c>config::DeviceIdentity</c>.
-/// </summary>
-public sealed record DeviceIdentity
-{
-    public required string DisplayName { get; init; }
-    public DeviceModelInfo? ModelInfo { get; init; }
-    public string? Codename { get; init; }
-    public required DeviceKind Kind { get; init; }
-    public required Capabilities Capabilities { get; init; }
-}
-
-/// <summary>Settings scoped to a single physical device.</summary>
-public sealed class DeviceConfig
-{
-    public GestureOwner? GestureOwner { get; set; }
-    public DeviceIdentity? Identity { get; set; }
-    public SortedDictionary<ButtonId, Binding> Bindings { get; set; } = new();
-    public SortedDictionary<string, SortedDictionary<ButtonId, Action>> PerAppBindings { get; set; } = new(StringComparer.Ordinal);
-    public List<uint> DpiPresets { get; set; } = [];
-    public uint? Dpi { get; set; }
-    public Lighting? Lighting { get; set; }
-    public SmartShift? SmartShift { get; set; }
-    public bool InvertScroll { get; set; }
-    /// <summary>Hi-res smooth scrolling (HiResWheel 0x2121 diverted + re-injected while the agent runs).</summary>
-    public bool SmoothScroll { get; set; }
-}
-
-/// <summary>App-wide preferences not tied to any device.</summary>
-public sealed class AppSettings
-{
-    public const int DefaultThumbwheelSensitivity = 14;
-    public const int MinThumbwheelSensitivity = 1;
-    public const int MaxThumbwheelSensitivity = 100;
-
-    public bool LaunchAtLogin { get; set; }
-    public bool CheckForUpdates { get; set; }
-    public bool UpdatePromptSeen { get; set; }
-    /// <summary>The latest-release version the user dismissed in the update banner; the banner stays hidden for it.</summary>
-    public string? DismissedUpdate { get; set; }
-    public bool ShowInMenuBar { get; set; } = true;
-    public bool AutoDownloadAssets { get; set; } = true;
-    /// <summary>Minimize to the system tray (hiding from the taskbar) instead of normal minimize. Off by default.</summary>
-    public bool MinimizeToTray { get; set; }
-    public string? Language { get; set; }
-    public int ThumbwheelSensitivity { get; set; } = DefaultThumbwheelSensitivity;
-
-    /// <summary>True when nothing diverges from the default (so the block is omitted).</summary>
-    public bool IsDefault() =>
-        !LaunchAtLogin && !CheckForUpdates && !UpdatePromptSeen && DismissedUpdate is null
-        && ShowInMenuBar && AutoDownloadAssets && !MinimizeToTray
-        && Language is null && ThumbwheelSensitivity == DefaultThumbwheelSensitivity;
-}
-
-/// <summary>Raised when config I/O or parsing fails.</summary>
-public sealed class ConfigException(string message, Exception? inner = null) : Exception(message, inner);
+namespace OpenLogi.Core.Config;
 
 /// <summary>
 /// Top-level config document, persisted as TOML. Ported from Rust
@@ -235,12 +98,12 @@ public sealed class Config
     /// map when that button has no gesture binding. Purely the stored map — global
     /// on/off and defaults are the caller's concern.
     /// </summary>
-    public SortedDictionary<GestureDirection, Action> GestureBindingsFor(string deviceKey, ButtonId button) =>
+    public SortedDictionary<GestureDirection, Actions.MouseAction> GestureBindingsFor(string deviceKey, ButtonId button) =>
         Devices.TryGetValue(deviceKey, out var d)
             && d.Bindings.TryGetValue(button, out var b)
             && b is Binding.Gesture g
-                ? new SortedDictionary<GestureDirection, Action>(g.Map)
-                : new SortedDictionary<GestureDirection, Action>();
+                ? new SortedDictionary<GestureDirection, Actions.MouseAction>(g.Map)
+                : new SortedDictionary<GestureDirection, Actions.MouseAction>();
 
     /// <summary>
     /// Every button with gestures configured (its stored binding is a gesture map).
@@ -251,7 +114,7 @@ public sealed class Config
     public IReadOnlyList<ButtonId> GestureButtons(string deviceKey)
     {
         if (Devices.TryGetValue(deviceKey, out var device)
-            && device.GestureOwner is OpenLogi.Core.GestureOwner.Off)
+            && (((device.GestureOwner is GestureOwner.Off))))
             return [];
         var result = new List<ButtonId>();
         var bindings = Devices.TryGetValue(deviceKey, out var d) ? d.Bindings : null;
@@ -271,11 +134,11 @@ public sealed class Config
     /// gesture map on it.
     /// </summary>
     public void SetGestureSelection(string deviceKey, ButtonId button) =>
-        Device(deviceKey).GestureOwner = new OpenLogi.Core.GestureOwner.Button(button);
+        Device(deviceKey).GestureOwner = new GestureOwner.Button(button);
 
     /// <summary>Whether gestures are globally enabled (i.e. not explicitly Off).</summary>
     public bool GesturesEnabled(string deviceKey) =>
-        !(Devices.TryGetValue(deviceKey, out var d) && d.GestureOwner is OpenLogi.Core.GestureOwner.Off);
+        !(Devices.TryGetValue(deviceKey, out var d) && (((d.GestureOwner is GestureOwner.Off))));
 
     /// <summary>
     /// Turn gestures globally back on by clearing an explicit Off (leaving any
@@ -283,12 +146,12 @@ public sealed class Config
     /// </summary>
     public void EnableGestures(string deviceKey)
     {
-        if (Devices.TryGetValue(deviceKey, out var d) && d.GestureOwner is OpenLogi.Core.GestureOwner.Off)
+        if (Devices.TryGetValue(deviceKey, out var d) && (((d.GestureOwner is GestureOwner.Off))))
             d.GestureOwner = null;
     }
 
     /// <summary>Record <paramref name="action"/> for one <paramref name="direction"/> of a button's gesture binding.</summary>
-    public void SetGestureDirection(string deviceKey, ButtonId button, GestureDirection direction, Action action)
+    public void SetGestureDirection(string deviceKey, ButtonId button, GestureDirection direction, Actions.MouseAction action)
     {
         var binding = EnsureGestureBinding(deviceKey, button);
         if (binding is Binding.Gesture g)
@@ -312,8 +175,8 @@ public sealed class Config
             return ButtonId.GestureButton;
         return device.GestureOwner switch
         {
-            OpenLogi.Core.GestureOwner.Off => null,
-            OpenLogi.Core.GestureOwner.Button b => b.Id,
+            Gestures.GestureOwner.Off => null,
+            GestureOwner.Button b => b.Id,
             _ => InferGestureOwner(device.Bindings),
         };
     }
@@ -331,14 +194,14 @@ public sealed class Config
     /// <summary>Make <paramref name="button"/> the device's sole gesture button.</summary>
     public void SetGestureOwner(string deviceKey, ButtonId button)
     {
-        Device(deviceKey).GestureOwner = new OpenLogi.Core.GestureOwner.Button(button);
+        Device(deviceKey).GestureOwner = new GestureOwner.Button(button);
         var binding = EnsureGestureBinding(deviceKey, button).FillGestureDefaults();
         Device(deviceKey).Bindings[button] = binding;
     }
 
     /// <summary>Turn gestures off for <paramref name="deviceKey"/> (keeping every gesture map intact).</summary>
     public void DisableGestures(string deviceKey) =>
-        Device(deviceKey).GestureOwner = OpenLogi.Core.GestureOwner.OffValue;
+        Device(deviceKey).GestureOwner = Gestures.GestureOwner.OffValue;
 
     /// <summary>
     /// The effective binding map, overlaying the per-app entry for
@@ -356,12 +219,12 @@ public sealed class Config
     }
 
     /// <summary>Record a per-app override. Passing <c>null</c> removes it and prunes the empty app map.</summary>
-    public void SetPerAppBinding(string deviceKey, string bundleId, ButtonId button, Action? action)
+    public void SetPerAppBinding(string deviceKey, string bundleId, ButtonId button, Actions.MouseAction? action)
     {
         var device = Device(deviceKey);
         if (!device.PerAppBindings.TryGetValue(bundleId, out var entry))
         {
-            entry = new SortedDictionary<ButtonId, Action>();
+            entry = new SortedDictionary<ButtonId, Actions.MouseAction>();
             device.PerAppBindings[bundleId] = entry;
         }
         if (action is not null)

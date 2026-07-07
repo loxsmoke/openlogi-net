@@ -181,12 +181,28 @@ public static class V20
     }
 
     /// <summary>
+    /// Per-attempt timeout for the version ping. Much shorter than the general
+    /// <see cref="HidppChannel.SendResponseTimeout"/>: an awake device answers a
+    /// ping within milliseconds, and a silent HID node otherwise stalls the whole
+    /// inventory sweep for the full send timeout.
+    /// </summary>
+    public static readonly TimeSpan PingTimeout = TimeSpan.FromMilliseconds(900);
+
+    /// <summary>
+    /// How many pings to send before concluding nothing answers at the index. A
+    /// sleeping Bluetooth device often swallows the first ping while its link
+    /// re-establishes and answers the retry.
+    /// </summary>
+    public const int PingAttempts = 3;
+
+    /// <summary>
     /// Determine a device's protocol version by sending a HID++2.0 ping. A
     /// HID++1.0-only device answers with an "invalid sub-id" error, which pins
     /// it to v1.0. Returns <c>null</c> if no device answered for the index.
     /// Ported from Rust <c>protocol::determine_version</c>.
     /// </summary>
-    public static async Task<ProtocolVersion?> DetermineVersionAsync(HidppChannel channel, byte deviceIndex)
+    public static async Task<ProtocolVersion?> DetermineVersionAsync(
+        HidppChannel channel, byte deviceIndex, TimeSpan? pingTimeout = null, int pingAttempts = PingAttempts)
     {
         var swId = channel.GetSwId();
         var msg = V20Message.Short(
@@ -194,32 +210,44 @@ public static class V20
             [0x00, 0x00, 0x00]);
         var header = msg.Header;
 
-        HidppMessage response;
-        try
+        bool IsPingResponse(HidppMessage raw)
         {
-            response = await channel.SendAsync(msg.ToHidpp(), raw =>
-            {
-                if (V20Message.FromHidpp(raw).Header == header)
-                    return true;
+            if (V20Message.FromHidpp(raw).Header == header)
+                return true;
 
-                // HID++1.0 error messages are always short.
-                var v10 = V10Message.FromHidpp(raw);
-                if (v10.Kind == HidppReportKind.Short
-                    && v10.Header.DeviceIndex == deviceIndex
-                    && v10.Header.SubId == (byte)V10MessageType.Error)
-                {
-                    var payload = v10.ExtendPayload();
-                    if (payload[0] == 0x00
-                        && payload[1] == U4.Combine(header.FunctionId, swId))
-                        return true;
-                }
-                return false;
-            }).ConfigureAwait(false);
+            // HID++1.0 error messages are always short.
+            var v10 = V10Message.FromHidpp(raw);
+            if (v10.Kind == HidppReportKind.Short
+                && v10.Header.DeviceIndex == deviceIndex
+                && v10.Header.SubId == (byte)V10MessageType.Error)
+            {
+                var payload = v10.ExtendPayload();
+                if (payload[0] == 0x00
+                    && payload[1] == U4.Combine(header.FunctionId, swId))
+                    return true;
+            }
+            return false;
         }
-        catch (ChannelException)
+
+        HidppMessage? response = null;
+        for (var attempt = 0; attempt < pingAttempts && response is null; attempt++)
         {
-            return null;
+            try
+            {
+                response = await channel.SendWithTimeoutAsync(
+                    msg.ToHidpp(), IsPingResponse, pingTimeout ?? PingTimeout).ConfigureAwait(false);
+            }
+            catch (ChannelException e) when (e.Kind == ChannelErrorKind.Timeout)
+            {
+                // Possibly a wake-up ping the device missed — retry.
+            }
+            catch (ChannelException)
+            {
+                return null;
+            }
         }
+        if (response is null)
+            return null;
 
         var v20 = V20Message.FromHidpp(response);
         if (v20.Header == header)

@@ -1,4 +1,6 @@
-using OpenLogi.Core;
+using OpenLogi.Core.Actions;
+using OpenLogi.Core.Config;
+using OpenLogi.Core.Gestures;
 
 namespace OpenLogi.Agent;
 
@@ -15,15 +17,15 @@ public static class BindingMaps
     /// default; a gesture binding is projected to its click action (its swipes are
     /// dispatched via <see cref="GestureBindingsFor"/> / <see cref="OsHookGesturesFor"/>).
     /// </summary>
-    public static SortedDictionary<ButtonId, Action> BindingsFor(Config config, string? configKey, string? appBundle)
+    public static SortedDictionary<ButtonId, MouseAction> BindingsFor(Config config, string? configKey, string? appBundle)
     {
         var stored = configKey is not null
             ? config.EffectiveBindings(configKey, appBundle)
             : new SortedDictionary<ButtonId, Binding>();
 
-        var bindings = new SortedDictionary<ButtonId, Action>();
+        var bindings = new SortedDictionary<ButtonId, MouseAction>();
         foreach (var b in ButtonIdExtensions.All)
-            bindings[b] = Core.Bindings.DefaultBinding(b);
+            bindings[b] = Bindings.DefaultBinding(b);
 
         foreach (var (k, binding) in stored)
         {
@@ -47,18 +49,18 @@ public static class BindingMaps
     /// deltas); <see cref="OsHookGesturesFor"/> exists for the macOS/Linux hook model
     /// and is unused on Windows.
     /// </summary>
-    public static SortedDictionary<GestureDirection, Action> GestureBindingsFor(
+    public static SortedDictionary<GestureDirection, MouseAction> GestureBindingsFor(
         Config config, string? configKey, ButtonId button)
     {
-        var bindings = new SortedDictionary<GestureDirection, Action>();
+        var bindings = new SortedDictionary<GestureDirection, MouseAction>();
         if (configKey is null || !config.GestureButtons(configKey).Contains(button))
             return bindings;
 
         var stored = config.GestureBindingsFor(configKey, button);
         foreach (var d in GestureDirectionExtensions.All)
             bindings[d] = stored.TryGetValue(d, out var a) ? a
-                : button == ButtonId.GestureButton ? Core.Bindings.DefaultGestureBinding(d)
-                : Action.None;
+                : button == ButtonId.GestureButton ? Bindings.DefaultGestureBinding(d)
+                : MouseAction.None;
         return bindings;
     }
 
@@ -67,17 +69,17 @@ public static class BindingMaps
     /// owns gestures on <paramref name="configKey"/>, with <paramref name="appBundle"/>'s
     /// overlay applied. Empty unless an OS-hook button is the gesture owner.
     /// </summary>
-    public static SortedDictionary<ButtonId, SortedDictionary<GestureDirection, Action>> OsHookGesturesFor(
+    public static SortedDictionary<ButtonId, SortedDictionary<GestureDirection, MouseAction>> OsHookGesturesFor(
         Config config, string? configKey, string? appBundle)
     {
-        var empty = new SortedDictionary<ButtonId, SortedDictionary<GestureDirection, Action>>();
+        var empty = new SortedDictionary<ButtonId, SortedDictionary<GestureDirection, MouseAction>>();
         if (configKey is null) return empty;
         var owner = config.GestureOwner(configKey);
         if (owner is not { } ownerId || !ownerId.IsOsHookButton()) return empty;
 
         var effective = config.EffectiveBindings(configKey, appBundle);
         if (effective.TryGetValue(ownerId, out var binding) && binding is Binding.Gesture g)
-            return new SortedDictionary<ButtonId, SortedDictionary<GestureDirection, Action>> { [ownerId] = g.Map };
+            return new SortedDictionary<ButtonId, SortedDictionary<GestureDirection, MouseAction>> { [ownerId] = g.Map };
         return empty;
     }
 }

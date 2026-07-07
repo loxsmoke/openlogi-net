@@ -1,4 +1,5 @@
-using OpenLogi.Core;
+using OpenLogi.Core.Actions;
+using OpenLogi.Core.Config;
 using OpenLogi.Input;
 
 namespace OpenLogi.Agent;
@@ -15,8 +16,8 @@ public static class ButtonDispatch
     /// the action to inject. A binding that is the button's own native click
     /// passes through (so the physical click still works and we don't re-inject).
     /// </summary>
-    public static (EventDisposition Disposition, Action? Inject) Resolve(
-        ButtonId button, bool pressed, IReadOnlyDictionary<ButtonId, Action> bindings)
+    public static (EventDisposition Disposition, MouseAction? Inject) Resolve(
+        ButtonId button, bool pressed, IReadOnlyDictionary<ButtonId, MouseAction> bindings)
     {
         // Only Middle/Back/Forward are visible to / remapped by the OS hook.
         if (!button.IsOsHookButton())
@@ -33,7 +34,7 @@ public static class ButtonDispatch
     }
 
     /// <summary>Whether <paramref name="action"/> is just the button's own native mouse click.</summary>
-    private static bool IsNativeIdentity(ButtonId button, Action action) => (button, action.Kind) switch
+    private static bool IsNativeIdentity(ButtonId button, MouseAction action) => (button, action.Kind) switch
     {
         (ButtonId.MiddleClick, ActionKind.MiddleClick) => true,
         (ButtonId.Back, ActionKind.MouseBack) => true,

@@ -173,7 +173,7 @@ public sealed class BoltReceiver : IDisposable
 
     private static readonly System.Text.UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
-    private static string? TryUtf8(ReadOnlySpan<byte> bytes)
+    internal static string? TryUtf8(ReadOnlySpan<byte> bytes)
     {
         try { return StrictUtf8.GetString(bytes); }
         catch (System.Text.DecoderFallbackException) { return null; }

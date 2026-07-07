@@ -1,8 +1,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
-using OpenLogi.Core;
-using CoreAction = OpenLogi.Core.Action;
+using OpenLogi.Core.Actions;
+using OpenLogi.Core.Config;
+using OpenLogi.Core.Gestures;
+using CoreAction = OpenLogi.Core.Actions.MouseAction;
 
 namespace OpenLogi.App.ViewModels;
 

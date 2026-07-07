@@ -33,6 +33,12 @@ public static class Paths
     /// <summary>Directory for the device-render asset cache.</summary>
     public static string AssetCacheDir() => Path.Combine(DataDir(), "assets");
 
+    /// <summary>Directory for diagnostic logs (<c>%LOCALAPPDATA%\OpenLogi\logs</c>).</summary>
+    public static string LogDir() => Path.Combine(DataDir(), "logs");
+
+    /// <summary>Full path to the current diagnostic log file.</summary>
+    public static string LogPath() => Path.Combine(LogDir(), "log.txt");
+
     /// <summary>
     /// Name of the agent's named-pipe IPC endpoint. Windows named pipes are not
     /// filesystem paths; the full pipe path is <c>\\.\pipe\OpenLogi.agent</c>.

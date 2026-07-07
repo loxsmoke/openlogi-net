@@ -1,12 +1,15 @@
 using System.Threading.Channels;
+using OpenLogi.Core.DeviceInfo;
+using OpenLogi.Core.Gestures;
 using OpenLogi.HidPP.Channel;
 using OpenLogi.HidPP.Device;
 using OpenLogi.HidPP.Feature;
 using OpenLogi.HidPP.Protocol;
 using OpenLogi.HidPP.Receiver;
-// Alias only ButtonId from Core: a blanket `using OpenLogi.Core` would make the
+// Alias only what's needed from Core: a blanket `using OpenLogi.Core` would make the
 // unqualified `Action` (used by StartDpiButtonCaptureAsync) ambiguous with System.Action.
-using ButtonId = OpenLogi.Core.ButtonId;
+using ButtonId = OpenLogi.Core.Config.ButtonId;
+using DiagnosticLog = OpenLogi.Core.Logging.DiagnosticLog;
 
 namespace OpenLogi.Hid;
 
@@ -109,6 +112,10 @@ public sealed class DeviceSession : IAsyncDisposable
                 await channel.DisposeAsync().ConfigureAwait(false);
             }
         }
+        if (best is null)
+            DiagnosticLog.Warn("session", $"open failed: no usable interface for {route}");
+        else
+            DiagnosticLog.Info("session", $"open {route}: interface score {bestScore}");
         return best;
     }
 
@@ -125,8 +132,15 @@ public sealed class DeviceSession : IAsyncDisposable
                 return Receivers.Detect(channel) is DetectedReceiver.Unifying ru
                        && string.Equals(await ru.Receiver.GetUniqueIdAsync().ConfigureAwait(false), u.ReceiverUid, StringComparison.OrdinalIgnoreCase);
             case DeviceRoute.Lightspeed l:
-                return Receivers.Detect(channel) is DetectedReceiver.Lightspeed rl
-                       && string.Equals(await rl.Receiver.GetUniqueIdAsync().ConfigureAwait(false), l.ReceiverUid, StringComparison.OrdinalIgnoreCase);
+                // LIGHTSPEED has no serial register — match on the same synthetic
+                // uid the inventory assigned; no register I/O (each read is a 5 s timeout).
+                // Don't gate on short support: a LIGHTSPEED receiver carries device
+                // HID++ 2.0 on a long-only *device* interface (col02), separate from the
+                // short *control* interface (col01) where the slot is unreachable. The
+                // scored open below tries every matching interface and keeps whichever one
+                // actually answers HID++ 2.0 for the slot.
+                return Receivers.Detect(channel) is DetectedReceiver.Lightspeed
+                       && string.Equals(Receivers.LightspeedSyntheticUid(channel), l.ReceiverUid, StringComparison.OrdinalIgnoreCase);
             default:
                 return false;
         }
@@ -293,9 +307,15 @@ public sealed class DeviceSession : IAsyncDisposable
             // A zero multiplier would make ticks vanish in the scaler; 8 is the
             // typical hardware value when the capability read is blank.
             var multiplier = capability.Multiplier == 0 ? (byte)8 : capability.Multiplier;
+            DiagnosticLog.Info("capture", $"smooth scroll: hi-res divert on, multiplier {multiplier}");
             return new SmoothScrollCapture(wheel, multiplier, onScroll);
         }
-        catch { wheel.Dispose(); return null; }
+        catch (Exception ex)
+        {
+            DiagnosticLog.Warn("capture", $"smooth scroll: divert failed: {ex.Message}");
+            wheel.Dispose();
+            return null;
+        }
     }
 
     /// <summary>
@@ -344,8 +364,9 @@ public sealed class DeviceSession : IAsyncDisposable
             {
                 var mode = await _wheel.GetModeAsync().ConfigureAwait(false);
                 await _wheel.SetModeAsync(mode with { Diverted = false, HighResolution = false }).ConfigureAwait(false);
+                DiagnosticLog.Info("capture", "smooth scroll: restored standard wheel reporting");
             }
-            catch { /* device gone — nothing to restore */ }
+            catch { DiagnosticLog.Info("capture", "smooth scroll: released (device gone, nothing to restore)"); }
             _wheel.Dispose();
             _cts.Dispose();
         }
@@ -937,13 +958,13 @@ public sealed class DeviceSession : IAsyncDisposable
 
     /// <summary>
     /// Read the current battery via UnifiedBattery (0x1004), mapped to the core
-    /// <see cref="OpenLogi.Core.BatteryInfo"/>, or <c>null</c> if the device has no
+    /// <see cref="Core.DeviceInfo.BatteryInfo"/>, or <c>null</c> if the device has no
     /// 0x1004 / the read fails. Unlike the startup-scan read, this runs on the live
     /// (wake-retried) session, so a sleeping keyboard's level resolves on open.
     /// </summary>
-    public Task<OpenLogi.Core.BatteryInfo?> ReadBatteryAsync() => RetryAsync(ReadBatteryOnceAsync);
+    public Task<BatteryInfo?> ReadBatteryAsync() => RetryAsync(ReadBatteryOnceAsync);
 
-    private async Task<OpenLogi.Core.BatteryInfo?> ReadBatteryOnceAsync()
+    private async Task<BatteryInfo?> ReadBatteryOnceAsync()
     {
         // Prefer UnifiedBattery (0x1004); fall back to BatteryVoltage (0x1001), which
         // Logitech G keyboards expose instead. Both normalize to HidppBatteryInfo.
@@ -969,31 +990,31 @@ public sealed class DeviceSession : IAsyncDisposable
     /// dispose, or <c>null</c> if the device has no 0x1004. The handle owns its own
     /// feature listener, so it is safe alongside a persistent session on the device.
     /// </summary>
-    public IAsyncDisposable? StartBatteryMonitor(Action<OpenLogi.Core.BatteryInfo> onUpdate)
+    public IAsyncDisposable? StartBatteryMonitor(Action<BatteryInfo> onUpdate)
     {
         if (_device.GetFeature<UnifiedBatteryFeature>() is not { } batt) return null;
         return new BatteryMonitor(batt, onUpdate);
     }
 
-    private static OpenLogi.Core.BatteryInfo MapBattery(HidppBatteryInfo b) => new()
+    private static BatteryInfo MapBattery(HidppBatteryInfo b) => new()
     {
         Percentage = b.ChargingPercentage,
         Level = b.Level switch
         {
-            HidppBatteryLevel.Critical => OpenLogi.Core.BatteryLevel.Critical,
-            HidppBatteryLevel.Low => OpenLogi.Core.BatteryLevel.Low,
-            HidppBatteryLevel.Good => OpenLogi.Core.BatteryLevel.Good,
-            HidppBatteryLevel.Full => OpenLogi.Core.BatteryLevel.Full,
-            _ => OpenLogi.Core.BatteryLevel.Unknown,
+            HidppBatteryLevel.Critical => BatteryLevel.Critical,
+            HidppBatteryLevel.Low => BatteryLevel.Low,
+            HidppBatteryLevel.Good => BatteryLevel.Good,
+            HidppBatteryLevel.Full => BatteryLevel.Full,
+            _ => BatteryLevel.Unknown,
         },
         Status = b.Status switch
         {
-            HidppBatteryStatus.Discharging => OpenLogi.Core.BatteryStatus.Discharging,
-            HidppBatteryStatus.Charging => OpenLogi.Core.BatteryStatus.Charging,
-            HidppBatteryStatus.ChargingSlow => OpenLogi.Core.BatteryStatus.ChargingSlow,
-            HidppBatteryStatus.Full => OpenLogi.Core.BatteryStatus.Full,
-            HidppBatteryStatus.Error => OpenLogi.Core.BatteryStatus.Error,
-            _ => OpenLogi.Core.BatteryStatus.Unknown,
+            HidppBatteryStatus.Discharging => BatteryStatus.Discharging,
+            HidppBatteryStatus.Charging => BatteryStatus.Charging,
+            HidppBatteryStatus.ChargingSlow => BatteryStatus.ChargingSlow,
+            HidppBatteryStatus.Full => BatteryStatus.Full,
+            HidppBatteryStatus.Error => BatteryStatus.Error,
+            _ => BatteryStatus.Unknown,
         },
     };
 
@@ -1004,13 +1025,13 @@ public sealed class DeviceSession : IAsyncDisposable
         private readonly CancellationTokenSource _cts = new();
         private readonly Task _pump;
 
-        public BatteryMonitor(UnifiedBatteryFeature batt, Action<OpenLogi.Core.BatteryInfo> onUpdate)
+        public BatteryMonitor(UnifiedBatteryFeature batt, Action<BatteryInfo> onUpdate)
         {
             _batt = batt;
             _pump = PumpAsync(batt.Listen(), onUpdate, _cts.Token);
         }
 
-        private static async Task PumpAsync(ChannelReader<BatteryEvent> reader, Action<OpenLogi.Core.BatteryInfo> onUpdate, CancellationToken ct)
+        private static async Task PumpAsync(ChannelReader<BatteryEvent> reader, Action<BatteryInfo> onUpdate, CancellationToken ct)
         {
             try
             {
@@ -1074,6 +1095,8 @@ public sealed class DeviceSession : IAsyncDisposable
         catch { /* best-effort; whatever diverted is handed back on dispose */ }
 
         if (diverted.Count == 0) { rc.Dispose(); return null; }
+        DiagnosticLog.Info("capture",
+            $"dpi button diverted: {string.Join(", ", diverted.Select(c => $"0x{c:x4}"))}");
         return new DpiButtonCapture(rc, diverted, onPressed);
     }
 
@@ -1132,14 +1155,14 @@ public sealed class DeviceSession : IAsyncDisposable
     /// over 0x1b04 with raw-XY reporting, so a hold-and-swipe on that button is
     /// captured instead of moving the cursor. <paramref name="onGesture"/> fires once
     /// per committed swipe — the instant the direction commits mid-motion — and once
-    /// with <see cref="OpenLogi.Core.GestureDirection.Click"/> for a plain press that
+    /// with <see cref="GestureDirection.Click"/> for a plain press that
     /// never swiped. Returns a handle that restores the control's native behaviour
     /// when disposed, or <c>null</c> if the device exposes no raw-XY-capable control
     /// for that button. Mirrors the DPI-button capture; ported from the Rust gesture
     /// path in <c>openlogi-hid::gesture</c>.
     /// </summary>
     public async Task<IAsyncDisposable?> StartGestureCaptureAsync(
-        ButtonId owner, System.Action<OpenLogi.Core.GestureDirection> onGesture)
+        ButtonId owner, System.Action<GestureDirection> onGesture)
     {
         var candidates = GestureCandidates.FirstOrDefault(gc => gc.Button == owner).Cids;
         if (candidates is null) return null;
@@ -1161,9 +1184,19 @@ public sealed class DeviceSession : IAsyncDisposable
                 await rc.SetCidReportingAsync(new ControlId(c),
                     CidReportingChange.TemporaryDiversion(diverted: true, rawXy: true)).ConfigureAwait(false);
         }
-        catch { cid = null; }
+        catch (Exception ex)
+        {
+            DiagnosticLog.Warn("capture", $"gesture: divert for {owner} failed: {ex.Message}");
+            cid = null;
+        }
 
-        if (cid is not { } gestureCid) { rc.Dispose(); return null; }
+        if (cid is not { } gestureCid)
+        {
+            DiagnosticLog.Info("capture", $"gesture: no raw-XY-capable control for {owner}");
+            rc.Dispose();
+            return null;
+        }
+        DiagnosticLog.Info("capture", $"gesture capture on {owner} (cid 0x{gestureCid:x4})");
         return new GestureCapture(rc, gestureCid, onGesture);
     }
 
@@ -1180,7 +1213,7 @@ public sealed class DeviceSession : IAsyncDisposable
         private readonly CancellationTokenSource _cts = new();
         private readonly Task _pump;
 
-        public GestureCapture(ReprogControlsFeature rc, ushort cid, System.Action<OpenLogi.Core.GestureDirection> onGesture)
+        public GestureCapture(ReprogControlsFeature rc, ushort cid, System.Action<GestureDirection> onGesture)
         {
             _rc = rc;
             _cid = cid;
@@ -1189,10 +1222,10 @@ public sealed class DeviceSession : IAsyncDisposable
 
         private async Task PumpAsync(
             ChannelReader<ReprogControlsEvent> reader,
-            System.Action<OpenLogi.Core.GestureDirection> onGesture,
+            System.Action<GestureDirection> onGesture,
             CancellationToken ct)
         {
-            var swipe = new OpenLogi.Core.SwipeAccumulator();
+            var swipe = new SwipeAccumulator();
             try
             {
                 await foreach (var ev in reader.ReadAllAsync(ct).ConfigureAwait(false))
@@ -1207,7 +1240,7 @@ public sealed class DeviceSession : IAsyncDisposable
                             if (held && !swipe.IsHolding)
                                 swipe.Begin();
                             else if (!held && swipe.IsHolding && swipe.End())
-                                onGesture(OpenLogi.Core.GestureDirection.Click);
+                                onGesture(GestureDirection.Click);
                             break;
                         }
                         case ReprogControlsEvent.DivertedRawMouseXy xy:
@@ -1233,8 +1266,9 @@ public sealed class DeviceSession : IAsyncDisposable
             {
                 await _rc.SetCidReportingAsync(new ControlId(_cid),
                     CidReportingChange.TemporaryDiversion(diverted: false, rawXy: false)).ConfigureAwait(false);
+                DiagnosticLog.Info("capture", $"gesture capture released (cid 0x{_cid:x4})");
             }
-            catch { /* device gone — nothing to restore */ }
+            catch { DiagnosticLog.Info("capture", $"gesture capture released (cid 0x{_cid:x4}, device gone)"); }
             _rc.Dispose();
             _cts.Dispose();
         }

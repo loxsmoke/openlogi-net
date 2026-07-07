@@ -50,6 +50,7 @@ public sealed class UnifyingReceiver : IDisposable
     private const byte RegConnections = 0x02;
     private const byte RegReceiverInfo = 0xb5;
     private const byte SubReceiverInfo = 0x03;
+    private const byte SubDeviceCodename = 0x40;
     private const byte SubDevicePairingInformation = 0x50;
 
     private readonly HidppChannel _channel;
@@ -146,6 +147,33 @@ public sealed class UnifyingReceiver : IDisposable
             UnitId: r[4..8]);
     }
 
+    /// <summary>
+    /// The codename of the device at <paramref name="deviceIndex"/> (e.g. "G915"),
+    /// read from the extended pairing registers — available even while the
+    /// device itself is offline.
+    /// </summary>
+    public async Task<string> GetDeviceCodenameAsync(byte deviceIndex)
+    {
+        var r = await _channel.ReadLongRegisterAsync(ReceiverDeviceIndex, RegReceiverInfo,
+            [(byte)(SubDeviceCodename | (deviceIndex & 0x0f)), 0x00, 0x00]).ConfigureAwait(false);
+        return ParseCodename(r) ?? throw Hidpp10Exception.UnsupportedResponse();
+    }
+
+    /// <summary>
+    /// Extract the codename from an extended-pairing-information (0xb5/0x4n)
+    /// register read: response[1] is the device-reported length, clamped to the
+    /// bytes present from response[2]. Unlike Bolt's, the whole name sits in one
+    /// packet (no chunking). Empty or non-UTF-8 yields <c>null</c>.
+    /// </summary>
+    public static string? ParseCodename(ReadOnlySpan<byte> response)
+    {
+        if (response.Length < 3) return null;
+        var end = Math.Min(2 + response[1], response.Length);
+        if (end <= 2) return null;
+        var name = BoltReceiver.TryUtf8(response[2..end])?.TrimEnd('\0');
+        return string.IsNullOrWhiteSpace(name) ? null : name;
+    }
+
     /// <summary>The receiver's unique ID (its serial number).</summary>
     public async Task<string> GetUniqueIdAsync() => (await GetReceiverInfoAsync().ConfigureAwait(false)).SerialNumber;
 
@@ -191,4 +219,19 @@ public static class Receivers
         if (UnifyingReceiver.TryCreateLightspeed(channel) is { } ls) return new DetectedReceiver.Lightspeed(ls);
         return null;
     }
+
+    /// <summary>Whether this VID/PID is a known wireless receiver (Bolt / Unifying / LIGHTSPEED).</summary>
+    public static bool IsReceiverPid(ushort vid, ushort pid) =>
+        BoltReceiver.VpidPairs.Contains((vid, pid))
+        || UnifyingReceiver.VpidPairs.Contains((vid, pid))
+        || UnifyingReceiver.LightspeedVpidPairs.Contains((vid, pid));
+
+    /// <summary>
+    /// Stable stand-in uid for LIGHTSPEED receivers, which don't implement the
+    /// 0xb5/03 serial register — the read just times out (HARDWARE-VERIFIED on a
+    /// G915 dongle, 046d:c547). VID/PID-based, so two identical dongles on one
+    /// host aren't distinguishable; acceptable until a real serial source is found.
+    /// </summary>
+    public static string LightspeedSyntheticUid(HidppChannel channel) =>
+        $"ls-{channel.VendorId:x4}{channel.ProductId:x4}";
 }

@@ -3,7 +3,7 @@
         xmlns:vm="using:OpenLogi.App.ViewModels"
         x:Class="OpenLogi.App.Views.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
-        Width="440" Height="300"
+        Width="440" SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         Icon="/Assets/icon.png"
@@ -19,6 +19,7 @@
         <CheckBox Content="Check for updates on launch" IsChecked="{Binding CheckForUpdates}"/>
         <CheckBox Content="Automatically download device images" IsChecked="{Binding AutoDownloadAssets}"/>
         <CheckBox Content="Minimize to the system tray (hide from the taskbar)" IsChecked="{Binding MinimizeToTray}"/>
+        <CheckBox Content="Suppress diagnostic logs" IsChecked="{Binding SuppressLogging}"/>
 
         <TextBlock Text="Settings are saved to config.toml. Update checks are opt-in and off by default."
                    TextWrapping="Wrap" Opacity="0.5" FontSize="12"/>

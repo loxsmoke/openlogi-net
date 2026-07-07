@@ -1,5 +1,6 @@
 using OpenLogi.Assets;
 using OpenLogi.Core;
+using OpenLogi.Core.DeviceInfo;
 using OpenLogi.Hid;
 using OpenLogi.HidPP.Channel;
 using OpenLogi.HidPP.Device;

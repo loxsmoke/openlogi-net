@@ -90,6 +90,50 @@ public class V20FramingTests
     }
 }
 
+public class VersionPingTests
+{
+    private static HidppMessage PingReply(HidppMessage request, byte major, byte minor)
+    {
+        var header = V20Message.FromHidpp(request).Header;
+        var payload = new byte[16];
+        payload[0] = major;
+        payload[1] = minor;
+        return V20Message.Long(header, payload).ToHidpp();
+    }
+
+    [Fact]
+    public async Task SleepyDeviceAnsweringSecondPingIsDetected()
+    {
+        // A sleeping Bluetooth device swallows the first ping while its link
+        // re-establishes; the retry must find it (regression: single 5 s attempt).
+        var pings = 0;
+        var raw = new MockRawHidChannel();
+        raw.OnWrite = req => ++pings == 1 ? null : PingReply(req, 4, 5);
+        await using var channel = await HidppChannel.FromRawChannelAsync(raw);
+
+        var version = await V20.DetermineVersionAsync(
+            channel, 0xff, pingTimeout: TimeSpan.FromMilliseconds(50));
+
+        var v20 = Assert.IsType<ProtocolVersion.V20>(version);
+        Assert.Equal(4, v20.ProtocolNum);
+        Assert.Equal(5, v20.TargetSw);
+        Assert.Equal(2, pings);
+    }
+
+    [Fact]
+    public async Task SilentNodeGivesUpAfterAllAttempts()
+    {
+        var raw = new MockRawHidChannel();
+        await using var channel = await HidppChannel.FromRawChannelAsync(raw);
+
+        var version = await V20.DetermineVersionAsync(
+            channel, 0xff, pingTimeout: TimeSpan.FromMilliseconds(50));
+
+        Assert.Null(version);
+        Assert.Equal(V20.PingAttempts, raw.WrittenReports().Count);
+    }
+}
+
 public class V10FramingTests
 {
     [Fact]
