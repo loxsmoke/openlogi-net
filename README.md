@@ -24,7 +24,8 @@ Rust), focused on Windows.
 ## What it is
 
 openlogi-net talks to Logitech HID++ devices — mice and keyboards — over a Logi
-Bolt / Unifying receiver, or a Bluetooth-direct / wired connection, without
+Bolt / Unifying / LIGHTSPEED receiver (including the Powerplay mat's embedded
+receiver), or a Bluetooth-direct / wired connection, without
 running Logi Options+. Everything is local: there is no account, no cloud
 sync, and no telemetry.
 
@@ -39,7 +40,7 @@ It ships two binaries:
 
 ## What it does
 
-- **Discover devices** behind Bolt / Unifying receivers and direct
+- **Discover devices** behind Bolt / Unifying / LIGHTSPEED receivers and direct
   Bluetooth / wired connections, with per-device online state and battery level.
 - **Remap buttons** to a catalog of actions and custom keyboard shortcuts.
 - **Mouse gestures** — hold a button and swipe up / down / left / right for four

@@ -40,6 +40,24 @@ public class DeviceRouteTests
     }
 
     [Fact]
+    public void LightspeedPidsCreateLightspeedRoute()
+    {
+        foreach (var pid in DeviceRoute.LightspeedPids)
+        {
+            var route = DeviceRoute.DeviceRouteFor(Inv(pid, "C3D4"), 1);
+            var l = Assert.IsType<DeviceRoute.Lightspeed>(route);
+            Assert.Equal("C3D4", l.ReceiverUid);
+            Assert.Equal((byte)1, l.Slot);
+        }
+    }
+
+    [Fact]
+    public void LightspeedPidsMatchReceiverDetectionList() =>
+        Assert.Equal(
+            OpenLogi.HidPP.Receiver.UnifyingReceiver.LightspeedVpidPairs.Select(p => p.Pid),
+            DeviceRoute.LightspeedPids);
+
+    [Fact]
     public void UnknownReceiverPidDefaultsToBolt()
     {
         var route = DeviceRoute.DeviceRouteFor(Inv(0x9999, "UID"), 3);
@@ -62,6 +80,10 @@ public class DeviceRouteTests
     [Fact]
     public void UnifyingDeviceIndexIsTheSlot() =>
         Assert.Equal((byte)4, new DeviceRoute.Unifying("X", 4).DeviceIndex());
+
+    [Fact]
+    public void LightspeedDeviceIndexIsTheSlot() =>
+        Assert.Equal((byte)1, new DeviceRoute.Lightspeed("X", 1).DeviceIndex());
 
     [Fact]
     public void DirectDeviceIndexIsSelfIndex() =>

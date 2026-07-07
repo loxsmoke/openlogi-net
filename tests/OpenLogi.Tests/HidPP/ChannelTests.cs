@@ -37,6 +37,26 @@ public class ChannelTests
     }
 
     [Fact]
+    public async Task PaddedWindowsReadStillMatchesPendingRequest()
+    {
+        // Windows reads return the collection's max input-report length, so a
+        // short response arrives zero-padded (regression: it was dropped and the
+        // request timed out).
+        var raw = new MockRawHidChannel();
+        await using var channel = await HidppChannel.FromRawChannelAsync(raw);
+
+        var request = MockRawHidChannel.ShortMsg(0x10);
+        var response = MockRawHidChannel.ShortMsg(0x20);
+        var padded = new byte[HidppMessage.LongReportLength];
+        response.WriteRaw(padded);
+
+        var send = channel.SendWithTimeoutAsync(request, c => c == response, TimeSpan.FromSeconds(1));
+        raw.SendIncomingRaw(padded);
+
+        Assert.Equal(response, await send);
+    }
+
+    [Fact]
     public async Task SendTimesOutAndRemovesPendingMessage()
     {
         var raw = new MockRawHidChannel();

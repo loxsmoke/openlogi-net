@@ -124,6 +124,9 @@ public sealed class DeviceSession : IAsyncDisposable
             case DeviceRoute.Unifying u:
                 return Receivers.Detect(channel) is DetectedReceiver.Unifying ru
                        && string.Equals(await ru.Receiver.GetUniqueIdAsync().ConfigureAwait(false), u.ReceiverUid, StringComparison.OrdinalIgnoreCase);
+            case DeviceRoute.Lightspeed l:
+                return Receivers.Detect(channel) is DetectedReceiver.Lightspeed rl
+                       && string.Equals(await rl.Receiver.GetUniqueIdAsync().ConfigureAwait(false), l.ReceiverUid, StringComparison.OrdinalIgnoreCase);
             default:
                 return false;
         }

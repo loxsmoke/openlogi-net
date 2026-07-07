@@ -12,6 +12,11 @@ namespace OpenLogi.App.Views;
 public partial class MainWindow : Window
 {
     private TrayIcon? _tray;
+    // Set once the user confirmed quitting (or quit from the tray menu), so the
+    // resumed close isn't intercepted again.
+    private bool _exitConfirmed;
+    // Guards against stacking dialogs when the close button is clicked repeatedly.
+    private bool _exitPromptOpen;
 
     public MainWindow()
     {
@@ -45,7 +50,12 @@ public partial class MainWindow : Window
         open.Click += (_, _) => RestoreFromTray();
         var quit = new NativeMenuItem("Quit");
         quit.Click += (_, _) =>
+        {
+            // Quit from the tray menu is already an explicit choice (and the window
+            // may be hidden, so there's nothing to own a dialog) — skip the prompt.
+            _exitConfirmed = true;
             (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown();
+        };
 
         _tray = new TrayIcon
         {
@@ -64,11 +74,53 @@ public partial class MainWindow : Window
     {
         base.OnPropertyChanged(change);
         if (change.Property == WindowStateProperty && WindowState == WindowState.Minimized && MinimizeToTrayEnabled())
+            HideToTray();
+    }
+
+    private void HideToTray()
+    {
+        if (_tray is not null) _tray.IsVisible = true;
+        ShowInTaskbar = false; // hide from the taskbar; the tray icon restores it
+        Hide();
+    }
+
+    /// <summary>
+    /// Intercept a user-initiated close: quitting silently kills the app's live
+    /// functionality (remaps, gestures, smooth scrolling), so confirm first and
+    /// offer minimizing to the tray instead. Programmatic/OS shutdowns (and the
+    /// close resumed after the user confirmed) pass through untouched.
+    /// </summary>
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+        if (!_exitConfirmed && e.CloseReason == WindowCloseReason.WindowClosing)
         {
-            if (_tray is not null) _tray.IsVisible = true;
-            ShowInTaskbar = false; // hide from the taskbar; the tray icon restores it
-            Hide();
+            e.Cancel = true;
+            if (!_exitPromptOpen) _ = ConfirmExitAsync();
         }
+        base.OnClosing(e);
+    }
+
+    private async System.Threading.Tasks.Task ConfirmExitAsync()
+    {
+        _exitPromptOpen = true;
+        try
+        {
+            switch (await new ExitConfirmWindow().ShowDialog<ExitChoice>(this))
+            {
+                case ExitChoice.Exit:
+                    _exitConfirmed = true;
+                    if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lifetime)
+                        lifetime.Shutdown();
+                    else
+                        Close();
+                    break;
+                case ExitChoice.MinimizeToTray:
+                    HideToTray();
+                    break;
+                // Cancel (or dialog dismissed): stay open, nothing to do.
+            }
+        }
+        finally { _exitPromptOpen = false; }
     }
 
     private void RestoreFromTray()

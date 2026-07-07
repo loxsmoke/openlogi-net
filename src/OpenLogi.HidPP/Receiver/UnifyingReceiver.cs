@@ -25,13 +25,28 @@ public readonly record struct UnifyingDeviceConnection(byte Index, UnifyingDevic
 /// <summary>Pairing-register information about a Unifying-paired device.</summary>
 public readonly record struct UnifyingDevicePairingInformation(ushort Wpid, UnifyingDeviceKind Kind, bool Encrypted, bool Online, byte[] UnitId);
 
-/// <summary>The Logitech Unifying receiver (HID++ 1.0). Ported from Rust <c>receiver::unifying</c>.</summary>
+/// <summary>
+/// The Logitech Unifying receiver (HID++ 1.0). Ported from Rust <c>receiver::unifying</c>.
+/// Also serves LIGHTSPEED receivers (G-series gaming dongles), which speak the same
+/// HID++ 1.0 register set — only the USB PID differs.
+/// </summary>
 public sealed class UnifyingReceiver : IDisposable
 {
     /// <summary>USB VID/PID pairs identifying Unifying receivers.</summary>
     public static readonly (ushort Vid, ushort Pid)[] VpidPairs = [(0x046d, 0xc52b), (0x046d, 0xc532)];
 
+    /// <summary>
+    /// USB VID/PID pairs identifying LIGHTSPEED receivers (per Solaar's receiver
+    /// table). 0xc53a is the Powerplay charging mat's embedded receiver.
+    /// </summary>
+    public static readonly (ushort Vid, ushort Pid)[] LightspeedVpidPairs =
+    [
+        (0x046d, 0xc539), (0x046d, 0xc53a), (0x046d, 0xc53f),
+        (0x046d, 0xc541), (0x046d, 0xc545), (0x046d, 0xc547),
+    ];
+
     private const byte ReceiverDeviceIndex = 0xff;
+    private const byte RegNotifications = 0x00;
     private const byte RegConnections = 0x02;
     private const byte RegReceiverInfo = 0xb5;
     private const byte SubReceiverInfo = 0x03;
@@ -64,12 +79,20 @@ public sealed class UnifyingReceiver : IDisposable
     public static UnifyingReceiver? TryCreate(HidppChannel channel) =>
         VpidPairs.Contains((channel.VendorId, channel.ProductId)) ? new UnifyingReceiver(channel) : null;
 
+    /// <summary>Create a receiver for a LIGHTSPEED dongle (same register set) if the channel's VID/PID matches; otherwise <c>null</c>.</summary>
+    public static UnifyingReceiver? TryCreateLightspeed(HidppChannel channel) =>
+        LightspeedVpidPairs.Contains((channel.VendorId, channel.ProductId)) ? new UnifyingReceiver(channel) : null;
+
     /// <summary>Subscribe to device-connection events.</summary>
     public ChannelReader<UnifyingDeviceConnection> Listen() => _emitter.CreateReceiver();
 
     /// <summary>The number of devices currently paired.</summary>
     public async Task<byte> CountPairingsAsync() =>
         (await _channel.ReadRegisterAsync(ReceiverDeviceIndex, RegConnections, [0, 0, 0]).ConfigureAwait(false))[1];
+
+    /// <summary>Enable/disable wireless device notifications (see <see cref="BoltReceiver.SetWirelessNotificationsAsync"/>).</summary>
+    public Task SetWirelessNotificationsAsync(bool enabled) =>
+        _channel.WriteRegisterAsync(ReceiverDeviceIndex, RegNotifications, [0, (byte)(enabled ? 1 : 0), 0]);
 
     /// <summary>Trigger device-arrival notifications for all connected devices.</summary>
     public Task TriggerDeviceArrivalAsync() =>
@@ -79,21 +102,26 @@ public sealed class UnifyingReceiver : IDisposable
     public async Task<List<UnifyingDeviceConnection>> CollectPairedDevicesAsync()
     {
         var rx = Listen();
-        var devices = new List<UnifyingDeviceConnection>();
-        var trigger = TriggerDeviceArrivalAsync();
+        await TriggerDeviceArrivalAsync().ConfigureAwait(false);
+        // The 0x41 arrival notifications land after (not before) the trigger
+        // write's ACK, so returning on the ACK would collect nothing. Keep
+        // draining until the receiver stays quiet; duplicate arrivals for a
+        // slot are collapsed (last wins).
+        var bySlot = new Dictionary<byte, UnifyingDeviceConnection>();
         while (true)
         {
-            var recv = rx.ReadAsync().AsTask();
-            var done = await Task.WhenAny(trigger, recv).ConfigureAwait(false);
-            if (done == trigger)
+            using var quiet = new CancellationTokenSource(Receivers.ArrivalQuietPeriod);
+            try
             {
-                await trigger.ConfigureAwait(false);
-                while (rx.TryRead(out var c)) devices.Add(c);
+                var conn = await rx.ReadAsync(quiet.Token).ConfigureAwait(false);
+                bySlot[conn.Index] = conn;
+            }
+            catch (OperationCanceledException)
+            {
                 break;
             }
-            devices.Add(await recv.ConfigureAwait(false));
         }
-        return devices;
+        return [.. bySlot.Values];
     }
 
     /// <summary>General receiver info (serial number + pairing slot count).</summary>
@@ -131,11 +159,15 @@ public abstract record DetectedReceiver
     public sealed record Bolt(BoltReceiver Receiver) : DetectedReceiver;
     public sealed record Unifying(UnifyingReceiver Receiver) : DetectedReceiver;
 
+    /// <summary>A LIGHTSPEED (G-series) receiver — Unifying's register set behind a different PID.</summary>
+    public sealed record Lightspeed(UnifyingReceiver Receiver) : DetectedReceiver;
+
     /// <summary>A human-readable receiver name.</summary>
     public string Name => this switch
     {
         Bolt => "Logi Bolt Receiver",
         Unifying => "Unifying Receiver",
+        Lightspeed => "Lightspeed Receiver",
         _ => "Receiver",
     };
 }
@@ -143,11 +175,20 @@ public abstract record DetectedReceiver
 /// <summary>Receiver detection by USB VID/PID. Ported from Rust <c>receiver::detect</c>.</summary>
 public static class Receivers
 {
+    /// <summary>
+    /// How long device-arrival collection lets the receiver stay silent before
+    /// concluding all paired devices have announced themselves. Notifications
+    /// for the whole pairing table arrive within a few milliseconds of each
+    /// other, so this is generous while keeping a zero-device sweep fast.
+    /// </summary>
+    public static readonly TimeSpan ArrivalQuietPeriod = TimeSpan.FromMilliseconds(500);
+
     /// <summary>Detect the receiver on a channel, or <c>null</c> if none is recognised.</summary>
     public static DetectedReceiver? Detect(HidppChannel channel)
     {
         if (BoltReceiver.TryCreate(channel) is { } bolt) return new DetectedReceiver.Bolt(bolt);
         if (UnifyingReceiver.TryCreate(channel) is { } uni) return new DetectedReceiver.Unifying(uni);
+        if (UnifyingReceiver.TryCreateLightspeed(channel) is { } ls) return new DetectedReceiver.Lightspeed(ls);
         return null;
     }
 }

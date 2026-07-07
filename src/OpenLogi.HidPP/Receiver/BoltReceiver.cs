@@ -85,27 +85,32 @@ public sealed class BoltReceiver : IDisposable
         _channel.WriteRegisterAsync(ReceiverDeviceIndex, RegConnections, [0x02, 0x00, 0x00]);
 
     /// <summary>
-    /// Collect all paired devices by triggering device arrival and gathering the
-    /// connection events that arrive before the trigger write is confirmed.
+    /// Collect all paired devices by triggering device arrival and draining the
+    /// connection notifications until the receiver stays quiet.
     /// </summary>
     public async Task<List<BoltDeviceConnection>> CollectPairedDevicesAsync()
     {
         var rx = Listen();
-        var devices = new List<BoltDeviceConnection>();
-        var trigger = TriggerDeviceArrivalAsync();
+        await TriggerDeviceArrivalAsync().ConfigureAwait(false);
+        // The 0x41 arrival notifications land after (not before) the trigger
+        // write's ACK, so returning on the ACK would collect nothing. Keep
+        // draining until the receiver stays quiet; duplicate arrivals for a
+        // slot are collapsed (last wins).
+        var bySlot = new Dictionary<byte, BoltDeviceConnection>();
         while (true)
         {
-            var recv = rx.ReadAsync().AsTask();
-            var done = await Task.WhenAny(trigger, recv).ConfigureAwait(false);
-            if (done == trigger)
+            using var quiet = new CancellationTokenSource(Receivers.ArrivalQuietPeriod);
+            try
             {
-                await trigger.ConfigureAwait(false);
-                while (rx.TryRead(out var c)) devices.Add(c);
+                var conn = await rx.ReadAsync(quiet.Token).ConfigureAwait(false);
+                bySlot[conn.Index] = conn;
+            }
+            catch (OperationCanceledException)
+            {
                 break;
             }
-            devices.Add(await recv.ConfigureAwait(false));
         }
-        return devices;
+        return [.. bySlot.Values];
     }
 
     /// <summary>The receiver's unique ID (not the serial number).</summary>

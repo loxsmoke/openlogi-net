@@ -67,6 +67,9 @@ public sealed class MockRawHidChannel : IRawHidChannel
 
     public void SendIncoming(HidppMessage msg) => _incoming.Writer.TryWrite(RawReport(msg));
 
+    /// <summary>Push an unsolicited raw report exactly as given (e.g. a Windows-style zero-padded read).</summary>
+    public void SendIncomingRaw(byte[] report) => _incoming.Writer.TryWrite(report);
+
     public IReadOnlyList<byte[]> WrittenReports()
     {
         lock (_lock) return [.. _written];

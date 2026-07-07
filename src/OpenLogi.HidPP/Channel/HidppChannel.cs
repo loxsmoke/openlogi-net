@@ -225,7 +225,10 @@ public sealed class HidppChannel : IAsyncDisposable
 
     private async Task ReadLoopAsync(CancellationToken ct)
     {
-        var buf = new byte[HidppMessage.LongReportLength];
+        // Sized past the longest HID++ report: receiver interfaces also carry DJ
+        // reports (ids 0x20/0x21, up to 32 bytes) and Windows reads always return
+        // the collection maximum, so a 20-byte buffer would truncate real traffic.
+        var buf = new byte[64];
         while (!ct.IsCancellationRequested)
         {
             int len;

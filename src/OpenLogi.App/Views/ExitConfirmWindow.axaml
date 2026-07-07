@@ -1,0 +1,27 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="OpenLogi.App.Views.ExitConfirmWindow"
+        Width="460" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False" ShowInTaskbar="False"
+        Title="Exit OpenLogi.net?">
+    <StackPanel Margin="24" Spacing="20">
+        <StackPanel Orientation="Horizontal" Spacing="18">
+            <TextBlock Text="⚠" FontSize="48" Foreground="#E3B341" VerticalAlignment="Top"/>
+            <StackPanel Spacing="8" MaxWidth="340">
+                <TextBlock Text="Exit OpenLogi.net?" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                <TextBlock Opacity="0.8" TextWrapping="Wrap"
+                           Text="While the app isn't running, button remaps, mouse gestures, per-app profiles, and smooth scrolling stop working — your devices fall back to their default behavior. You can minimize to the system tray instead to keep everything active."/>
+            </StackPanel>
+        </StackPanel>
+        <!-- Windows dialog convention: affirmative actions first, Cancel rightmost;
+             the safe choice (tray) is the accented default (Enter), Cancel takes Esc. -->
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button x:Name="MinimizeButton" Content="Minimize to tray" Click="OnMinimize" MinWidth="130"
+                    HorizontalContentAlignment="Center" IsDefault="True"
+                    Background="#3B82F6" Foreground="White"/>
+            <Button Content="Exit" Click="OnExit" MinWidth="84" HorizontalContentAlignment="Center"/>
+            <Button Content="Cancel" Click="OnCancel" MinWidth="84" HorizontalContentAlignment="Center" IsCancel="True"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

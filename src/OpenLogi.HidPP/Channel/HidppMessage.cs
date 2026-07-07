@@ -51,14 +51,20 @@ public sealed class HidppMessage : IEquatable<HidppMessage>
         return new HidppMessage(HidppReportKind.Long, payload.ToArray());
     }
 
-    /// <summary>Try to read a HID++ message from a raw report (including report id), or <c>null</c>.</summary>
+    /// <summary>
+    /// Try to read a HID++ message from a raw report (including report id), or <c>null</c>.
+    /// Windows always reads the collection's <em>maximum</em> input-report length,
+    /// zero-padded — on an interface that declares both widths a short report
+    /// arrives in a 20+-byte buffer — so any buffer at least as long as the
+    /// report id demands is accepted and sliced to size.
+    /// </summary>
     public static HidppMessage? ReadRaw(ReadOnlySpan<byte> data)
     {
         if (data.IsEmpty) return null;
         if (data[0] == ShortReportId)
-            return data.Length == ShortReportLength ? Short(data[1..]) : null;
+            return data.Length >= ShortReportLength ? Short(data[1..ShortReportLength]) : null;
         if (data[0] == LongReportId)
-            return data.Length == LongReportLength ? Long(data[1..]) : null;
+            return data.Length >= LongReportLength ? Long(data[1..LongReportLength]) : null;
         return null;
     }
 

@@ -40,7 +40,9 @@ public static class HidInventory
                     var inventory = Receivers.Detect(channel) switch
                     {
                         DetectedReceiver.Bolt b => await BuildBoltInventoryAsync(channel, b.Receiver).ConfigureAwait(false),
-                        DetectedReceiver.Unifying u => await BuildUnifyingInventoryAsync(channel, u.Receiver).ConfigureAwait(false),
+                        // LIGHTSPEED shares Unifying's register set; only the reported name differs.
+                        DetectedReceiver.Unifying u => await BuildUnifyingInventoryAsync(channel, u.Receiver, u.Name).ConfigureAwait(false),
+                        DetectedReceiver.Lightspeed l => await BuildUnifyingInventoryAsync(channel, l.Receiver, l.Name).ConfigureAwait(false),
                         _ => await BuildDirectInventoryAsync(channel).ConfigureAwait(false),
                     };
                     if (inventory is not null) result.Add(inventory);
@@ -73,16 +75,20 @@ public static class HidInventory
         };
     }
 
-    private static async Task<DeviceInventory> BuildUnifyingInventoryAsync(HidppChannel channel, UnifyingReceiver receiver)
+    private static async Task<DeviceInventory> BuildUnifyingInventoryAsync(HidppChannel channel, UnifyingReceiver receiver, string name)
     {
         var uid = await TryAsync(receiver.GetUniqueIdAsync).ConfigureAwait(false);
+        // Without the wireless-notification flag the arrival trigger below stays
+        // silent on a cold-booted receiver (same reason the Bolt path sets it).
+        try { await receiver.SetWirelessNotificationsAsync(true).ConfigureAwait(false); } catch { /* best effort */ }
+
         var paired = new List<PairedDevice>();
         foreach (var conn in await receiver.CollectPairedDevicesAsync().ConfigureAwait(false))
             paired.Add(await ProbeAsync(channel, conn.Index, MapUnifying(conn.Kind), conn.Online, conn.Wpid, codename: null).ConfigureAwait(false));
 
         return new DeviceInventory
         {
-            Receiver = new ReceiverInfo { Name = "Unifying Receiver", VendorId = channel.VendorId, ProductId = channel.ProductId, UniqueId = uid },
+            Receiver = new ReceiverInfo { Name = name, VendorId = channel.VendorId, ProductId = channel.ProductId, UniqueId = uid },
             Paired = paired,
         };
     }
