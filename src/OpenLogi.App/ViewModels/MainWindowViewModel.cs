@@ -323,6 +323,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     // device page (or a scan is already running); the rescan then runs when they
     // return to the gallery, so the open page is never disturbed.
     private bool _rescanPending;
+    // Guards ReconnectAfterResumeAsync so the resume event and the watcher's node-change
+    // event (both fire on wake) don't run overlapping reconnects; a request landing mid-run
+    // is coalesced into one trailing re-run.
+    private bool _reconnecting;
+    private bool _reconnectQueued;
 
     // Last-known identity (marketing name + model render) per wireless product id,
     // remembered from a sweep where the device was awake. A wireless keyboard that
@@ -350,7 +355,67 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 _deviceWatcher.Changed += OnHidDeviceSetChanged;
             }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"device watcher unavailable: {ex.Message}"); }
+
+            // Wake from sleep resets each mouse's volatile hardware state (sensor DPI,
+            // scroll-invert) to firmware defaults. A mouse that re-enumerates on wake is
+            // caught by the device watcher above; one that stays enumerated across sleep
+            // needs this resume signal to get its persisted preferences re-pushed.
+            try { Microsoft.Win32.SystemEvents.PowerModeChanged += OnPowerModeChanged; }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"power events unavailable: {ex.Message}"); }
         }
+    }
+
+    /// <summary>
+    /// On resume from sleep, the HID handles opened before sleep are dead, so every
+    /// live mouse session is stale — writes silently fail and the mouse keeps the
+    /// firmware DPI it reset to on wake. Rebuild the persistent sessions from scratch
+    /// (which re-pushes DPI + scroll-invert as part of (re)connect), then, if a device
+    /// page is open, rebind its controls to the fresh session so the UI works again.
+    /// The watcher's node-change path is suppressed while a page is open, so this
+    /// resume signal is what recovers the on-screen device.
+    /// </summary>
+    private void OnPowerModeChanged(object? sender, Microsoft.Win32.PowerModeChangedEventArgs e)
+    {
+        if (e.Mode != Microsoft.Win32.PowerModes.Resume) return;
+        Dispatcher.UIThread.Post(async () =>
+        {
+            // Let USB/BLE links re-establish before we re-enumerate and talk to devices.
+            await Task.Delay(TimeSpan.FromSeconds(2));
+            await ReconnectAfterResumeAsync();
+        });
+    }
+
+    /// <summary>
+    /// Re-establish device connectivity after a wake. Reopens the persistent per-mouse
+    /// sessions (their pre-sleep HID handles are dead) — this reapplies each mouse's
+    /// persisted DPI + scroll-invert on connect — and, when a device page is showing,
+    /// reloads its controls so they bind to the new session instead of the stale one.
+    /// </summary>
+    private async Task ReconnectAfterResumeAsync()
+    {
+        // Serialize reconnects: the resume event and the watcher's node-change event can
+        // both fire on wake, and several node events may arrive. Coalesce overlapping
+        // requests into one trailing re-run so the final state always reflects reality.
+        if (_reconnecting) { _reconnectQueued = true; return; }
+        _reconnecting = true;
+        try
+        {
+            do
+            {
+                _reconnectQueued = false;
+                var showing = ShowingDevice ? SelectedDevice : null;
+                // The on-screen device's persistent session is the stale _session, which
+                // ActivateAgentMiceAsync deliberately keeps alive. Drop the reference so it
+                // disposes that dead HID handle too — no lingering handle to block the fresh
+                // open, and LoadControlsAsync then rebinds the UI to the new session.
+                _session = null;
+                await ActivateAgentMiceAsync([.. Devices.Where(d => d.HasButtons)]);
+                if (showing is not null && ReferenceEquals(SelectedDevice, showing))
+                    await LoadControlsAsync(showing);
+            } while (_reconnectQueued);
+        }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"resume reconnect failed: {ex.Message}"); }
+        finally { _reconnecting = false; }
     }
 
     /// <summary>
@@ -358,11 +423,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// we're on the gallery and idle; otherwise defer until the user returns home,
     /// so an open device page and its live session are left intact.
     /// </summary>
-    private void OnHidDeviceSetChanged() => Dispatcher.UIThread.Post(() =>
+    private void OnHidDeviceSetChanged() => Dispatcher.UIThread.Post(async () =>
     {
-        if (ShowingDevice || IsScanning)
+        if (IsScanning) { _rescanPending = true; return; }
+        if (ShowingDevice)
         {
+            // A device page is open and the Logitech node set changed — most often the
+            // on-screen mouse re-enumerated (e.g. waking from sleep), which kills its
+            // live HID session so its controls silently stop working. Reconnect it in
+            // place. Still flag a full gallery rescan for when the user returns home, so
+            // other devices arriving/leaving are picked up too.
             _rescanPending = true;
+            await ReconnectAfterResumeAsync();
             return;
         }
         _ = LoadAsync();
@@ -749,6 +821,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 // The native scroll-invert bit (0x2121) is volatile — restore the
                 // persisted preference whenever the mouse (re)connects. No-op if unsupported.
                 if (ck is not null) await session.ApplyScrollInvertAsync(_config.InvertScroll(ck));
+                // Sensor DPI is likewise volatile — the mouse firmware resets it to its
+                // default (e.g. 1000) on wake from sleep. Re-apply the persisted DPI on
+                // every (re)connect so a saved value survives sleep/wake. No-op if the
+                // user never set one, or if the device doesn't support 0x2201.
+                if (ck is not null && _config.Dpi(ck) is { } savedDpi)
+                    await session.ApplyDpiAsync((ushort)savedDpi);
 
                 var captures = await StartMouseCapturesAsync(session, ck);
                 if (captures.Count == 0) { await session.DisposeAsync(); continue; } // nothing capturable
@@ -1349,6 +1427,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>Tear down the remap hook and any open device session on app exit.</summary>
     public void Dispose()
     {
+        try { Microsoft.Win32.SystemEvents.PowerModeChanged -= OnPowerModeChanged; } catch { /* never subscribed */ }
         _agent.Dispose();
         if (_deviceWatcher is not null)
         {
