@@ -261,6 +261,17 @@ public sealed class Config
     public void SetLighting(string deviceKey, Lighting lighting) =>
         Device(deviceKey).Lighting = lighting;
 
+    /// <summary>
+    /// Record which lighting source is active (0 = "No profile" custom/host, N ≥ 1 =
+    /// onboard profile N) without disturbing the stored colours, so the custom colours
+    /// can be re-applied after the keyboard sleeps. Creates a default Lighting if none.
+    /// </summary>
+    public void SetLightingProfile(string deviceKey, int profile)
+    {
+        var device = Device(deviceKey);
+        device.Lighting = (device.Lighting ?? new Lighting()) with { Profile = profile };
+    }
+
     public uint? Dpi(string deviceKey) =>
         Devices.TryGetValue(deviceKey, out var d) ? d.Dpi : null;
 

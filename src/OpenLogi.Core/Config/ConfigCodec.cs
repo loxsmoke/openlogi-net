@@ -96,6 +96,8 @@ public static class ConfigCodec
             };
             if (lighting.PaintColor is { } paint)
                 lightingTable["paint_color"] = paint;
+            if (lighting.Profile != 0)
+                lightingTable["profile"] = (long)lighting.Profile;
             // Per-key overrides (zone → "RRGGBB") nest after the scalars; omitted when empty.
             if (lighting.PerKey.Count > 0)
             {
@@ -278,6 +280,7 @@ public static class ConfigCodec
                 Color = GetString(lighting, "color") ?? "ffffff",
                 Brightness = (byte)GetLong(lighting, "brightness", 100),
                 PaintColor = GetString(lighting, "paint_color"),
+                Profile = (int)GetLong(lighting, "profile", 0),
                 PerKey = ParsePerKey(lighting),
             };
         if (t.TryGetValue("smartshift", out var s) && s is TomlTable ss)

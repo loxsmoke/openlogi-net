@@ -151,7 +151,14 @@ public partial class MainWindow : Window
     private void OnOpenPerKeyEditor(object? sender, RoutedEventArgs e)
     {
         if (DataContext is MainWindowViewModel vm && vm.CreatePerKeyEditor() is { } editor)
-            new PerKeyColorWindow(editor).Show(this);
+        {
+            var window = new PerKeyColorWindow(editor);
+            // Pause the lighting keepalive while the editor is open so it can't overwrite
+            // the user's live painting; resume when the window closes.
+            vm.PerKeyEditorOpen = true;
+            window.Closed += (_, _) => vm.PerKeyEditorOpen = false;
+            window.Show(this);
+        }
     }
 
     private void OnSettings(object? sender, RoutedEventArgs e)

@@ -16,6 +16,7 @@ using OpenLogi.Core;
 using OpenLogi.Core.Actions;
 using OpenLogi.Core.Config;
 using OpenLogi.Core.DeviceInfo;
+using OpenLogi.Core.Logging;
 using OpenLogi.Core.Gestures;
 using OpenLogi.Hid;
 
@@ -319,6 +320,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     // Watches for Logitech HID nodes arriving/leaving (e.g. a Bluetooth mouse
     // waking) and auto-rescans, so devices appear without a manual Refresh.
     private HidDeviceWatcher? _deviceWatcher;
+    // Watches receivers for a paired wireless device (re)connecting — a keyboard/mouse
+    // waking on a receiver doesn't change the HID node set, so _deviceWatcher can't see
+    // it; this hears the receiver's 0x41 connection notification and triggers a rescan.
+    private ReceiverConnectionWatcher? _receiverWatcher;
     // Set when a device-set change lands while the user is mid-configuration on a
     // device page (or a scan is already running); the rescan then runs when they
     // return to the gallery, so the open page is never disturbed.
@@ -355,6 +360,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 _deviceWatcher.Changed += OnHidDeviceSetChanged;
             }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"device watcher unavailable: {ex.Message}"); }
+
+            // A wireless device waking on its receiver leaves the HID node set unchanged,
+            // so the node watcher above stays silent. Listen to the receiver's connection
+            // notifications instead and rescan when a device comes online (e.g. a keyboard
+            // woken by a keypress, so its gallery tile flips from "Asleep" to "Online").
+            try
+            {
+                _receiverWatcher = new ReceiverConnectionWatcher();
+                _receiverWatcher.DeviceWoke += OnReceiverDeviceWoke;
+                _ = _receiverWatcher.RefreshAsync();
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"receiver watcher unavailable: {ex.Message}"); }
 
             // Wake from sleep resets each mouse's volatile hardware state (sensor DPI,
             // scroll-invert) to firmware defaults. A mouse that re-enumerates on wake is
@@ -425,25 +442,43 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// </summary>
     private void OnHidDeviceSetChanged() => Dispatcher.UIThread.Post(async () =>
     {
+        // The receiver set may have changed too (a dongle plugged/unplugged) — re-bind
+        // the receiver watcher so it tracks the current receivers.
+        if (_receiverWatcher is not null) _ = _receiverWatcher.RefreshAsync();
+        await HandleTopologyChangeAsync();
+    });
+
+    /// <summary>
+    /// A receiver reported a paired device coming online (a wireless keyboard/mouse woke
+    /// on its receiver, which leaves the HID node set unchanged). Refresh so its gallery
+    /// tile reflects the live state — same policy as a node-set change.
+    /// </summary>
+    private void OnReceiverDeviceWoke() => Dispatcher.UIThread.Post(async () => await HandleTopologyChangeAsync());
+
+    /// <summary>
+    /// Shared response to the device set changing (a HID node arriving/leaving, or a
+    /// receiver reporting a wake): rescan the gallery when idle; reconnect the on-screen
+    /// device in place when a page is open (its session may have just died); defer a full
+    /// rescan for when the user returns home so nothing else is missed.
+    /// </summary>
+    private async Task HandleTopologyChangeAsync()
+    {
         if (IsScanning) { _rescanPending = true; return; }
         if (ShowingDevice)
         {
-            // A device page is open and the Logitech node set changed — most often the
-            // on-screen mouse re-enumerated (e.g. waking from sleep), which kills its
-            // live HID session so its controls silently stop working. Reconnect it in
-            // place. Still flag a full gallery rescan for when the user returns home, so
-            // other devices arriving/leaving are picked up too.
             _rescanPending = true;
             await ReconnectAfterResumeAsync();
             return;
         }
         _ = LoadAsync();
-    });
+    }
 
     partial void OnShowingDeviceChanged(bool value)
     {
         if (!value && _rescanPending && !IsScanning)
             _ = LoadAsync();
+        // Entering/leaving a keyboard's page switches which session the keepalive uses.
+        PokeLightingKeepalive();
     }
 
     /// <summary>
@@ -834,6 +869,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             }
             catch { /* mouse unreachable */ }
         }
+
+        // Every (re)scan/reconnect/wake funnels through here, so this is where we (re)arm
+        // the No-profile lighting keepalive — and re-apply on wake.
+        PokeLightingKeepalive();
     }
 
     /// <summary>
@@ -959,6 +998,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (device?.Route is not { } route) { IsLoadingDevice = false; return; }
         IsLoadingDevice = true; // show the thin loading line while the device's controls load
 
+        // If the lighting keepalive holds a dedicated session for this device (it was on the
+        // gallery), release it now so we don't open a second session to the same slot below —
+        // concurrent opens to a LIGHTSPEED slot make the profile/lighting reads fail.
+        if (device.ConfigKey is { } dck && _keepaliveKey == dck)
+            await ReleaseKeepaliveSessionAsync();
+
         // Reuse this mouse's already-open persistent session instead of opening a
         // second HID handle to the same device.
         DeviceSession? session;
@@ -1034,10 +1079,23 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             if (await session.ReadProfilesAsync() is { } prof && ReferenceEquals(SelectedDevice, device))
             {
                 _profileCount = prof.Info.ProfileCount;
-                RebuildProfiles(prof.Current);
                 ShowProfiles = prof.Info.ProfileCount >= 1;
-                if (prof.Current >= 1 && ReferenceEquals(SelectedDevice, device))
-                    await LoadProfileLightingAsync(prof.Current);
+                // If the user's last choice was "No profile" (custom/host colours) but the
+                // device is now on an onboard profile — the classic sleep/wake revert, since
+                // host mode is volatile — restore the custom colours and show "No profile"
+                // instead of reflecting the firmware's fallback.
+                var wantNoProfile = device.ConfigKey is { } lck && _config.Lighting(lck) is { Profile: 0 };
+                if (wantNoProfile && prof.Current >= 1)
+                {
+                    await ReassertNoProfileLightingAsync(session, device.ConfigKey);
+                    RebuildProfiles(0);
+                }
+                else
+                {
+                    RebuildProfiles(prof.Current);
+                    if (prof.Current >= 1 && ReferenceEquals(SelectedDevice, device))
+                        await LoadProfileLightingAsync(prof.Current);
+                }
                 gkeyProfile = Math.Max(prof.Current, (byte)1);
             }
 
@@ -1323,6 +1381,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             RebuildProfiles(0);                  // "No profile" selected
             await ApplyNoProfileLightingAsync(); // saved per-key colors, else solid
+            PersistLightingProfile(0);           // remember it so wake can restore it
             return;
         }
 
@@ -1331,7 +1390,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             RebuildProfiles(prof.Current);
             await LoadProfileLightingAsync(prof.Current);
+            PersistLightingProfile(prof.Current);
         }
+    }
+
+    /// <summary>Persist which lighting source is active (0 = No profile) so wake can restore it.</summary>
+    private void PersistLightingProfile(int profile)
+    {
+        if (SelectedDevice?.ConfigKey is not { } ck) return;
+        _config.SetLightingProfile(ck, profile);
+        SaveConfig();
     }
 
     // Live host-mode lighting only applies in "No profile" mode; with a real profile
@@ -1359,22 +1427,136 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private async Task ApplyNoProfileLightingAsync()
     {
         if (_session is null) return;
-        var ck = SelectedDevice?.ConfigKey;
-        var perKey = ck is not null ? _config.Lighting(ck)?.PerKey : null;
-        if (LightingEnabled && _session.SupportsPerKey && perKey is { Count: > 0 })
+        var perKey = SelectedDevice?.ConfigKey is { } ck ? _config.Lighting(ck)?.PerKey : null;
+        await ApplyNoProfileLightingToAsync(_session, LightingEnabled, LightingColor, (byte)LightingBrightness, perKey);
+    }
+
+    /// <summary>
+    /// Push the "No profile" lighting onto <paramref name="session"/> from stored config:
+    /// the saved per-key colours (base fill + painted keys) when the device supports
+    /// per-key and any are saved, else the solid custom colour (scaled by brightness).
+    /// Shared by the live editor path and the sleep/wake re-assert.
+    /// </summary>
+    private static async Task ApplyNoProfileLightingToAsync(
+        DeviceSession session, bool enabled, Avalonia.Media.Color baseColor, byte brightness,
+        IReadOnlyDictionary<byte, string>? perKey)
+    {
+        if (enabled && session.SupportsPerKey && perKey is { Count: > 0 })
         {
-            var b = LightingColor; // base = the unpainted-key colour
             var map = new Dictionary<byte, (byte R, byte G, byte B)>(perKey.Count);
             foreach (var (zone, hex) in perKey)
             {
                 var c = ParseHexColor(hex);
                 map[zone] = (c.R, c.G, c.B);
             }
-            await _session.ApplyPerKeyMapAsync(b.R, b.G, b.B, map);
+            await session.ApplyPerKeyMapAsync(baseColor.R, baseColor.G, baseColor.B, map);
         }
         else
         {
-            await ApplySolidAsync();
+            byte r = 0, g = 0, b = 0;
+            if (enabled)
+            {
+                var scale = brightness / 100.0;
+                r = (byte)Math.Clamp(baseColor.R * scale, 0, 255);
+                g = (byte)Math.Clamp(baseColor.G * scale, 0, 255);
+                b = (byte)Math.Clamp(baseColor.B * scale, 0, 255);
+            }
+            await session.ApplyLightingAsync(r, g, b);
+        }
+    }
+
+    /// <summary>Re-apply a device's persisted "No profile" custom lighting onto a session (config-driven).</summary>
+    private async Task ReassertNoProfileLightingAsync(DeviceSession session, string? configKey)
+    {
+        var lighting = configKey is not null ? _config.Lighting(configKey) : null;
+        await ApplyNoProfileLightingToAsync(
+            session, lighting?.Enabled ?? true, ParseHexColor(lighting?.Color), lighting?.Brightness ?? 100, lighting?.PerKey);
+    }
+
+    // Host-mode "No profile" lighting is volatile: the firmware drops it back to onboard
+    // profile 1 after ~1-3 min without a refresh (HARDWARE-OBSERVED on the G915). So for a
+    // gallery keyboard the user left in that mode, hold a session open and re-stream the
+    // frame on this interval — a keepalive, like the official software streams continuously.
+    private System.Threading.Timer? _lightingKeepaliveTimer;
+    private DeviceSession? _keepaliveSession;
+    private string? _keepaliveKey;
+    private bool _keepaliveBusy;
+    private static readonly TimeSpan LightingKeepaliveInterval = TimeSpan.FromSeconds(30);
+
+    /// <summary>Set while the per-key colour editor window is open, so the keepalive doesn't overwrite live painting.</summary>
+    public bool PerKeyEditorOpen { get; set; }
+
+    /// <summary>
+    /// Ensure the keepalive timer is running and refresh the lighting now. Called after every
+    /// scan/activation/wake and when the viewed page changes, so a fresh apply lands promptly.
+    /// </summary>
+    private void PokeLightingKeepalive()
+    {
+        _lightingKeepaliveTimer ??= new System.Threading.Timer(
+            _ => Dispatcher.UIThread.Post(() => _ = LightingKeepaliveTickAsync()),
+            null, LightingKeepaliveInterval, LightingKeepaliveInterval);
+        _ = LightingKeepaliveTickAsync();
+    }
+
+    /// <summary>
+    /// Re-stream a "No profile" keyboard's custom colours so the firmware doesn't drop host
+    /// mode back to onboard profile 1. Uses the viewed keyboard's live session when its page
+    /// is open, otherwise a held dedicated session (for the gallery case). Skipped while a
+    /// sweep runs or the per-key editor is open.
+    /// </summary>
+    private async Task LightingKeepaliveTickAsync()
+    {
+        if (_keepaliveBusy || IsScanning || PerKeyEditorOpen) return;
+        _keepaliveBusy = true;
+        try
+        {
+            var target = Devices.FirstOrDefault(d =>
+                d.ConfigKey is { } ck && d.Route is not null && d.HasLighting
+                && _config.Lighting(ck) is { Profile: 0 } l && l.PerKey.Count > 0);
+            if (target?.ConfigKey is not { } key || target.Route is not { } route)
+            {
+                await ReleaseKeepaliveSessionAsync();
+                return;
+            }
+
+            // While its page is open, drive lighting on the live session — never open a
+            // second session to the same (LIGHTSPEED) slot. On the gallery, hold a dedicated one.
+            DeviceSession? session;
+            if (ShowingDevice && ReferenceEquals(target, SelectedDevice))
+            {
+                await ReleaseKeepaliveSessionAsync();
+                if (_session is null) return; // live session not ready yet — refresh on a later tick
+                session = _session;
+            }
+            else
+            {
+                if (_keepaliveKey != key || _keepaliveSession is null)
+                {
+                    await ReleaseKeepaliveSessionAsync();
+                    var opened = await DeviceSession.OpenAsync(route);
+                    if (opened is null) return; // asleep/unreachable — retry next tick
+                    _keepaliveSession = opened;
+                    _keepaliveKey = key;
+                    DiagnosticLog.Info("lightwake", $"{key}: No-profile lighting keepalive session opened ({LightingKeepaliveInterval.TotalSeconds:0}s)");
+                }
+                session = _keepaliveSession;
+            }
+
+            if (session is null || !session.SupportsPerKey) return;
+            try { await ReassertNoProfileLightingAsync(session, key); }
+            catch { /* asleep/unreachable — resumes on the next tick */ }
+        }
+        catch (Exception ex) { DiagnosticLog.Warn("lightwake", $"keepalive tick failed: {ex.Message}"); }
+        finally { _keepaliveBusy = false; }
+    }
+
+    private async Task ReleaseKeepaliveSessionAsync()
+    {
+        if (_keepaliveSession is { } s)
+        {
+            _keepaliveSession = null;
+            _keepaliveKey = null;
+            await s.DisposeAsync();
         }
     }
 
@@ -1434,6 +1616,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             _deviceWatcher.Changed -= OnHidDeviceSetChanged;
             _deviceWatcher.Dispose();
         }
+        if (_receiverWatcher is not null)
+        {
+            _receiverWatcher.DeviceWoke -= OnReceiverDeviceWoke;
+            _ = _receiverWatcher.DisposeAsync();
+        }
+        _lightingKeepaliveTimer?.Dispose();
+        _ = _keepaliveSession?.DisposeAsync();
         _ = _batteryMonitor?.DisposeAsync();
         foreach (var mc in _mouseCaptures)
         {

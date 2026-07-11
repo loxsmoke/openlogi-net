@@ -47,6 +47,20 @@ public class ConfigTests
     }
 
     [Fact]
+    public void LightingProfileRoundtripsAndSetterPreservesColours()
+    {
+        var cfg = new Config();
+        cfg.SetLighting("g915", new Lighting { Color = "112233", Profile = 2 });
+        Assert.Equal(2, WriteAndRead(cfg).Lighting("g915")!.Profile);
+
+        // Switching the active source (e.g. back to "No profile") must not lose the colours.
+        cfg.SetLightingProfile("g915", 0);
+        var restored = WriteAndRead(cfg).Lighting("g915")!;
+        Assert.Equal(0, restored.Profile);
+        Assert.Equal("112233", restored.Color);
+    }
+
+    [Fact]
     public void PerKeyColorsRoundtripPerDevice()
     {
         var cfg = new Config();

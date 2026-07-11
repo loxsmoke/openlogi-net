@@ -16,9 +16,8 @@ sealed class Program
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
-#if DEBUG
-            .WithDeveloperTools()
-#endif
+            // DevTools (F12) intentionally not attached: it isn't needed at runtime and
+            // otherwise pops a "developer tools not installed" dialog on F12.
             .WithInterFont()
             .LogToTrace();
 }
