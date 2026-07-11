@@ -1457,10 +1457,34 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void Persist(string configKey, ButtonId button, Core.Actions.MouseAction action)
     {
+        // A button that drives gestures is diverted at the device, so its plain click is
+        // dispatched from the gesture map's Click entry — its single binding is ignored,
+        // and writing a Single here would also drop its swipe map. Route the diagram
+        // picker's edit into the gesture Click instead (preserving the swipes) and mirror
+        // it into the Gestures panel's Click row, so picking an action on the diagram
+        // actually takes effect. Covers a button already gesturing or one just chosen as
+        // the panel's gesture owner.
+        if (ClickEditRoutesToGesture(_config, configKey, button, SelectedGestureOwner?.Button))
+        {
+            PersistGesture(configKey, button, GestureDirection.Click, action);
+            if (SelectedGestureOwner?.Button == button)
+                GestureClick?.SetSelectedSilently(action);
+            return;
+        }
         _config.SetBinding(configKey, button, new Binding.Single(action));
         try { _config.SaveAtomic(); }
         catch { /* keep editing fluid */ }
     }
+
+    /// <summary>
+    /// Whether a plain-click edit for <paramref name="button"/> (from the diagram picker)
+    /// must be written into its gesture map's Click entry rather than a single binding.
+    /// True when the button already drives gestures, or is the current gesture owner:
+    /// such a button is diverted at the device, so its click is dispatched from the
+    /// gesture map — a single binding would be ignored (and would drop the swipe map).
+    /// </summary>
+    public static bool ClickEditRoutesToGesture(Config config, string configKey, ButtonId button, ButtonId? selectedGestureOwner) =>
+        config.GestureButtons(configKey).Contains(button) || selectedGestureOwner == button;
 
     /// <summary>
     /// Build the gesture button's five-direction editor. Seeds each direction from
@@ -1512,6 +1536,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (!wasActive)
             _ = RestartGestureCaptureForSelectedAsync();
         RefreshGestureSummaries(configKey);
+        // Keep the button's diagram picker in agreement: the plain click shown there is
+        // the same value as the gesture Click. (The synthetic gesture button edits its
+        // click inside its own five-way flyout, so skip that IsGesture binding.)
+        if (direction == GestureDirection.Click
+            && _bindings.TryGetValue(owner, out var diagramBinding) && !diagramBinding.IsGesture)
+            diagramBinding.SetSelectedSilently(action);
         if (!_suppressGesturePanel)
         {
             // One user edit (click or a single swipe) = one undo step.

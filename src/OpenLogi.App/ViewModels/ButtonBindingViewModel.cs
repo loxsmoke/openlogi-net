@@ -96,6 +96,14 @@ public sealed partial class GestureDirectionBindingViewModel : ObservableObject
         if (_suppress) return;
         _persist(Direction, value.Action);
     }
+
+    /// <summary>Set the shown action without persisting — used to mirror an edit made elsewhere.</summary>
+    public void SetSelectedSilently(CoreAction action)
+    {
+        _suppress = true;
+        Selected = Choices.FirstOrDefault(c => c.Action.Equals(action)) ?? Choices[0];
+        _suppress = false;
+    }
 }
 
 /// <summary>
@@ -163,6 +171,15 @@ public sealed partial class ButtonBindingViewModel : ObservableObject
         if (_suppress) return;
         OnPropertyChanged(nameof(SummaryLabel));
         _persist(Button, value.Action);
+    }
+
+    /// <summary>Set the shown action without persisting — used to mirror an edit made elsewhere.</summary>
+    public void SetSelectedSilently(CoreAction action)
+    {
+        _suppress = true;
+        Selected = Choices.FirstOrDefault(c => c.Action.Equals(action)) ?? Choices[0];
+        _suppress = false;
+        OnPropertyChanged(nameof(SummaryLabel));
     }
 
     /// <summary>The catalog of pickable actions, shared across buttons.</summary>
