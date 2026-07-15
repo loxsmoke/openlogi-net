@@ -15,8 +15,11 @@ public sealed class MockRawHidChannel : IRawHidChannel
     private readonly Queue<byte[]> _responsesOnWrite = new();
     private readonly object _lock = new();
 
-    public ushort VendorId => 0x046d;
-    public ushort ProductId => 0xc539;
+    public ushort VendorId { get; init; } = 0x046d;
+    public ushort ProductId { get; init; } = 0xc539;
+
+    /// <summary>What the node advertises for HID++ short/long reports; defaults to both.</summary>
+    public (bool SupportsShort, bool SupportsLong) Support { get; init; } = (true, true);
 
     /// <summary>
     /// Optional request-driven responder: invoked with each written message; a
@@ -53,7 +56,7 @@ public sealed class MockRawHidChannel : IRawHidChannel
         return len;
     }
 
-    public (bool SupportsShort, bool SupportsLong)? SupportsShortLongHidpp() => (true, true);
+    public (bool SupportsShort, bool SupportsLong)? SupportsShortLongHidpp() => Support;
 
     public Task<int> GetReportDescriptorAsync(Memory<byte> buf) =>
         throw new InvalidOperationException("mock declares HID++ support");

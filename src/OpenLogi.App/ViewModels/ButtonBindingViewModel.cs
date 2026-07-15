@@ -72,10 +72,21 @@ public sealed partial class GestureDirectionBindingViewModel : ObservableObject
     public IReadOnlyList<ActionChoice> Choices { get; }
 
     /// <summary>Grouped items (headers + choices) for the dropdown.</summary>
-    public IReadOnlyList<object> GroupedChoices => ButtonBindingViewModel.GroupedCatalog;
+    public IReadOnlyList<IActionPickerItem> GroupedChoices => ButtonBindingViewModel.GroupedCatalog;
 
     [ObservableProperty]
     private ActionChoice _selected;
+
+    /// <summary>The picker's SelectedItem — see <see cref="ButtonBindingViewModel.SelectedPickerItem"/>.</summary>
+    public IActionPickerItem SelectedPickerItem
+    {
+        get => Selected;
+        set
+        {
+            Selected = ButtonBindingViewModel.Land(value, Selected);
+            OnPropertyChanged();
+        }
+    }
 
     public GestureDirectionBindingViewModel(
         GestureDirection direction, CoreAction current, IReadOnlyList<ActionChoice> choices,
@@ -93,6 +104,7 @@ public sealed partial class GestureDirectionBindingViewModel : ObservableObject
 
     partial void OnSelectedChanged(ActionChoice value)
     {
+        OnPropertyChanged(nameof(SelectedPickerItem));
         if (_suppress) return;
         _persist(Direction, value.Action);
     }
@@ -136,6 +148,23 @@ public sealed partial class ButtonBindingViewModel : ObservableObject
     private ActionChoice _selected;
 
     /// <summary>
+    /// The picker's SelectedItem. Widened to <see cref="IActionPickerItem"/> because the
+    /// dropdown also holds group headers: <see cref="ActionChoice.Selectable"/> keeps a
+    /// click off them, but wheel and arrow-key selection moves by index and steps onto
+    /// them regardless, so a header does reach this setter. <see cref="Land"/> carries it
+    /// on to the next action instead.
+    /// </summary>
+    public IActionPickerItem SelectedPickerItem
+    {
+        get => Selected;
+        set
+        {
+            Selected = Land(value, Selected);
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>
     /// The diagram label's "Gestures: …" third line — set while this button is the
     /// device's gesture owner (category name, or action names within budget), else
     /// <c>null</c> and the line is hidden.
@@ -168,6 +197,7 @@ public sealed partial class ButtonBindingViewModel : ObservableObject
 
     partial void OnSelectedChanged(ActionChoice value)
     {
+        OnPropertyChanged(nameof(SelectedPickerItem));
         if (_suppress) return;
         OnPropertyChanged(nameof(SummaryLabel));
         _persist(Button, value.Action);
@@ -192,14 +222,40 @@ public sealed partial class ButtonBindingViewModel : ObservableObject
     /// Contains the same <see cref="ActionChoice"/> instances as <see cref="Catalog"/>,
     /// so a SelectedItem bound to a catalog entry matches by reference.
     /// </summary>
-    public static IReadOnlyList<object> GroupedCatalog { get; } = BuildGroupedCatalog();
+    public static IReadOnlyList<IActionPickerItem> GroupedCatalog { get; } = BuildGroupedCatalog();
 
     /// <summary>Grouped items for this button's picker (headers + choices).</summary>
-    public IReadOnlyList<object> GroupedChoices => GroupedCatalog;
+    public IReadOnlyList<IActionPickerItem> GroupedChoices => GroupedCatalog;
 
-    private static List<object> BuildGroupedCatalog()
+    /// <summary>
+    /// Resolve a picker item into the action to select. Choices land on themselves; a
+    /// group header keeps going the way the selection was already travelling (down the
+    /// list if the header sits below <paramref name="from"/>, up if above) and lands on
+    /// the first action beyond it, so headers can't be selected and can't block the
+    /// wheel at a category boundary. Sticks on <paramref name="from"/> when there is
+    /// nothing beyond the header — the top and bottom of the list.
+    /// </summary>
+    internal static ActionChoice Land(IActionPickerItem item, ActionChoice from)
     {
-        var items = new List<object>();
+        if (item is ActionChoice choice) return choice;
+        var target = IndexOf(item);
+        if (target < 0) return from;
+        var step = target >= IndexOf(from) ? 1 : -1;
+        for (var i = target; i >= 0 && i < GroupedCatalog.Count; i += step)
+            if (GroupedCatalog[i] is ActionChoice next) return next;
+        return from;
+    }
+
+    private static int IndexOf(IActionPickerItem item)
+    {
+        for (var i = 0; i < GroupedCatalog.Count; i++)
+            if (Equals(GroupedCatalog[i], item)) return i;
+        return -1;
+    }
+
+    private static List<IActionPickerItem> BuildGroupedCatalog()
+    {
+        var items = new List<IActionPickerItem>();
         foreach (var category in CategoryExtensions.PickerOrder)
         {
             // "Do Nothing" is pulled out of its group and appended as the very

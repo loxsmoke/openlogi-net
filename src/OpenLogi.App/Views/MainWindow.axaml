@@ -46,7 +46,7 @@
                     <TextBlock Text="{Binding Label}" Opacity="0.85"/>
                 </StackPanel>
                 <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
-                          ItemsSource="{Binding GroupedChoices}" SelectedItem="{Binding Selected}">
+                          ItemsSource="{Binding GroupedChoices}" SelectedItem="{Binding SelectedPickerItem}">
                     <ComboBox.Styles>
                         <Style Selector="ComboBoxItem" x:DataType="vm:IActionPickerItem">
                             <Setter Property="IsEnabled" Value="{Binding Selectable}"/>
@@ -242,7 +242,7 @@
                                                             <!-- Single-action buttons: one picker, grouped by category -->
                                                             <ListBox IsVisible="{Binding !Binding.IsGesture}"
                                                                      ItemsSource="{Binding Binding.GroupedChoices}"
-                                                                     SelectedItem="{Binding Binding.Selected}" MaxHeight="280">
+                                                                     SelectedItem="{Binding Binding.SelectedPickerItem}" MaxHeight="280">
                                                                 <ListBox.Styles>
                                                                     <!-- Headers: disabled container (mouse + keyboard skip it), compact row. -->
                                                                     <Style Selector="ListBoxItem" x:DataType="vm:IActionPickerItem">
@@ -267,7 +267,7 @@
                                                                                 <TextBlock Text="{Binding Label}" Opacity="0.8"/>
                                                                             </StackPanel>
                                                                             <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
-                                                                                      ItemsSource="{Binding GroupedChoices}" SelectedItem="{Binding Selected}">
+                                                                                      ItemsSource="{Binding GroupedChoices}" SelectedItem="{Binding SelectedPickerItem}">
                                                                                 <ComboBox.Styles>
                                                                                     <Style Selector="ComboBoxItem" x:DataType="vm:IActionPickerItem">
                                                                                         <Setter Property="IsEnabled" Value="{Binding Selectable}"/>
@@ -342,7 +342,7 @@
                                                             <!-- Single-action buttons: one picker, grouped by category -->
                                                             <ListBox IsVisible="{Binding !Binding.IsGesture}"
                                                                      ItemsSource="{Binding Binding.GroupedChoices}"
-                                                                     SelectedItem="{Binding Binding.Selected}" MaxHeight="280">
+                                                                     SelectedItem="{Binding Binding.SelectedPickerItem}" MaxHeight="280">
                                                                 <ListBox.Styles>
                                                                     <!-- Headers: disabled container (mouse + keyboard skip it), compact row. -->
                                                                     <Style Selector="ListBoxItem" x:DataType="vm:IActionPickerItem">
@@ -367,7 +367,7 @@
                                                                                 <TextBlock Text="{Binding Label}" Opacity="0.8"/>
                                                                             </StackPanel>
                                                                             <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
-                                                                                      ItemsSource="{Binding GroupedChoices}" SelectedItem="{Binding Selected}">
+                                                                                      ItemsSource="{Binding GroupedChoices}" SelectedItem="{Binding SelectedPickerItem}">
                                                                                 <ComboBox.Styles>
                                                                                     <Style Selector="ComboBoxItem" x:DataType="vm:IActionPickerItem">
                                                                                         <Setter Property="IsEnabled" Value="{Binding Selectable}"/>

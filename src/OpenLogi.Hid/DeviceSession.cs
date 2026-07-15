@@ -1234,13 +1234,14 @@ public sealed class DeviceSession : IAsyncDisposable
                     {
                         case ReprogControlsEvent.DivertedButtons db:
                         {
-                            // Begin a hold on the rising edge of the gesture button, and on
-                            // the falling edge fire a plain Click when no swipe committed.
+                            // Begin a hold on the rising edge of the gesture button. On the
+                            // falling edge End() settles the hold: a swipe whose travel never
+                            // got a post-gate event to commit on (a quick flick), else Click.
                             var held = db.Controls.Any(c => c.Value == _cid);
                             if (held && !swipe.IsHolding)
                                 swipe.Begin();
-                            else if (!held && swipe.IsHolding && swipe.End())
-                                onGesture(GestureDirection.Click);
+                            else if (!held && swipe.IsHolding && swipe.End() is { } end)
+                                onGesture(end);
                             break;
                         }
                         case ReprogControlsEvent.DivertedRawMouseXy xy:

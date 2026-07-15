@@ -18,19 +18,23 @@ namespace OpenLogi.Hid;
 /// </summary>
 public static class HidInventory
 {
-    /// <summary>Enumerate all receivers (with their paired devices) and directly-attached HID++ devices.</summary>
-    public static async Task<IReadOnlyList<DeviceInventory>> EnumerateAsync()
+    /// <summary>
+    /// Enumerate all receivers (with their paired devices) and directly-attached HID++
+    /// devices. <paramref name="nodeSource"/> defaults to the local machine; tests pass a
+    /// scripted source to model a specific receiver's interface layout without hardware.
+    /// </summary>
+    public static async Task<IReadOnlyList<DeviceInventory>> EnumerateAsync(IHidNodeSource? nodeSource = null)
     {
         var result = new List<DeviceInventory>();
-        var nodes = HidDiscovery.EnumerateHidppDevices();
+        var nodes = (nodeSource ?? LocalHidNodeSource.Instance).Enumerate();
         DiagnosticLog.Info("sweep", $"{nodes.Count} Logitech HID++ node(s)");
-        foreach (var hidDevice in nodes)
+        foreach (var hidNode in nodes)
         {
-            var node = NodeTag(hidDevice);
+            var node = NodeTag(hidNode);
             HidppChannel channel;
             try
             {
-                channel = await HidppChannel.FromRawChannelAsync(WindowsRawHidChannel.Open(hidDevice)).ConfigureAwait(false);
+                channel = await HidppChannel.FromRawChannelAsync(hidNode.Open()).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -54,7 +58,7 @@ public static class HidInventory
                     var detected = Receivers.Detect(channel);
                     var inventory = detected switch
                     {
-                        DetectedReceiver.Bolt b => await BuildBoltInventoryAsync(channel, b.Receiver).ConfigureAwait(false),
+                        DetectedReceiver.Bolt b => await BuildBoltInventoryAsync(channel, b.Receiver, DeviceInterfaceFor(nodes, channel)).ConfigureAwait(false),
                         // LIGHTSPEED shares Unifying's register set; only the name and
                         // the uid differ (no serial register → synthetic uid, no read).
                         DetectedReceiver.Unifying u => await BuildUnifyingInventoryAsync(channel, u.Receiver, u.Name).ConfigureAwait(false),
@@ -163,7 +167,8 @@ public static class HidInventory
         return result;
     }
 
-    private static async Task<DeviceInventory> BuildBoltInventoryAsync(HidppChannel channel, BoltReceiver receiver)
+    private static async Task<DeviceInventory> BuildBoltInventoryAsync(
+        HidppChannel channel, BoltReceiver receiver, IHidNode? deviceInterface = null)
     {
         var uid = await TryAsync(receiver.GetUniqueIdAsync).ConfigureAwait(false);
         if (uid is null)
@@ -171,23 +176,45 @@ public static class HidInventory
         try { await receiver.SetWirelessNotificationsAsync(true).ConfigureAwait(false); }
         catch (Exception ex) { DiagnosticLog.Warn("sweep", $"enable wireless notifications failed: {ex.Message}"); }
 
-        var paired = new List<PairedDevice>();
-        foreach (var conn in await receiver.CollectPairedDevicesAsync().ConfigureAwait(false))
+        // Newer Bolt receivers carry device HID++ 2.0 on a long-only *device* interface
+        // (col02), separate from the short *control* interface (col01) where the paired
+        // device is unreachable at its slot — the same split LIGHTSPEED has (issue #6,
+        // HARDWARE-CONFIRMED on 046d:c548 with an MX Master 4 / Lift). Probe on the device
+        // interface when one is present so the slot yields a real name/model/capabilities;
+        // fall back to the control channel for the classic single-interface Bolt receiver.
+        HidppChannel? deviceChannel = null;
+        if (deviceInterface is not null)
         {
-            var codename = await TryAsync(() => receiver.GetDeviceCodenameAsync(conn.Index)).ConfigureAwait(false);
-            paired.Add(await ProbeAsync(channel, conn.Index, MapBolt(conn.Kind), conn.Online, conn.Wpid, codename).ConfigureAwait(false));
+            try { deviceChannel = await HidppChannel.FromRawChannelAsync(deviceInterface.Open()).ConfigureAwait(false); }
+            catch (Exception ex) { DiagnosticLog.Warn("sweep", $"device interface open failed: {ex.Message} — probing on the control interface"); }
         }
+        var probeChannel = deviceChannel ?? channel;
 
-        return new DeviceInventory
+        try
         {
-            Receiver = new ReceiverInfo { Name = "Logi Bolt Receiver", VendorId = channel.VendorId, ProductId = channel.ProductId, UniqueId = uid },
-            Paired = paired,
-        };
+            var paired = new List<PairedDevice>();
+            foreach (var conn in await receiver.CollectPairedDevicesAsync().ConfigureAwait(false))
+            {
+                // Codename comes from the receiver's pairing registers (control channel).
+                var codename = await TryAsync(() => receiver.GetDeviceCodenameAsync(conn.Index)).ConfigureAwait(false);
+                paired.Add(await ProbeAsync(probeChannel, conn.Index, MapBolt(conn.Kind), conn.Online, conn.Wpid, codename).ConfigureAwait(false));
+            }
+
+            return new DeviceInventory
+            {
+                Receiver = new ReceiverInfo { Name = "Logi Bolt Receiver", VendorId = channel.VendorId, ProductId = channel.ProductId, UniqueId = uid },
+                Paired = paired,
+            };
+        }
+        finally
+        {
+            if (deviceChannel is not null) await deviceChannel.DisposeAsync().ConfigureAwait(false);
+        }
     }
 
     private static async Task<DeviceInventory> BuildUnifyingInventoryAsync(
         HidppChannel channel, UnifyingReceiver receiver, string name, string? uidOverride = null,
-        HidSharp.HidDevice? deviceInterface = null)
+        IHidNode? deviceInterface = null)
     {
         var uid = uidOverride ?? await TryAsync(receiver.GetUniqueIdAsync).ConfigureAwait(false);
         if (uid is null)
@@ -207,7 +234,7 @@ public static class HidInventory
         HidppChannel? deviceChannel = null;
         if (deviceInterface is not null)
         {
-            try { deviceChannel = await HidppChannel.FromRawChannelAsync(WindowsRawHidChannel.Open(deviceInterface)).ConfigureAwait(false); }
+            try { deviceChannel = await HidppChannel.FromRawChannelAsync(deviceInterface.Open()).ConfigureAwait(false); }
             catch (Exception ex) { DiagnosticLog.Warn("sweep", $"device interface open failed: {ex.Message} — probing on the control interface"); }
         }
         var probeChannel = deviceChannel ?? channel;
@@ -242,17 +269,18 @@ public static class HidInventory
     /// <summary>
     /// Find a receiver's long-only *device* interface — the sibling HID node that
     /// carries device HID++ 2.0 traffic, separate from the short *control* interface
-    /// <paramref name="control"/> we enumerate on (LIGHTSPEED splits these; Bolt/Unifying
-    /// combine them into one interface, so there's no sibling to find). Matched by
+    /// <paramref name="control"/> we enumerate on. LIGHTSPEED and newer Bolt receivers
+    /// (issue #6) split these; older Bolt/Unifying combine them into one interface, so
+    /// there's no sibling to find and this returns <c>null</c>. Matched by
     /// VID/PID, consistent with the VID/PID-based LIGHTSPEED synthetic uid — two
     /// identical dongles on one host aren't distinguished, which is already accepted.
     /// </summary>
-    private static HidSharp.HidDevice? DeviceInterfaceFor(IReadOnlyList<HidSharp.HidDevice> nodes, HidppChannel control)
+    private static IHidNode? DeviceInterfaceFor(IReadOnlyList<IHidNode> nodes, HidppChannel control)
     {
         foreach (var n in nodes)
         {
-            if (n.VendorID != control.VendorId || n.ProductID != control.ProductId) continue;
-            if (WindowsRawHidChannel.DetectSupport(n) is { SupportsShort: false, SupportsLong: true })
+            if (n.VendorId != control.VendorId || n.ProductId != control.ProductId) continue;
+            if (n is { SupportsShort: false, SupportsLong: true })
                 return n;
         }
         return null;
@@ -352,9 +380,9 @@ public static class HidInventory
     /// (e.g. "node 046d:c547 [mi_02&amp;col01]" — without it, two interfaces of
     /// the same receiver log identically).
     /// </summary>
-    private static string NodeTag(HidSharp.HidDevice device)
+    private static string NodeTag(IHidNode device)
     {
-        var tag = $"node {device.VendorID:x4}:{device.ProductID:x4}";
+        var tag = $"node {device.VendorId:x4}:{device.ProductId:x4}";
         try
         {
             // \\?\hid#vid_046d&pid_c547&mi_01&col02#8&2de4…#{guid} → "mi_01&col02"

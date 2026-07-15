@@ -31,7 +31,7 @@ upward swipe reports negative `dy` and maps to **Up**.
 ### Default bindings
 
 The **dedicated gesture button** ships with a full five-direction map
-(`Bindings.DefaultGestureBinding` in `OpenLogi.Core/Actions.cs`):
+(`Bindings.DefaultGestureBinding` in `OpenLogi.Core/Actions/Bindings.cs`):
 
 | Direction | Default action        |
 |-----------|-----------------------|
@@ -62,8 +62,9 @@ silences them all while keeping every map. Two kinds of control can gesture:
      Gesture"*) on MX-line mice such as the MX Master series — the thumb button
      under the thumb rest. Gestures by default when present.
    - Any other **divertable raw-XY button** — Middle (`0x0052`), Back
-     (`0x0053`), Forward (`0x0056`), or the DPI / wheel-mode button (`0x00c4`
-     family) — on mice that have no dedicated gesture button. Repurposing a
+     (`0x0053`), Forward (`0x0056`), or the DPI / wheel-mode button (tried in
+     order `0x00c4`, `0x00ed`, `0x00fd`) — on mice that have no dedicated gesture
+     button. Repurposing a
      button for gestures gives up its normal function — exactly the trade Logi
      Options+ makes. The swipe mechanism is identical; only the diverted
      control differs. On Windows even Middle/Back/Forward gesture over HID++
@@ -89,28 +90,55 @@ normal single-action behavior.
 
 ## Swipe detection
 
-Classification is shared by both paths (`OpenLogi.Core/Gestures.cs`, ported from
-Rust `binding::detect_swipe` / `SwipeAccumulator`):
+Classification is shared by both paths (`OpenLogi.Core/Gestures/Gestures.cs` +
+`SwipeAccumulator.cs`, ported from Rust `binding::detect_swipe` /
+`SwipeAccumulator`):
 
-- **Hold gate** — travel is ignored until the button has been held for at least
-  **160 ms** (`Gestures.HoldForSwipe`). This rejects a quick click that happened
-  to drift a few pixels.
+- **Hold gate** — travel accumulates from the moment of press, but no direction
+  may *commit* until the button has been held for at least **160 ms**
+  (`Gestures.HoldForSwipe`). This rejects a quick click that happened to drift a
+  few pixels.
 - **Commit threshold** — the dominant axis must travel at least **50 raw-XY
   units** (`Gestures.SwipeThreshold`) before a direction commits.
 - **Deadzone** — the cross axis must stay within
   `max(40, 35% of the dominant axis)` (`Gestures.SwipeDeadzone`), so a diagonal
   smear does not register as a clean swipe.
 - **Mid-swipe commit** — the direction fires **the instant** it crosses the
-  threshold during the hold (matching Options+), not on release. It fires **at
-  most once per hold**.
-- **Click fallback** — if the button is released while a hold was in progress
-  and no direction ever committed, that is a **Click**.
+  threshold during the hold (matching Options+), not on release.
+- **Chaining** — a hold can fire more than one gesture: after one commits,
+  changing direction commits the next, so press → drag left → drag right fires
+  **Left** then **Right** without releasing. Re-arming requires a *change* of
+  direction, which is what keeps one long sweep worth exactly one gesture however
+  far it runs; repeating the *same* direction needs a fresh press. While the
+  motion continues the way it just fired, the travel pivot is pinned (both axes),
+  so follow-through neither repeats the gesture nor has to be undone before the
+  reversal can commit — and an arcing sweep cannot bank its drift into a phantom
+  cross-axis gesture.
+- **Commit on release** — the travel is classified once more when the button is
+  released, so a hold past the gate that never got a post-gate movement event to
+  commit on still fires its swipe. This is what catches a **quick flick**: the
+  whole motion lands inside the 160 ms gate and the mouse is then still, so the
+  device streams no further raw-XY event to re-check the travel. Without it such
+  a flick silently degrades to a Click, and gestures appear to work only
+  sometimes, depending on how fast you swipe. Only the *first* stroke can need
+  this — the gate is measured from the press, so by the time a chain exists the
+  hold is past it and every later stroke commits on its own event.
+- **Click fallback** — a hold released before the gate, or whose travel never
+  resolves to a clean direction, is a **Click**. A hold that fired any swipe is
+  never a click.
 - All arithmetic **saturates** — an arbitrarily long diagonal hold can never
   overflow or throw. A crash in the input callback would be a freeze hazard.
 
 The state machine (`SwipeAccumulator`) has three operations: `Begin()` on
-press, `Accumulate(dx, dy)` per movement delta (returns the committed direction
-once), and `End()` on release (returns `true` when the hold was a plain click).
+press, `Accumulate(dx, dy)` per movement delta (returns a direction the instant
+it commits, once per stroke), and `End()` on release (returns the direction to
+fire — a late-committing swipe or `Click` — or `null` when the hold's swipes
+already fired mid-hold).
+
+One known corner: if the *first* stroke is flicked out inside the 160 ms gate and
+then reversed, the two strokes share one pivot, so the reversal's travel cancels
+the first's and only the reversal fires. Chaining that fast from a standing press
+is not a motion the gate can tell from a jittery click.
 
 ## Editing gestures in the app
 
@@ -171,8 +199,9 @@ Gestures do nothing — the button behaves natively — in any of these cases:
 
 - **The device exposes no capturable gesture control**, i.e. none of the
   candidate controls (`0x00c3`, Middle `0x0052`, Back `0x0053`, Forward
-  `0x0056`, or the `0x00c4`-family DPI/wheel button) is present in its `0x1b04`
-  reprogrammable-controls table with the **raw-XY** capability. (Note: some mice,
+  `0x0056`, or the DPI/wheel button `0x00c4` / `0x00ed` / `0x00fd`) is present in
+  its `0x1b04` reprogrammable-controls table with the **raw-XY** capability.
+  (Note: some mice,
   e.g. the MX Anywhere 3S, expose a *Virtual Gesture Button* `0x00d7` that
   Logi Options+ uses; openlogi-net does not drive that virtual control directly —
   it repurposes a real button instead.)
@@ -256,8 +285,8 @@ running — even minimized to the tray — independent of which device page is o
 
 | Concern                     | Location |
 |-----------------------------|----------|
-| Swipe classification + state machine | `OpenLogi.Core/Gestures.cs` |
-| Directions, per-button maps, master switch, defaults | `OpenLogi.Core/Actions.cs`, `OpenLogi.Core/Config.cs` (`GestureButtons`, `GesturesEnabled`) |
+| Swipe classification + state machine | `OpenLogi.Core/Gestures/Gestures.cs`, `SwipeAccumulator.cs` |
+| Directions + master switch; per-button maps; defaults | `OpenLogi.Core/Gestures/` (`GestureDirection`, `GestureOwner`), `OpenLogi.Core/Config/Config.cs` (`GestureButtons`, `GesturesEnabled`), `OpenLogi.Core/Actions/Bindings.cs` (`DefaultGestureBinding`) |
 | Effective per-button gesture maps | `OpenLogi.Agent/Bindings.cs` (`GestureBindingsFor(config, key, button)`) |
 | HID++ `0x1b04` control divert / raw-XY events | `OpenLogi.HidPP/Feature/ReprogControlsFeature.cs` |
 | Live gesture capture session (one per button) | `OpenLogi.Hid/DeviceSession.cs` (`StartGestureCaptureAsync`, `GestureCandidates`) |
@@ -275,11 +304,12 @@ running — even minimized to the tray — independent of which device page is o
 2. Each `StartGestureCaptureAsync(button, …)` scans the `0x1b04` control table
    for that button's candidate CID (`DeviceSession.GestureCandidates`) with the
    raw-XY flag. If found, it diverts it
-   (`SetCidReporting(diverted: true, rawXy: true)`) and starts a pump that reads
-   the feature's event stream.
+   (`SetCidReportingAsync` with a divert + raw-XY change) and starts a pump that
+   reads the feature's event stream.
 3. Each pump drives its own `SwipeAccumulator`:
    - `DivertedButtons` events containing its CID → `Begin()` on the rising
-     edge; on the falling edge, `End()` → emit **Click** if no swipe committed.
+     edge; on the falling edge, `End()` → emit whatever it settles on (a
+     late-committing swipe, else **Click**).
    - `DivertedRawMouseXy` events → `Accumulate(dx, dy)`; a returned direction is
      emitted immediately (mid-swipe). Raw-XY events carry no CID, but only an
      accumulator inside a hold consumes them.
