@@ -16,6 +16,17 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
+    <Window.Styles>
+        <!-- Gallery connection badges: stroke follows the theme (see App.axaml
+             ThemeDictionaries); the Bluetooth variant wears its blue. -->
+        <Style Selector="Path.connBadge">
+            <Setter Property="Stroke" Value="{DynamicResource ConnectionBadgeBrush}"/>
+        </Style>
+        <Style Selector="Path.connBadge.bt">
+            <Setter Property="Stroke" Value="{DynamicResource ConnectionBadgeBluetoothBrush}"/>
+        </Style>
+    </Window.Styles>
+
     <!-- Shared templates for the grouped action pickers: a plain row per action,
          and a compact header row (category name + rule) per group. Typed, so they
          apply wherever these items appear (flyout ListBoxes, gesture ComboBoxes). -->
@@ -127,25 +138,35 @@
                                     HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
                                     Command="{Binding DataContext.OpenDeviceCommand, ElementName=Root}"
                                     CommandParameter="{Binding}">
-                                <DockPanel>
-                                    <StackPanel DockPanel.Dock="Bottom" Spacing="2" Height="56">
-                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
-                                                   HorizontalAlignment="Center" TextAlignment="Center"
-                                                   TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"/>
-                                        <!-- Battery when awake; a sleep indicator when the receiver reports it off the link -->
-                                        <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center"
-                                                    IsVisible="{Binding !IsAsleep}">
-                                            <ctrl:BatteryIcon Percent="{Binding BatteryPercent}" Charging="{Binding BatteryCharging}"
-                                                              IsVisible="{Binding HasBattery}" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding Battery}" Opacity="0.6" FontSize="11"
-                                                       VerticalAlignment="Center"/>
+                                <Panel>
+                                    <DockPanel>
+                                        <StackPanel DockPanel.Dock="Bottom" Spacing="2" Height="56">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                                       HorizontalAlignment="Center" TextAlignment="Center"
+                                                       TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"/>
+                                            <!-- Battery when awake; a sleep indicator when the receiver reports it off the link -->
+                                            <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center"
+                                                        IsVisible="{Binding !IsAsleep}">
+                                                <ctrl:BatteryIcon Percent="{Binding BatteryPercent}" Charging="{Binding BatteryCharging}"
+                                                                  IsVisible="{Binding HasBattery}" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding Battery}" Opacity="0.6" FontSize="11"
+                                                           VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <TextBlock Text="☾ Asleep" IsVisible="{Binding IsAsleep}"
+                                                       Opacity="0.5" FontSize="11" HorizontalAlignment="Center"/>
                                         </StackPanel>
-                                        <TextBlock Text="☾ Asleep" IsVisible="{Binding IsAsleep}"
-                                                   Opacity="0.5" FontSize="11" HorizontalAlignment="Center"/>
-                                    </StackPanel>
-                                    <Image Source="{Binding Image}" Stretch="Uniform" Opacity="{Binding TileImageOpacity}"
-                                           RenderOptions.BitmapInterpolationMode="HighQuality"/>
-                                </DockPanel>
+                                        <Image Source="{Binding Image}" Stretch="Uniform" Opacity="{Binding TileImageOpacity}"
+                                               RenderOptions.BitmapInterpolationMode="HighQuality"/>
+                                    </DockPanel>
+                                    <!-- Connection-type badge: Bluetooth rune / receiver dongle / cable plug -->
+                                    <Path Data="{Binding ConnectionIcon}" IsVisible="{Binding HasConnectionIcon}"
+                                          Classes="connBadge" Classes.bt="{Binding IsBluetoothConnection}"
+                                          StrokeThickness="1.6"
+                                          StrokeJoin="Round" StrokeLineCap="Round"
+                                          Width="15" Height="15" Stretch="Uniform"
+                                          HorizontalAlignment="Right" VerticalAlignment="Top"
+                                          ToolTip.Tip="{Binding ConnectionLabel}"/>
+                                </Panel>
                             </Button>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

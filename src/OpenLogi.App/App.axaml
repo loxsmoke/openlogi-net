@@ -8,7 +8,24 @@
     <Application.DataTemplates>
         <local:ViewLocator/>
     </Application.DataTemplates>
-  
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <!-- Gallery connection badges: near-foreground stroke + a Bluetooth blue
+                     with enough contrast against each variant's tile background. -->
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="ConnectionBadgeBrush" Color="#000000"/>
+                    <SolidColorBrush x:Key="ConnectionBadgeBluetoothBrush" Color="#1565C0"/>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="ConnectionBadgeBrush" Color="#F2F2F2"/>
+                    <SolidColorBrush x:Key="ConnectionBadgeBluetoothBrush" Color="#64B5F6"/>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+
     <Application.Styles>
         <FluentTheme />
         <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml" />

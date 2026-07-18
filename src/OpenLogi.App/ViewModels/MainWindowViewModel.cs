@@ -1067,34 +1067,85 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         // The global OS hook applies one mouse's Middle/Back/Forward bindings.
         _agent.SetSelectedDevice(mice.FirstOrDefault()?.ConfigKey);
 
+        var gen = ++_mouseActivationGen;
+        var unreachable = new List<DeviceViewModel>();
         foreach (var mouse in mice)
-        {
-            if (mouse.Route is not { } route) continue;
-            try
-            {
-                var session = await DeviceSession.OpenAsync(route);
-                if (session is null) continue;
-                var ck = mouse.ConfigKey; // capture this mouse's bindings, not the global selection
-                // The native scroll-invert bit (0x2121) is volatile — restore the
-                // persisted preference whenever the mouse (re)connects. No-op if unsupported.
-                if (ck is not null) await session.ApplyScrollInvertAsync(_config.InvertScroll(ck));
-                // Sensor DPI is likewise volatile — the mouse firmware resets it to its
-                // default (e.g. 1000) on wake from sleep. Re-apply the persisted DPI on
-                // every (re)connect so a saved value survives sleep/wake. No-op if the
-                // user never set one, or if the device doesn't support 0x2201.
-                if (ck is not null && _config.Dpi(ck) is { } savedDpi)
-                    await session.ApplyDpiAsync((ushort)savedDpi);
-
-                var captures = await StartMouseCapturesAsync(session, ck);
-                if (captures.Count == 0) { await session.DisposeAsync(); continue; } // nothing capturable
-                _mouseCaptures.Add(new MouseCapture(mouse, session, new CompositeCapture(captures)));
-            }
-            catch { /* mouse unreachable */ }
-        }
+            if (!await TryActivateMouseAsync(mouse, gen))
+                unreachable.Add(mouse);
+        if (unreachable.Count > 0) _ = RearmUnreachableMiceAsync(unreachable, gen);
 
         // Every (re)scan/reconnect/wake funnels through here, so this is where we (re)arm
         // the No-profile lighting keepalive — and re-apply on wake.
         PokeLightingKeepalive();
+    }
+
+    // Bumped by every ActivateAgentMiceAsync run; an older run's background re-arm
+    // loop stops the moment a newer activation owns the capture set.
+    private int _mouseActivationGen;
+
+    /// <summary>
+    /// Open one mouse's persistent capture session and arm its captures (restoring the
+    /// volatile scroll-invert bit and persisted DPI on the way, since firmware resets
+    /// both on wake). Returns <c>true</c> when there is nothing left to do for this
+    /// mouse — captures armed, nothing capturable, unroutable, or a newer activation
+    /// superseded this attempt — and <c>false</c> when the mouse was unreachable and
+    /// the attempt is worth retrying.
+    /// </summary>
+    private async Task<bool> TryActivateMouseAsync(DeviceViewModel mouse, int gen)
+    {
+        if (mouse.Route is not { } route) return true;
+        try
+        {
+            var session = await DeviceSession.OpenAsync(route);
+            if (session is null) return false;
+            var ck = mouse.ConfigKey; // capture this mouse's bindings, not the global selection
+            if (ck is not null) await session.ApplyScrollInvertAsync(_config.InvertScroll(ck));
+            if (ck is not null && _config.Dpi(ck) is { } savedDpi)
+                await session.ApplyDpiAsync((ushort)savedDpi);
+
+            var captures = await StartMouseCapturesAsync(session, ck);
+            if (gen != _mouseActivationGen)
+            {
+                // A newer activation took over while this attempt was talking to the
+                // device — its capture set owns the mouse now; discard this one's.
+                foreach (var c in captures) await c.DisposeAsync();
+                await session.DisposeAsync();
+                return true;
+            }
+            if (captures.Count == 0) { await session.DisposeAsync(); return true; } // nothing capturable
+            _mouseCaptures.Add(new MouseCapture(mouse, session, new CompositeCapture(captures)));
+            return true;
+        }
+        catch { return false; } // unreachable — worth retrying
+    }
+
+    /// <summary>
+    /// Re-arm captures for mice that were unreachable when the capture set was rebuilt.
+    /// A mouse can be gone at exactly the wrong moment — e.g. a low-battery brown-out
+    /// during the rescan that tore its captures down (observed 2026-07-17: captures
+    /// released "device gone", the rebuild's open failed, gestures stayed dead until a
+    /// manual refresh). A device that returns without a node change never triggers a
+    /// rescan, so nothing external retries — this loop does, with backoff, until the
+    /// mouse answers or a newer activation supersedes it.
+    /// </summary>
+    private async Task RearmUnreachableMiceAsync(List<DeviceViewModel> mice, int gen)
+    {
+        DiagnosticLog.Warn("capture",
+            $"{mice.Count} pointer device(s) unreachable during capture activation — retrying in the background");
+        var delay = TimeSpan.FromSeconds(5);
+        while (mice.Count > 0 && gen == _mouseActivationGen)
+        {
+            await Task.Delay(delay);
+            foreach (var mouse in mice.ToArray())
+            {
+                if (gen != _mouseActivationGen) return;
+                if (!await TryActivateMouseAsync(mouse, gen)) continue;
+                mice.Remove(mouse);
+                if (gen == _mouseActivationGen)
+                    DiagnosticLog.Info("capture", $"{mouse.Name}: captures re-armed after the device returned");
+            }
+            delay = TimeSpan.FromTicks(Math.Min(delay.Ticks * 2, TimeSpan.FromSeconds(60).Ticks));
+        }
     }
 
     /// <summary>

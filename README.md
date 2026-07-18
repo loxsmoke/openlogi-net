@@ -67,6 +67,13 @@ It ships two binaries:
 > openlogi-net is under active development and not yet stable. Features and
 > configuration may still change between releases.
 
+> [!WARNING]
+> **Dongle (receiver) support may be unreliable.** The app has not been tested
+> with most Bolt / Unifying / LIGHTSPEED dongles and the devices behind them.
+> A device reached through a dongle can show up as asleep moments after you
+> used it, and settings or lighting may only apply while it is actively in
+> use. Bluetooth and wired connections are not affected.
+
 ## How it differs from the original OpenLogi
 
 The upstream [OpenLogi](https://github.com/AprilNEA/OpenLogi) is a Rust + GPUI

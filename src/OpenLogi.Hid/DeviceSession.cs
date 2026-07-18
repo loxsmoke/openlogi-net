@@ -603,6 +603,21 @@ public sealed class DeviceSession : IAsyncDisposable
         catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"ReadProfiles: onboard-mode read failed: {ex}"); return null; }
     }
 
+    /// <summary>
+    /// Raw diagnostic call into an arbitrary feature: resolves <paramref name="featureId"/>'s
+    /// index and invokes <paramref name="function"/> with a short payload, returning the
+    /// extended response payload — <c>null</c> if the device lacks the feature. CLI-only
+    /// escape hatch for probing undocumented features (e.g. 0x1830 Power Modes).
+    /// </summary>
+    public async Task<byte[]?> CallRawFeatureAsync(ushort featureId, byte function, byte[] args)
+    {
+        if (_device.FeatureIndex(featureId) is not { } idx) return null;
+        var ep = new FeatureEndpoint(_channel, _device.DeviceIndex, idx);
+        var padded = new byte[3]; // short calls carry exactly 3 payload bytes
+        args.AsSpan(0, Math.Min(args.Length, 3)).CopyTo(padded);
+        return (await ep.CallAsync(function, padded).ConfigureAwait(false)).ExtendPayload();
+    }
+
     /// <summary>Read 16 bytes at sector/offset (OnboardProfiles readMemory), or <c>null</c> if no 0x8100.</summary>
     public async Task<byte[]?> ReadMemoryRawAsync(ushort sector, ushort offset)
     {

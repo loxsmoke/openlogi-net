@@ -39,21 +39,37 @@ public static class HidInventory
     public static async Task<IReadOnlyList<DeviceInventory>> EnumerateAsync(
         IHidNodeSource? nodeSource = null, PostProbeHook? postProbe = null, Func<IHidNode, bool>? nodeFilter = null)
     {
-        var result = new List<DeviceInventory>();
         // Receivers first: a wake-triggered rescan must reach the just-woken wireless
         // device before its RF link parks again (a G915 parks within seconds of the
-        // wake keypress), and every non-receiver node ahead of it can burn seconds of
-        // ping timeouts. Stable sort — relative order is otherwise preserved.
+        // wake keypress). Stable sort — relative order is otherwise preserved.
         var nodes = (nodeSource ?? LocalHidNodeSource.Instance).Enumerate()
             .Where(n => nodeFilter?.Invoke(n) ?? true)
             .OrderByDescending(n => Receivers.IsReceiverPid(n.VendorId, n.ProductId))
             .ToList();
         DiagnosticLog.Info("sweep", $"{nodes.Count} Logitech HID++ node(s){(nodeFilter is null ? "" : " (scoped)")}");
-        foreach (var hidNode in nodes)
+
+        // Physical devices are independent — sweep them concurrently so the whole
+        // pass costs roughly its slowest device, not the sum of every node's ping
+        // timeouts (measured 10 s → ~4 s on a receiver + mic + mouse host). Nodes
+        // sharing a VID/PID stay sequential: they're one composite device whose
+        // interfaces interact (the control-interface sweep opens its long-only
+        // sibling as the probe channel — see DeviceInterfaceFor). The post-probe
+        // hook may now fire concurrently for devices of DIFFERENT vid:pids; the
+        // app's hook does per-device work only, and single-receiver hosts never
+        // overlap in practice. Results keep the receiver-first node order, so
+        // Deduplicate sees the same sequence the sequential sweep produced.
+        var groups = nodes.GroupBy(n => (n.VendorId, n.ProductId)).Select(async group =>
         {
-            if (await SweepNodeAsync(hidNode, nodes, postProbe).ConfigureAwait(false) is { } inventory)
-                result.Add(inventory);
-        }
+            var inventories = new List<DeviceInventory>();
+            foreach (var hidNode in group)
+                if (await SweepNodeAsync(hidNode, nodes, postProbe).ConfigureAwait(false) is { } inventory)
+                    inventories.Add(inventory);
+            return inventories;
+        }).ToList();
+
+        var result = new List<DeviceInventory>();
+        foreach (var group in groups)
+            result.AddRange(await group.ConfigureAwait(false));
         var deduped = Deduplicate(result);
         DiagnosticLog.Info("sweep", $"done: {deduped.Count} receiver(s)/device(s) usable");
         return deduped;
