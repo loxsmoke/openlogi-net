@@ -19,9 +19,6 @@ switch (command)
     case "controls":
         await ControlsAsync();
         break;
-    case "gestureprobe":
-        await GestureProbeAsync(args.Length > 1 ? Convert.ToUInt16(args[1], 16) : (ushort)0x00c4);
-        break;
     case "assets":
         await AssetsAsync();
         break;
@@ -205,66 +202,6 @@ static async Task ControlsAsync()
             }
         }
     }
-}
-
-// Divert one control with raw-XY (the exact mechanism the gesture capture uses) and
-// print its events for ~8 seconds so a gesture button + swipe can be confirmed live,
-// then restore the control. Defaults to 0x00c4 (wheel/DPI button on the MX Anywhere 3S).
-static async Task GestureProbeAsync(ushort cid)
-{
-    foreach (var hid in HidDiscovery.EnumerateHidppDevices())
-    {
-        HidppChannel channel;
-        try { channel = await HidppChannel.FromRawChannelAsync(WindowsRawHidChannel.Open(hid)); }
-        catch { continue; }
-
-        await using (channel)
-        {
-            HidppDevice device;
-            try { device = await HidppDevice.NewAsync(channel, DeviceRoute.DirectDeviceIndex); }
-            catch { continue; }
-            if (await device.EnumerateFeaturesAsync() is null) continue;
-            if (device.GetFeature<OpenLogi.HidPP.Feature.ReprogControlsFeature>() is not { } rc) continue;
-
-            using (rc)
-            {
-                Console.WriteLine($"{hid.GetFriendlyName()} ({hid.VendorID:x4}:{hid.ProductID:x4})");
-                Console.WriteLine($"Diverting cid 0x{cid:x4} with raw-XY. HOLD that button and swipe now…");
-                var control = new OpenLogi.HidPP.Feature.ControlId(cid);
-                await rc.SetCidReportingAsync(control,
-                    OpenLogi.HidPP.Feature.CidReportingChange.TemporaryDiversion(diverted: true, rawXy: true));
-
-                var reader = rc.Listen();
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
-                var events = 0;
-                try
-                {
-                    await foreach (var ev in reader.ReadAllAsync(cts.Token))
-                    {
-                        events++;
-                        switch (ev)
-                        {
-                            case OpenLogi.HidPP.Feature.ReprogControlsEvent.DivertedButtons db:
-                                Console.WriteLine($"  buttons: [{string.Join(", ", db.Controls.Select(c => $"0x{c.Value:x4}"))}]");
-                                break;
-                            case OpenLogi.HidPP.Feature.ReprogControlsEvent.DivertedRawMouseXy xy:
-                                Console.WriteLine($"  raw-xy: dx={xy.Dx} dy={xy.Dy}");
-                                break;
-                        }
-                    }
-                }
-                catch (OperationCanceledException) { }
-
-                await rc.SetCidReportingAsync(control,
-                    OpenLogi.HidPP.Feature.CidReportingChange.TemporaryDiversion(diverted: false, rawXy: false));
-                Console.WriteLine(events > 0
-                    ? $"Restored. Captured {events} event(s) — gesture divert works on 0x{cid:x4}."
-                    : "Restored. No events — was the button held/swiped during the window?");
-            }
-            return;
-        }
-    }
-    Console.WriteLine("No direct HID++ device found.");
 }
 
 static async Task AssetsAsync()

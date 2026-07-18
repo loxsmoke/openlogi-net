@@ -87,27 +87,7 @@ public static class ConfigCodec
         if (d.Identity is { } identity)
             t["identity"] = SerializeIdentity(identity);
         if (d.Lighting is { } lighting)
-        {
-            var lightingTable = new TomlTable
-            {
-                ["enabled"] = lighting.Enabled,
-                ["color"] = lighting.Color,
-                ["brightness"] = (long)lighting.Brightness,
-            };
-            if (lighting.PaintColor is { } paint)
-                lightingTable["paint_color"] = paint;
-            if (lighting.Profile != 0)
-                lightingTable["profile"] = (long)lighting.Profile;
-            // Per-key overrides (zone → "RRGGBB") nest after the scalars; omitted when empty.
-            if (lighting.PerKey.Count > 0)
-            {
-                var perKey = new TomlTable();
-                foreach (var (zone, hex) in lighting.PerKey.OrderBy(p => p.Key))
-                    perKey[zone.ToString()] = hex;
-                lightingTable["per_key"] = perKey;
-            }
-            t["lighting"] = lightingTable;
-        }
+            t["lighting"] = SerializeLighting(lighting);
         if (d.SmartShift is { } ss)
             t["smartshift"] = new TomlTable
             {
@@ -123,18 +103,45 @@ public static class ConfigCodec
             t["bindings"] = bindings;
         }
         if (d.PerAppBindings.Count > 0)
+            t["per_app_bindings"] = SerializePerAppBindings(d.PerAppBindings);
+        return t;
+    }
+
+    private static TomlTable SerializeLighting(Lighting lighting)
+    {
+        var t = new TomlTable
         {
-            var perApp = new TomlTable();
-            foreach (var (bundle, map) in d.PerAppBindings)
-            {
-                var inner = new TomlTable();
-                foreach (var (button, action) in map)
-                    inner[button.ToString()] = SerializeAction(action);
-                perApp[bundle] = inner;
-            }
-            t["per_app_bindings"] = perApp;
+            ["enabled"] = lighting.Enabled,
+            ["color"] = lighting.Color,
+            ["brightness"] = (long)lighting.Brightness,
+        };
+        if (lighting.PaintColor is { } paint)
+            t["paint_color"] = paint;
+        if (lighting.Profile != 0)
+            t["profile"] = (long)lighting.Profile;
+        // Per-key overrides (zone → "RRGGBB") nest after the scalars; omitted when empty.
+        if (lighting.PerKey.Count > 0)
+        {
+            var perKey = new TomlTable();
+            foreach (var (zone, hex) in lighting.PerKey.OrderBy(p => p.Key))
+                perKey[zone.ToString()] = hex;
+            t["per_key"] = perKey;
         }
         return t;
+    }
+
+    private static TomlTable SerializePerAppBindings(
+        SortedDictionary<string, SortedDictionary<ButtonId, Actions.MouseAction>> perAppBindings)
+    {
+        var perApp = new TomlTable();
+        foreach (var (bundle, map) in perAppBindings)
+        {
+            var inner = new TomlTable();
+            foreach (var (button, action) in map)
+                inner[button.ToString()] = SerializeAction(action);
+            perApp[bundle] = inner;
+        }
+        return perApp;
     }
 
     private static TomlTable SerializeIdentity(DeviceIdentity i)

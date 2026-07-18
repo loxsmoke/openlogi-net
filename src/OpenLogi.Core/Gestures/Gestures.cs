@@ -8,11 +8,33 @@ namespace OpenLogi.Core.Gestures;
 /// </summary>
 public static class Gestures
 {
-    /// <summary>Minimum dominant-axis travel (raw-XY units) before a held gesture commits.</summary>
-    public const int SwipeThreshold = 50;
+    /// <summary>
+    /// Minimum dominant-axis travel (raw-XY units) before a held gesture commits.
+    /// This is the click tolerance: a press that outlasts <see cref="HoldForSwipe"/>
+    /// with accidental hand drift below this stays a Click. The Rust original's 50
+    /// counts is only 1–2 mm on a modern sensor — real clicks drift that far, firing
+    /// phantom gestures — while a deliberate swipe travels 10+ mm (hundreds of
+    /// counts), so 150 keeps swipes effortless and clicks safe.
+    /// </summary>
+    public const int SwipeThreshold = 150;
 
-    /// <summary>Maximum cross-axis travel allowed at the threshold (floor; grows as max(deadzone, 35%)).</summary>
-    public const int SwipeDeadzone = 40;
+    /// <summary>
+    /// How many times <see cref="SwipeThreshold"/> a follow-up stroke of the same hold
+    /// (a chain: left→right without releasing) must travel to commit. The first stroke's
+    /// 50 counts is 1–2 mm on a modern sensor — the wobble of releasing the button
+    /// covers that, so a same-threshold re-arm made "swipe, release" fire the reverse
+    /// gesture too (HARDWARE-OBSERVED on an MX Anywhere 3S). A deliberate return
+    /// stroke travels far more than 3×.
+    /// </summary>
+    public const int RearmTravelFactor = 3;
+
+    /// <summary>
+    /// Maximum cross-axis travel allowed at the threshold (floor; grows as
+    /// max(deadzone, 35%)). Scaled with <see cref="SwipeThreshold"/> to keep the
+    /// original geometry at the commit point (80% of the threshold): a natural hand
+    /// arc curves substantially, and a tighter band would reject it as diagonal.
+    /// </summary>
+    public const int SwipeDeadzone = 120;
 
     /// <summary>Minimum hold before travel can commit to a swipe (vs. a quick click that drifted).</summary>
     public static readonly TimeSpan HoldForSwipe = TimeSpan.FromMilliseconds(160);
@@ -37,12 +59,18 @@ public static class Gestures
     /// diagonal. Coordinates follow the device convention (+x right, +y down),
     /// so an upward swipe (negative dy) maps to <see cref="GestureDirection.Up"/>.
     /// </summary>
-    public static GestureDirection? DetectSwipe(int dx, int dy)
+    public static GestureDirection? DetectSwipe(int dx, int dy) => DetectSwipe(dx, dy, SwipeThreshold);
+
+    /// <summary>
+    /// <see cref="DetectSwipe(int,int)"/> with a caller-chosen minimum dominant-axis
+    /// travel — the accumulator demands more for a chained stroke than a first one.
+    /// </summary>
+    public static GestureDirection? DetectSwipe(int dx, int dy, int minTravel)
     {
         var absX = SaturatingAbs(dx);
         var absY = SaturatingAbs(dy);
         var dominant = Math.Max(absX, absY);
-        if (dominant < SwipeThreshold) return null;
+        if (dominant < minTravel) return null;
         var crossLimit = Math.Max(SwipeDeadzone, SaturatingMul(dominant, 35) / 100);
         if (absX > absY)
         {

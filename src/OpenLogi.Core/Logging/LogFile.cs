@@ -121,6 +121,40 @@ public sealed class LogFile : IAsyncDisposable
             suppressed = 0;
         }
 
+        void WriteDetailLines(string detail)
+        {
+            var lines = detail.Split('\n');
+            foreach (var line in lines.Take(MaxDetailLines))
+                WriteRaw("    | " + line.TrimEnd('\r'));
+            if (lines.Length > MaxDetailLines)
+                WriteRaw($"    | … {lines.Length - MaxDetailLines} more line(s)");
+        }
+
+        void WriteEntry(Entry e)
+        {
+            var droppedNow = Interlocked.Exchange(ref _dropped, 0);
+            if (droppedNow > 0)
+            {
+                FlushSuppressed(e.At);
+                lastKey = null;
+                WriteRaw(Format(e.At, LogLevel.Warn, "log", $"queue overflowed, dropped {droppedNow} message(s)"));
+            }
+
+            var key = $"{e.Level}|{e.Area}|{e.Text}";
+            if (key == lastKey)
+            {
+                if (suppressed++ == 0) suppressedSince = e.At;
+                return;
+            }
+            FlushSuppressed(e.At);
+            WriteRaw(Format(e.At, e.Level, e.Area, e.Text));
+            if (e.Detail is not null)
+                WriteDetailLines(e.Detail);
+            lastKey = key;
+            lastLevel = e.Level;
+            lastArea = e.Area;
+        }
+
         try
         {
             (stream, writer) = Open();
@@ -142,36 +176,7 @@ public sealed class LogFile : IAsyncDisposable
                     continue;
                 }
                 if (writer is null) continue; // file unavailable — swallow silently
-                try
-                {
-                    var droppedNow = Interlocked.Exchange(ref _dropped, 0);
-                    if (droppedNow > 0)
-                    {
-                        FlushSuppressed(e.At);
-                        lastKey = null;
-                        WriteRaw(Format(e.At, LogLevel.Warn, "log", $"queue overflowed, dropped {droppedNow} message(s)"));
-                    }
-
-                    var key = $"{e.Level}|{e.Area}|{e.Text}";
-                    if (key == lastKey)
-                    {
-                        if (suppressed++ == 0) suppressedSince = e.At;
-                        continue;
-                    }
-                    FlushSuppressed(e.At);
-                    WriteRaw(Format(e.At, e.Level, e.Area, e.Text));
-                    if (e.Detail is not null)
-                    {
-                        var lines = e.Detail.Split('\n');
-                        foreach (var line in lines.Take(MaxDetailLines))
-                            WriteRaw("    | " + line.TrimEnd('\r'));
-                        if (lines.Length > MaxDetailLines)
-                            WriteRaw($"    | … {lines.Length - MaxDetailLines} more line(s)");
-                    }
-                    lastKey = key;
-                    lastLevel = e.Level;
-                    lastArea = e.Area;
-                }
+                try { WriteEntry(e); }
                 catch { /* one bad write must not kill the drain */ }
             }
 

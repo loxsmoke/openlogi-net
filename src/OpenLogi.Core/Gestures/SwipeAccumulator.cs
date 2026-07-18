@@ -12,8 +12,10 @@ namespace OpenLogi.Core.Gestures;
 /// <para>
 /// A single hold can chain gestures: after one commits, reversing (or turning onto
 /// the other axis) commits the next, so press → left → right fires both without
-/// releasing. Re-arming requires a *change* of direction, which is what keeps one
-/// long sweep worth exactly one gesture no matter how far it runs.
+/// releasing. Re-arming requires a *change* of direction — which keeps one long
+/// sweep worth exactly one gesture — and <see cref="Gestures.RearmTravelFactor"/>×
+/// the first stroke's travel, so the wobble of releasing the button after a swipe
+/// can't fire the reverse gesture.
 /// </para>
 /// </summary>
 public sealed class SwipeAccumulator
@@ -67,7 +69,13 @@ public sealed class SwipeAccumulator
         _dx = SaturatingAddPublic(_dx, dx);
         _dy = SaturatingAddPublic(_dy, dy);
         var elapsed = Stopwatch.GetElapsedTime(_heldSinceTicks.Value);
-        if (elapsed >= Gestures.HoldForSwipe && Gestures.DetectSwipe(_dx, _dy) is { } dir && dir != _lastFired)
+        // A chained stroke must travel several times as far as a first one: the
+        // release wobble after a committed swipe easily covers the base threshold,
+        // and firing on it made "swipe, let go" also trigger the reverse gesture.
+        var minTravel = _lastFired is null
+            ? Gestures.SwipeThreshold
+            : Gestures.SwipeThreshold * Gestures.RearmTravelFactor;
+        if (elapsed >= Gestures.HoldForSwipe && Gestures.DetectSwipe(_dx, _dy, minTravel) is { } dir && dir != _lastFired)
         {
             _lastFired = dir;
             _dx = 0;
@@ -98,6 +106,13 @@ public sealed class SwipeAccumulator
     /// swipe would be silently downgraded to <see cref="GestureDirection.Click"/> —
     /// gestures appearing to "work only sometimes", depending on flick speed.
     /// </para>
+    /// <para>
+    /// Only the FIRST stroke can need that settling: the gate is measured from the
+    /// press, so by the time a chain exists every later stroke commits mid-hold in
+    /// <see cref="Accumulate"/> on the very event that crosses its threshold. Travel
+    /// still banked here after a commit is the wobble of letting go — settling it
+    /// made releasing after a swipe fire the reverse gesture (HARDWARE-OBSERVED).
+    /// </para>
     /// A hold whose travel never resolves to a direction is a plain Click, as is one
     /// released before the hold gate (a quick click that happened to drift).
     /// </summary>
@@ -107,9 +122,7 @@ public sealed class SwipeAccumulator
         var elapsed = Stopwatch.GetElapsedTime(_heldSinceTicks.Value);
         _heldSinceTicks = null;
 
-        // Settle the stroke in progress — including the last one of a chain, which is
-        // just as likely as a lone swipe to have been flicked out inside the gate.
-        if (elapsed >= Gestures.HoldForSwipe && Gestures.DetectSwipe(_dx, _dy) is { } dir && dir != _lastFired)
+        if (_lastFired is null && elapsed >= Gestures.HoldForSwipe && Gestures.DetectSwipe(_dx, _dy) is { } dir)
         {
             _lastFired = dir;
             return dir;

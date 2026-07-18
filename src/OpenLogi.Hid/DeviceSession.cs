@@ -40,12 +40,23 @@ public sealed class DeviceSession : IAsyncDisposable
 {
     private readonly HidppChannel _channel;
     private readonly HidppDevice _device;
+    private readonly bool _ownsChannel;
 
-    private DeviceSession(HidppChannel channel, HidppDevice device)
+    private DeviceSession(HidppChannel channel, HidppDevice device, bool ownsChannel = true)
     {
         _channel = channel;
         _device = device;
+        _ownsChannel = ownsChannel;
     }
+
+    /// <summary>
+    /// Wrap an already-open channel + enumerated device in a session WITHOUT taking
+    /// ownership — so lighting can be applied at the one moment a napping wireless
+    /// keyboard is known reachable: during the inventory sweep's probe, before its
+    /// channel closes. Disposing an attached session leaves the channel open.
+    /// </summary>
+    public static DeviceSession Attach(HidppChannel channel, HidppDevice device) =>
+        new(channel, device, ownsChannel: false);
 
     /// <summary>
     /// Open a session for <paramref name="route"/>, or <c>null</c> if unreachable.
@@ -308,7 +319,7 @@ public sealed class DeviceSession : IAsyncDisposable
             // typical hardware value when the capability read is blank.
             var multiplier = capability.Multiplier == 0 ? (byte)8 : capability.Multiplier;
             DiagnosticLog.Info("capture", $"smooth scroll: hi-res divert on, multiplier {multiplier}");
-            return new SmoothScrollCapture(wheel, multiplier, onScroll);
+            return new SmoothScrollCapture(wheel, _device.GetFeature<WirelessDeviceStatusFeature>(), multiplier, onScroll);
         }
         catch (Exception ex)
         {
@@ -326,13 +337,22 @@ public sealed class DeviceSession : IAsyncDisposable
     private sealed class SmoothScrollCapture : IAsyncDisposable
     {
         private readonly HiResWheelFeature _wheel;
+        private readonly WirelessDeviceStatusFeature? _wireless;
         private readonly CancellationTokenSource _cts = new();
         private readonly Task _pump;
+        private readonly Task _keepalive;
 
-        public SmoothScrollCapture(HiResWheelFeature wheel, byte multiplier, System.Action<int> onScroll)
+        public SmoothScrollCapture(HiResWheelFeature wheel, WirelessDeviceStatusFeature? wireless, byte multiplier, System.Action<int> onScroll)
         {
             _wheel = wheel;
+            _wireless = wireless;
             _pump = PumpAsync(wheel.Listen(), multiplier, onScroll, _cts.Token);
+            _keepalive = ReassertDivertLoopAsync(wireless?.Listen(), async () =>
+            {
+                var mode = await _wheel.GetModeAsync().ConfigureAwait(false);
+                if (!mode.Diverted || !mode.HighResolution)
+                    await _wheel.SetModeAsync(mode with { Diverted = true, HighResolution = true }).ConfigureAwait(false);
+            }, _cts.Token);
         }
 
         private static async Task PumpAsync(
@@ -353,13 +373,18 @@ public sealed class DeviceSession : IAsyncDisposable
                 }
             }
             catch (OperationCanceledException) { /* shutting down */ }
-            catch { /* listener torn down with the channel */ }
+            catch (Exception ex)
+            {
+                // A dead pump means a diverted wheel that scrolls nothing — make it visible.
+                DiagnosticLog.Warn("capture", $"smooth scroll pump ended: {ex.Message}");
+            }
         }
 
         public async ValueTask DisposeAsync()
         {
             _cts.Cancel();
             try { await _pump.ConfigureAwait(false); } catch { /* already faulted/cancelled */ }
+            try { await _keepalive.ConfigureAwait(false); } catch { /* cancellation */ }
             try
             {
                 var mode = await _wheel.GetModeAsync().ConfigureAwait(false);
@@ -367,6 +392,7 @@ public sealed class DeviceSession : IAsyncDisposable
                 DiagnosticLog.Info("capture", "smooth scroll: restored standard wheel reporting");
             }
             catch { DiagnosticLog.Info("capture", "smooth scroll: released (device gone, nothing to restore)"); }
+            _wireless?.Dispose();
             _wheel.Dispose();
             _cts.Dispose();
         }
@@ -389,19 +415,7 @@ public sealed class DeviceSession : IAsyncDisposable
         try
         {
             if (_device.GetFeature<ColorLedEffectsFeature>() is { } led)
-            {
-                var zoneCount = await led.GetZoneCountAsync().ConfigureAwait(false);
-                var zones = zoneCount == 0 ? (byte)4 : Math.Min(zoneCount, (byte)4);
-                var p = new byte[ColorLedEffectsFeature.ZoneEffectParamCount];
-                p[0] = r; p[1] = g; p[2] = b;
-                for (byte zone = 0; zone < zones; zone++)
-                {
-                    await led.SetZoneEffectAsync(zone, ColorLedEffectsFeature.EffectFixedColor, p,
-                        ColorLedEffectsFeature.PersistenceVolatile).ConfigureAwait(false);
-                    await Task.Delay(8).ConfigureAwait(false);
-                }
-                return true;
-            }
+                return await ApplyColorLedEffectsAsync(led, r, g, b).ConfigureAwait(false);
 
             // 0x8081 (PerKeyLighting v2) — works on the G915 via host mode; prefer it
             // over 0x8071 (which the onboard profile replays over).
@@ -409,33 +423,51 @@ public sealed class DeviceSession : IAsyncDisposable
                 return true;
 
             if (_device.GetFeature<RgbEffectsFeature>() is { } rgb)
-            {
-                // 0x8071 needs software control first; then set each real cluster
-                // (0xff "all clusters" is a read-only selector — invalid for set).
-                // NB: on G-series keyboards with an onboard profile (e.g. the G915)
-                // the firmware replays the stored profile over these writes; live
-                // colour there needs host mode + 0x8081 per-key streaming, not yet
-                // implemented, so we don't switch host mode here (it would just go dark).
-                await rgb.SetSwControlAsync(RgbEffectsFeature.SwControlAllClusters).ConfigureAwait(false);
-                var p = new byte[RgbEffectsFeature.ClusterEffectParamCount];
-                p[0] = r; p[1] = g; p[2] = b;
-                var applied = false;
-                for (byte cluster = 0; cluster < 4; cluster++)
-                {
-                    try
-                    {
-                        await rgb.SetRgbClusterEffectAsync(cluster, RgbEffectsFeature.EffectFixed, p,
-                            RgbEffectsFeature.PersistenceVolatile, RgbEffectsFeature.PowerFull).ConfigureAwait(false);
-                        applied = true;
-                        await Task.Delay(8).ConfigureAwait(false);
-                    }
-                    catch (Hidpp20Exception) { /* cluster doesn't exist on this device */ }
-                }
-                return applied;
-            }
+                return await ApplyRgbEffectsAsync(rgb, r, g, b).ConfigureAwait(false);
         }
         catch { /* fall through */ }
         return false;
+    }
+
+    private static async Task<bool> ApplyColorLedEffectsAsync(ColorLedEffectsFeature led, byte r, byte g, byte b)
+    {
+        var zoneCount = await led.GetZoneCountAsync().ConfigureAwait(false);
+        var zones = zoneCount == 0 ? (byte)4 : Math.Min(zoneCount, (byte)4);
+        var p = new byte[ColorLedEffectsFeature.ZoneEffectParamCount];
+        p[0] = r; p[1] = g; p[2] = b;
+        for (byte zone = 0; zone < zones; zone++)
+        {
+            await led.SetZoneEffectAsync(zone, ColorLedEffectsFeature.EffectFixedColor, p,
+                ColorLedEffectsFeature.PersistenceVolatile).ConfigureAwait(false);
+            await Task.Delay(8).ConfigureAwait(false);
+        }
+        return true;
+    }
+
+    private static async Task<bool> ApplyRgbEffectsAsync(RgbEffectsFeature rgb, byte r, byte g, byte b)
+    {
+        // 0x8071 needs software control first; then set each real cluster
+        // (0xff "all clusters" is a read-only selector — invalid for set).
+        // NB: on G-series keyboards with an onboard profile (e.g. the G915)
+        // the firmware replays the stored profile over these writes; live
+        // colour there needs host mode + 0x8081 per-key streaming, not yet
+        // implemented, so we don't switch host mode here (it would just go dark).
+        await rgb.SetSwControlAsync(RgbEffectsFeature.SwControlAllClusters).ConfigureAwait(false);
+        var p = new byte[RgbEffectsFeature.ClusterEffectParamCount];
+        p[0] = r; p[1] = g; p[2] = b;
+        var applied = false;
+        for (byte cluster = 0; cluster < 4; cluster++)
+        {
+            try
+            {
+                await rgb.SetRgbClusterEffectAsync(cluster, RgbEffectsFeature.EffectFixed, p,
+                    RgbEffectsFeature.PersistenceVolatile, RgbEffectsFeature.PowerFull).ConfigureAwait(false);
+                applied = true;
+                await Task.Delay(8).ConfigureAwait(false);
+            }
+            catch (Hidpp20Exception) { /* cluster doesn't exist on this device */ }
+        }
+        return applied;
     }
 
     // ── Hosts (EasySwitch / multi-host) ──────────────────────────────────────
@@ -1051,7 +1083,10 @@ public sealed class DeviceSession : IAsyncDisposable
         }
     }
 
-    public async ValueTask DisposeAsync() => await _channel.DisposeAsync().ConfigureAwait(false);
+    public async ValueTask DisposeAsync()
+    {
+        if (_ownsChannel) await _channel.DisposeAsync().ConfigureAwait(false);
+    }
 
     // ── Diverted-button capture (ReprogControls 0x1b04) ─────────────────────────
 
@@ -1097,7 +1132,7 @@ public sealed class DeviceSession : IAsyncDisposable
         if (diverted.Count == 0) { rc.Dispose(); return null; }
         DiagnosticLog.Info("capture",
             $"dpi button diverted: {string.Join(", ", diverted.Select(c => $"0x{c:x4}"))}");
-        return new DpiButtonCapture(rc, diverted, onPressed);
+        return new DpiButtonCapture(rc, diverted, _device.GetFeature<WirelessDeviceStatusFeature>(), onPressed);
     }
 
     /// <summary>
@@ -1197,7 +1232,51 @@ public sealed class DeviceSession : IAsyncDisposable
             return null;
         }
         DiagnosticLog.Info("capture", $"gesture capture on {owner} (cid 0x{gestureCid:x4})");
-        return new GestureCapture(rc, gestureCid, onGesture);
+        return new GestureCapture(rc, gestureCid, _device.GetFeature<WirelessDeviceStatusFeature>(), onGesture);
+    }
+
+    /// <summary>
+    /// Interval between periodic divert re-assertions. Diversion is volatile device
+    /// state — a napping/reconnecting device drops it (the same reset class as the
+    /// DPI/scroll-invert loss on wake), and a BT-direct mouse's wake is invisible to
+    /// the app, so the diverted buttons would silently act native ("gestures do
+    /// nothing") until an unrelated rescan re-armed them. Each capture re-asserts its
+    /// divert instantly on the device's 0x1d4b reconnect broadcast, and on this tick
+    /// as insurance; both are idempotent, and a write to a napping device just fails
+    /// until a later try.
+    /// </summary>
+    private static readonly TimeSpan DivertKeepalive = TimeSpan.FromSeconds(20);
+
+    /// <summary>
+    /// Run <paramref name="reassert"/> whenever the device announces a wireless
+    /// reconnect (instant heal) and every <see cref="DivertKeepalive"/> (insurance) —
+    /// see <see cref="DivertKeepalive"/> for why. Failures are swallowed: the device
+    /// is napping/unreachable and a later round retries.
+    /// </summary>
+    private static async Task ReassertDivertLoopAsync(
+        ChannelReader<WirelessDeviceStatusFeature.StatusBroadcast>? wake,
+        Func<Task> reassert, CancellationToken ct)
+    {
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                if (wake is not null)
+                {
+                    using var round = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    round.CancelAfter(DivertKeepalive);
+                    try { await wake.ReadAsync(round.Token).ConfigureAwait(false); }
+                    catch (OperationCanceledException) when (!ct.IsCancellationRequested) { /* periodic tick */ }
+                }
+                else
+                {
+                    await Task.Delay(DivertKeepalive, ct).ConfigureAwait(false);
+                }
+                try { await reassert().ConfigureAwait(false); }
+                catch { /* napping/unreachable — retried next round */ }
+            }
+        }
+        catch (OperationCanceledException) { /* disposing */ }
     }
 
     /// <summary>
@@ -1210,14 +1289,23 @@ public sealed class DeviceSession : IAsyncDisposable
     {
         private readonly ReprogControlsFeature _rc;
         private readonly ushort _cid;
+        private readonly WirelessDeviceStatusFeature? _wireless;
         private readonly CancellationTokenSource _cts = new();
         private readonly Task _pump;
+        private readonly Task _keepalive;
 
-        public GestureCapture(ReprogControlsFeature rc, ushort cid, System.Action<GestureDirection> onGesture)
+        public GestureCapture(
+            ReprogControlsFeature rc, ushort cid, WirelessDeviceStatusFeature? wireless,
+            System.Action<GestureDirection> onGesture)
         {
             _rc = rc;
             _cid = cid;
+            _wireless = wireless;
             _pump = PumpAsync(rc.Listen(), onGesture, _cts.Token);
+            _keepalive = ReassertDivertLoopAsync(wireless?.Listen(),
+                () => _rc.SetCidReportingAsync(new ControlId(_cid),
+                    CidReportingChange.TemporaryDiversion(diverted: true, rawXy: true)),
+                _cts.Token);
         }
 
         private async Task PumpAsync(
@@ -1256,13 +1344,18 @@ public sealed class DeviceSession : IAsyncDisposable
                 }
             }
             catch (OperationCanceledException) { /* shutting down */ }
-            catch { /* listener torn down with the channel */ }
+            catch (Exception ex)
+            {
+                // A dead pump means gestures silently stop — make it visible.
+                DiagnosticLog.Warn("capture", $"gesture pump (cid 0x{_cid:x4}) ended: {ex.Message}");
+            }
         }
 
         public async ValueTask DisposeAsync()
         {
             _cts.Cancel();
             try { await _pump.ConfigureAwait(false); } catch { /* already faulted/cancelled */ }
+            try { await _keepalive.ConfigureAwait(false); } catch { /* cancellation */ }
             try
             {
                 await _rc.SetCidReportingAsync(new ControlId(_cid),
@@ -1270,6 +1363,7 @@ public sealed class DeviceSession : IAsyncDisposable
                 DiagnosticLog.Info("capture", $"gesture capture released (cid 0x{_cid:x4})");
             }
             catch { DiagnosticLog.Info("capture", $"gesture capture released (cid 0x{_cid:x4}, device gone)"); }
+            _wireless?.Dispose();
             _rc.Dispose();
             _cts.Dispose();
         }
@@ -1280,15 +1374,25 @@ public sealed class DeviceSession : IAsyncDisposable
     {
         private readonly ReprogControlsFeature _rc;
         private readonly ushort[] _cids;
+        private readonly WirelessDeviceStatusFeature? _wireless;
         private readonly CancellationTokenSource _cts = new();
         private readonly Task _pump;
+        private readonly Task _keepalive;
         private bool _down;
 
-        public DpiButtonCapture(ReprogControlsFeature rc, IEnumerable<ushort> cids, Action onPressed)
+        public DpiButtonCapture(
+            ReprogControlsFeature rc, IEnumerable<ushort> cids, WirelessDeviceStatusFeature? wireless, Action onPressed)
         {
             _rc = rc;
             _cids = [.. cids];
+            _wireless = wireless;
             _pump = PumpAsync(rc.Listen(), onPressed, _cts.Token);
+            _keepalive = ReassertDivertLoopAsync(wireless?.Listen(), async () =>
+            {
+                foreach (var cid in _cids)
+                    await _rc.SetCidReportingAsync(new ControlId(cid),
+                        CidReportingChange.TemporaryDiversion(diverted: true, rawXy: false)).ConfigureAwait(false);
+            }, _cts.Token);
         }
 
         private async Task PumpAsync(ChannelReader<ReprogControlsEvent> reader, Action onPressed, CancellationToken ct)
@@ -1306,13 +1410,18 @@ public sealed class DeviceSession : IAsyncDisposable
                 }
             }
             catch (OperationCanceledException) { /* shutting down */ }
-            catch { /* listener torn down with the channel */ }
+            catch (Exception ex)
+            {
+                // A dead pump means the diverted button silently stops — make it visible.
+                DiagnosticLog.Warn("capture", $"dpi button pump ended: {ex.Message}");
+            }
         }
 
         public async ValueTask DisposeAsync()
         {
             _cts.Cancel();
             try { await _pump.ConfigureAwait(false); } catch { /* already faulted/cancelled */ }
+            try { await _keepalive.ConfigureAwait(false); } catch { /* cancellation */ }
             foreach (var cid in _cids)
             {
                 try
@@ -1322,6 +1431,7 @@ public sealed class DeviceSession : IAsyncDisposable
                 }
                 catch { /* device gone — nothing to restore */ }
             }
+            _wireless?.Dispose();
             _rc.Dispose();
             _cts.Dispose();
         }

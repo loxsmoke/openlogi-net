@@ -334,13 +334,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private bool _reconnecting;
     private bool _reconnectQueued;
 
-    // Last-known identity (marketing name + model render) per wireless product id,
-    // remembered from a sweep where the device was awake. A wireless keyboard that
-    // has gone to sleep is reported offline by its receiver with no readable name
-    // (a LIGHTSPEED-paired G915's codename register even ResourceErrors) — backfilling
-    // from here keeps its tile showing the real name/render instead of a bare
-    // "Keyboard" until the user presses a key. In-session only (not persisted).
-    private readonly Dictionary<ushort, (string? Codename, DeviceModelInfo? Model)> _identityCache = [];
+    // Last-known identity (marketing name + model + capabilities) per wireless product
+    // id, remembered from a sweep where the device was awake and persisted to config
+    // (DeviceIdentity), so it survives app restarts. A wireless keyboard that has gone
+    // to sleep is reported offline by its receiver with no readable name (a
+    // LIGHTSPEED-paired G915's codename register even ResourceErrors), and its
+    // wake-time HID++ probes fail more often than not — without the durable backfill
+    // such a device has no config key, so none of its saved settings (per-key
+    // lighting!) can ever be applied. Model-level: identical twins share an identity,
+    // harmlessly.
+    private readonly Dictionary<ushort, DeviceIdentity> _identityCache = [];
 
     public MainWindowViewModel()
     {
@@ -451,9 +454,139 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>
     /// A receiver reported a paired device coming online (a wireless keyboard/mouse woke
     /// on its receiver, which leaves the HID node set unchanged). Refresh so its gallery
-    /// tile reflects the live state — same policy as a node-set change.
+    /// tile reflects the live state — same policy as a node-set change — and rush the
+    /// "No profile" lighting restore into the wake window, since the keyboard shows a
+    /// black backlight in host mode until the colours are streamed.
     /// </summary>
-    private void OnReceiverDeviceWoke() => Dispatcher.UIThread.Post(async () => await HandleTopologyChangeAsync());
+    private void OnReceiverDeviceWoke(ReceiverConnectionWatcher.ReceiverWake wake) => Dispatcher.UIThread.Post(async () =>
+    {
+        _ = RushLightingAfterWakeAsync();
+        // A keyboard-only wake from one known receiver: refresh just that receiver's
+        // tiles. The full sweep pays every other node's ping timeouts (~8-10 s), while
+        // the waking keyboard's reachable window is seconds — scoping gets its probe,
+        // identity and lighting restored in ~1-2 s and leaves everything else alone.
+        if (wake is { KeyboardOnly: true, VendorId: { } vid, ProductId: { } pid } && !ShowingDevice)
+        {
+            await RescanReceiverAsync(vid, pid);
+            return;
+        }
+        await HandleTopologyChangeAsync(wake.KeyboardOnly);
+    });
+
+    /// <summary>
+    /// Scoped rescan of one receiver's interfaces: rebuild only the tiles routed
+    /// through it (matched by receiver uid, in place, so the gallery doesn't
+    /// reshuffle) and leave every other device — and all mouse captures — untouched.
+    /// </summary>
+    private async Task RescanReceiverAsync(ushort vid, ushort pid)
+    {
+        if (IsScanning) { _rescanPending = true; return; }
+        IsScanning = true;
+        try
+        {
+            var inventories = await HidInventory.EnumerateAsync(
+                postProbe: OnReceiverDeviceProbedAsync,
+                nodeFilter: n => n.VendorId == vid && n.ProductId == pid);
+            foreach (var inv in inventories)
+                MergeInventoryIntoGallery(inv);
+            StatusText = $"{Devices.Count} device(s).";
+            PokeLightingKeepalive();
+        }
+        catch (System.Exception e)
+        {
+            StatusText = $"Rescan failed: {e.Message}";
+        }
+        finally
+        {
+            IsScanning = false;
+            // A broader change landed while we were scoped — settle it with a full scan.
+            if (_rescanPending && !ShowingDevice) _ = LoadAsync();
+        }
+    }
+
+    /// <summary>
+    /// Replace the gallery tiles belonging to one receiver with the fresh inventory,
+    /// keeping their position in the gallery.
+    /// </summary>
+    private void MergeInventoryIntoGallery(DeviceInventory inv)
+    {
+        var uid = inv.Receiver.UniqueId;
+        if (uid is null) return; // direct-device inventory can't match a receiver route
+
+        var insertAt = Devices.Count;
+        for (var i = Devices.Count - 1; i >= 0; i--)
+            if (string.Equals(RouteReceiverUid(Devices[i].Route), uid, StringComparison.OrdinalIgnoreCase))
+            {
+                Devices.RemoveAt(i);
+                insertAt = i;
+            }
+
+        foreach (var paired in inv.Paired)
+        {
+            if (!IsConfigurable(paired)) continue;
+            // The full sweep's dedup hides an offline slot whose model is online
+            // over another transport; the scoped sweep can't see those, so apply
+            // the same rule against the tiles already on the gallery.
+            if (!paired.Online && paired.Wpid is { } w
+                && Devices.Any(d => d.Device.Online && d.Device.ModelInfo?.ModelIds.Contains(w) == true))
+                continue;
+            var vm = new DeviceViewModel(inv.Receiver.Name, RememberIdentity(paired), DeviceRoute.DeviceRouteFor(inv, paired.Slot));
+            Devices.Insert(Math.Min(insertAt, Devices.Count), vm);
+            insertAt++;
+            if (vm.ConfigKey is not null)
+                _ = ResolveCardImageAsync(vm);
+        }
+    }
+
+    private static string? RouteReceiverUid(DeviceRoute? route) => route switch
+    {
+        DeviceRoute.Bolt b => b.ReceiverUid,
+        DeviceRoute.Unifying u => u.ReceiverUid,
+        DeviceRoute.Lightspeed l => l.ReceiverUid,
+        _ => null,
+    };
+
+    /// <summary>
+    /// After a receiver wake, a "No profile" per-key keyboard sits dark: host-mode
+    /// lighting is volatile, and the device only answers intermittently while its RF
+    /// link parks/unparks after the wake keypress — the 30 s keepalive cadence misses
+    /// that window (its one open lands seconds late and fails). So rush it: once the
+    /// wake rescan is done, retry the keepalive tick every few hundred ms until the
+    /// colours land (a keepalive session exists) or the window closes.
+    /// </summary>
+    private bool _lightingRushActive;
+    private async Task RushLightingAfterWakeAsync()
+    {
+        if (_lightingRushActive) return;
+        _lightingRushActive = true;
+        try
+        {
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
+            var attempts = 0;
+            while (DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(400);
+                if (IsScanning) continue; // let the wake rescan finish first — concurrent slot opens fail
+                if (ShowingDevice) return; // an open device page owns its session; LoadControlsAsync restores there
+
+                await LightingKeepaliveTickAsync();
+                attempts++;
+                if (_keepaliveSession is not null)
+                {
+                    DiagnosticLog.Info("lightwake", $"wake rush: colours restored (attempt {attempts})");
+                    return;
+                }
+                // Nothing to restore (no No-profile per-key keyboard identified) — bail
+                // rather than spin; a partial probe is already logged by the tick itself.
+                if (!Devices.Any(d => d.ConfigKey is { } ck && d.Route is not null && d.HasLighting
+                        && _config.Lighting(ck) is { Profile: 0 } l && l.PerKey.Count > 0))
+                    return;
+            }
+            DiagnosticLog.Info("lightwake", "wake rush: device never reachable — colours not restored");
+        }
+        catch (Exception ex) { DiagnosticLog.Warn("lightwake", $"wake rush failed: {ex.Message}"); }
+        finally { _lightingRushActive = false; }
+    }
 
     /// <summary>
     /// Shared response to the device set changing (a HID node arriving/leaving, or a
@@ -461,16 +594,21 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// device in place when a page is open (its session may have just died); defer a full
     /// rescan for when the user returns home so nothing else is missed.
     /// </summary>
-    private async Task HandleTopologyChangeAsync()
+    private async Task HandleTopologyChangeAsync(bool keyboardOnly = false)
     {
         if (IsScanning) { _rescanPending = true; return; }
         if (ShowingDevice)
         {
             _rescanPending = true;
+            // A keyboard waking can't invalidate an open pointer-device page's session
+            // — and the reconnect would tear down every mouse capture, killing the
+            // diverts of a mouse that happens to be napping right then. Only reconnect
+            // when the shown device is itself a keyboard (to rebind its page).
+            if (keyboardOnly && SelectedDevice?.Device.Kind != DeviceKind.Keyboard) return;
             await ReconnectAfterResumeAsync();
             return;
         }
-        _ = LoadAsync();
+        _ = LoadAsync(reactivateMice: !keyboardOnly);
     }
 
     partial void OnShowingDeviceChanged(bool value)
@@ -595,27 +733,75 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         + "can take over the receiver; only one app at a time can reliably control your devices.";
 
     /// <summary>
-    /// Cache a device's identity (name + model render) when it's seen with one, or
-    /// backfill it from the cache when a later sweep finds the same wireless unit
-    /// asleep/offline with none. Keyed by wpid (present in both the online and offline
-    /// receiver arrival notifications); model-level, so identical twins share a render
-    /// harmlessly. Fields already present on the fresh reading always win.
+    /// Cache a device's identity (name + model + capabilities) when it's seen with one
+    /// — persisting it to config keyed by the model's config key — or backfill it when
+    /// a sweep finds the same wireless unit with a partial/failed probe. Keyed by wpid
+    /// (present in both the online and offline receiver arrival notifications), matched
+    /// against the persisted identities' model ids on a cold start. Fields present on
+    /// the fresh reading always win; a full probe's capabilities replace remembered
+    /// ones, a partial probe's kind-presumed guess never does.
     /// </summary>
     private PairedDevice RememberIdentity(PairedDevice d)
     {
         if (d.Wpid is not { } wpid) return d;
+        var prev = _identityCache.TryGetValue(wpid, out var c) ? c : FindPersistedIdentity(wpid);
+
         if (d.Codename is not null || d.ModelInfo is not null)
         {
-            var prev = _identityCache.TryGetValue(wpid, out var p) ? p : default;
-            _identityCache[wpid] = (d.Codename ?? prev.Codename, d.ModelInfo ?? prev.Model);
-            return d;
+            var identity = new DeviceIdentity
+            {
+                DisplayName = d.Codename ?? prev?.DisplayName ?? string.Empty,
+                Codename = d.Codename ?? prev?.Codename,
+                Kind = d.Kind != DeviceKind.Unknown ? d.Kind : prev?.Kind ?? DeviceKind.Unknown,
+                Capabilities = d.ModelInfo is not null
+                    ? d.Capabilities ?? new Capabilities()
+                    : prev?.Capabilities ?? d.Capabilities ?? new Capabilities(),
+                ModelInfo = d.ModelInfo ?? prev?.ModelInfo,
+            };
+            _identityCache[wpid] = identity;
+            if (identity.ModelInfo is { } mi && !identity.Equals(_config.DeviceIdentity(mi.ConfigKey())))
+            {
+                _config.SetDeviceIdentity(mi.ConfigKey(), identity);
+                SaveConfig();
+            }
+            // A codename-only reading (receiver register worked, HID++ probe failed)
+            // still gets the remembered model + capabilities, so the config key works.
+            return d.ModelInfo is null && identity.ModelInfo is not null
+                ? d with { ModelInfo = identity.ModelInfo, Capabilities = identity.Capabilities }
+                : d;
         }
-        if (_identityCache.TryGetValue(wpid, out var cached))
-            return d with { Codename = cached.Codename, ModelInfo = cached.Model };
-        return d;
+
+        if (prev is null) return d;
+        _identityCache[wpid] = prev;
+        return d with
+        {
+            Codename = prev.Codename ?? (prev.DisplayName.Length > 0 ? prev.DisplayName : null),
+            ModelInfo = prev.ModelInfo,
+            Capabilities = prev.ModelInfo is not null ? prev.Capabilities : d.Capabilities,
+        };
     }
 
-    private async Task LoadAsync()
+    /// <summary>
+    /// The persisted identity whose model ids contain <paramref name="wpid"/> — the
+    /// same wpid↔model-id match the offline dedup uses. Lets a fresh app session
+    /// identify a keyboard whose wake-time probe failed, so its saved settings
+    /// (per-key lighting, DPI…) still apply.
+    /// </summary>
+    private DeviceIdentity? FindPersistedIdentity(ushort wpid)
+    {
+        foreach (var (_, identity) in _config.KnownIdentities())
+            if (identity.ModelInfo is { } mi && mi.ModelIds.Contains(wpid))
+                return identity;
+        return null;
+    }
+
+    /// <param name="reactivateMice">
+    /// False for a keyboard-only receiver wake: the gallery is refreshed but the
+    /// existing mouse captures are left untouched — rebuilding them while a mouse
+    /// naps kills its diverts (the un-divert and re-arm writes both time out), and a
+    /// keyboard waking can't have invalidated them in the first place.
+    /// </param>
+    private async Task LoadAsync(bool reactivateMice = true)
     {
         _rescanPending = false; // this scan reflects the current device set
         StatusText = "Scanning for Logitech devices…";
@@ -626,7 +812,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _ = RefreshLogiWarningAsync();
         try
         {
-            var inventories = await HidInventory.EnumerateAsync();
+            var inventories = await HidInventory.EnumerateAsync(postProbe: OnReceiverDeviceProbedAsync);
             foreach (var inv in inventories)
                 foreach (var paired in inv.Paired)
                     if (IsConfigurable(paired))
@@ -640,7 +826,22 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             // Activate every connected mouse's overrides as soon as the app is running,
             // without opening any page: the OS hook for Middle/Back/Forward (global) and
             // a per-mouse session that diverts each mouse's DPI button.
-            _ = ActivateAgentMiceAsync([.. Devices.Where(d => d.HasButtons)]);
+            if (reactivateMice)
+            {
+                _ = ActivateAgentMiceAsync([.. Devices.Where(d => d.HasButtons)]);
+            }
+            else
+            {
+                // Captures stay as they are, but their DeviceViewModels were just
+                // replaced by this rescan — re-point each capture at the fresh VM so
+                // LoadControlsAsync's session reuse (ReferenceEquals on Device) still
+                // matches when that mouse's page is opened.
+                for (var i = 0; i < _mouseCaptures.Count; i++)
+                    if (Devices.FirstOrDefault(d =>
+                            d.ConfigKey is not null && d.ConfigKey == _mouseCaptures[i].Device.ConfigKey) is { } fresh)
+                        _mouseCaptures[i] = _mouseCaptures[i] with { Device = fresh };
+                PokeLightingKeepalive(); // Activate normally does this at its end
+            }
 
             foreach (var vm in Devices)
                 if (vm.ConfigKey is not null)
@@ -665,6 +866,33 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (value?.HasButtons == true)
             _agent.SetSelectedDevice(value.ConfigKey);
 
+        ResetDeviceControls();
+        // Capability-gated tabs, set synchronously from the scan-time feature set so
+        // they appear immediately (Buttons needs a mouse/trackball; Pointer needs DPI;
+        // G-keys content still loads in the background).
+        HasButtonsTab = value?.HasButtons == true
+            && value.Device.Kind is DeviceKind.Mouse or DeviceKind.Trackball or DeviceKind.Unknown;
+        HasPointerTab = value?.HasPointer == true;
+        HasLightingTab = value?.HasLighting == true;
+        HasGKeysTab = value?.HasGKeys == true;
+        _ = LoadControlsAsync(value);
+
+        if (value?.ConfigKey is not { } configKey)
+            return;
+
+        SeedLightingFromConfig(configKey);
+        RebuildButtonBindings(configKey);
+
+        // Only surface the button pickers / diagram for devices that actually have
+        // remappable buttons (a mouse), not e.g. a HID++ microphone or a keyboard.
+        // The button list is derived from the device's real buttons in BuildDiagramAsync.
+        if (value.HasButtons)
+            _ = BuildDiagramAsync(value, configKey);
+    }
+
+    /// <summary>Clear every per-device control back to its blank state before a new device loads.</summary>
+    private void ResetDeviceControls()
+    {
         Buttons.Clear();
         Annotations.Clear();
         DiagramImage = null;
@@ -687,20 +915,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Profiles.Clear();
         _profileCount = 0;
         DpiPresets.Clear();
-        // Capability-gated tabs, set synchronously from the scan-time feature set so
-        // they appear immediately (Buttons needs a mouse/trackball; Pointer needs DPI;
-        // G-keys content still loads in the background).
-        HasButtonsTab = value?.HasButtons == true
-            && value.Device.Kind is DeviceKind.Mouse or DeviceKind.Trackball or DeviceKind.Unknown;
-        HasPointerTab = value?.HasPointer == true;
-        HasLightingTab = value?.HasLighting == true;
-        HasGKeysTab = value?.HasGKeys == true;
-        _ = LoadControlsAsync(value);
+    }
 
-        if (value?.ConfigKey is not { } configKey)
-            return;
-
-        // Seed lighting controls from the saved config (device read is optional).
+    /// <summary>Seed lighting controls from the saved config (device read is optional).</summary>
+    private void SeedLightingFromConfig(string configKey)
+    {
         _loadingControls = true;
         var lighting = _config.Lighting(configKey);
         LightingEnabled = lighting?.Enabled ?? true;
@@ -708,7 +927,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         LightingColor = ParseHexColor(lighting?.Color);
         SelectedEffect = LightingEffect.Solid;
         _loadingControls = false;
+    }
 
+    private void RebuildButtonBindings(string configKey)
+    {
         var current = BindingMaps.BindingsFor(_config, configKey, null);
         foreach (var button in ButtonIdExtensions.All)
         {
@@ -722,12 +944,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 (b, act) => Persist(configKey, b, act));
         }
         RefreshGestureSummaries(configKey);
-
-        // Only surface the button pickers / diagram for devices that actually have
-        // remappable buttons (a mouse), not e.g. a HID++ microphone or a keyboard.
-        // The button list is derived from the device's real buttons in BuildDiagramAsync.
-        if (value.HasButtons)
-            _ = BuildDiagramAsync(value, configKey);
     }
 
     private async Task BuildDiagramAsync(DeviceViewModel device, string configKey)
@@ -833,6 +1049,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// </summary>
     private async Task ActivateAgentMiceAsync(IReadOnlyList<DeviceViewModel> mice)
     {
+        // Keyboards report reprogrammable controls too (the G915 does, now that full
+        // capabilities are persisted and receivers are swept first), but this path is
+        // pointer-device overrides only: a keyboard in the list would grab the global
+        // hook's "first mouse" slot — killing the real mouse's Middle/Back/Forward
+        // bindings and gestures — and get pointless session opens while asleep.
+        mice = [.. mice.Where(m => m.Device.Kind is not (DeviceKind.Keyboard or DeviceKind.Numpad))];
         var old = _mouseCaptures.ToArray();
         _mouseCaptures.Clear();
         foreach (var mc in old)
@@ -998,6 +1220,36 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (device?.Route is not { } route) { IsLoadingDevice = false; return; }
         IsLoadingDevice = true; // show the thin loading line while the device's controls load
 
+        var session = await AcquireSessionAsync(device, route);
+        if (session is null) { IsLoadingDevice = false; return; }
+        _session = session;
+        ShowPerKeyEditor = session.SupportsPerKey;
+
+        await LoadBatterySectionAsync(session, device);
+
+        _loadingControls = true;
+        try
+        {
+            await LoadDpiSectionAsync(session, device);
+            await LoadSmartShiftSectionAsync(session, device);
+            await LoadScrollSectionAsync(session, device);
+            await BuildGestureSectionAsync(session, device);
+            if (await session.ReadHostsAsync() is { } hosts && ReferenceEquals(SelectedDevice, device))
+                RebuildHosts(hosts);
+            await LoadBacklightSectionAsync(session, device);
+            var gkeyProfile = await LoadProfilesSectionAsync(session, device);
+            await LoadGKeysSectionAsync(session, device, gkeyProfile);
+        }
+        finally { _loadingControls = false; IsLoadingDevice = false; }
+    }
+
+    /// <summary>
+    /// Resolve the session for a device page: reuse the mouse's already-open persistent
+    /// session when there is one, otherwise open a fresh one (with the wake retry).
+    /// <c>null</c> when the open fails or the selection moved on meanwhile.
+    /// </summary>
+    private async Task<DeviceSession?> AcquireSessionAsync(DeviceViewModel device, DeviceRoute route)
+    {
         // If the lighting keepalive holds a dedicated session for this device (it was on the
         // gallery), release it now so we don't open a second session to the same slot below —
         // concurrent opens to a LIGHTSPEED slot make the profile/lighting reads fail.
@@ -1006,24 +1258,23 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         // Reuse this mouse's already-open persistent session instead of opening a
         // second HID handle to the same device.
-        DeviceSession? session;
         var persistent = _mouseCaptures.FirstOrDefault(mc => ReferenceEquals(mc.Device, device))?.Session;
-        if (persistent is not null)
-            session = persistent;
-        else
-            session = await OpenWokenAsync(device, route);
-        if (session is null) { IsLoadingDevice = false; return; }
+        var session = persistent ?? await OpenWokenAsync(device, route);
+        if (session is null) return null;
         if (!ReferenceEquals(SelectedDevice, device))
         {
             if (!IsPersistentSession(session)) await session.DisposeAsync();
-            IsLoadingDevice = false;
-            return;
+            return null;
         }
-        _session = session;
-        ShowPerKeyEditor = session.SupportsPerKey;
+        return session;
+    }
 
-        // Battery: read once on open (benefits from the wake-retry), then subscribe to
-        // 0x1004 broadcasts so the card/detail update live while the app is open.
+    /// <summary>
+    /// Battery: read once on open (benefits from the wake-retry), then subscribe to
+    /// 0x1004 broadcasts so the card/detail update live while the app is open.
+    /// </summary>
+    private async Task LoadBatterySectionAsync(DeviceSession session, DeviceViewModel device)
+    {
         if (await session.ReadBatteryAsync() is { } battery && ReferenceEquals(SelectedDevice, device))
             device.LiveBattery = battery;
         if (ReferenceEquals(SelectedDevice, device))
@@ -1032,92 +1283,102 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 {
                     if (ReferenceEquals(SelectedDevice, device)) device.LiveBattery = info;
                 }));
+    }
 
-        _loadingControls = true;
-        try
+    private async Task LoadDpiSectionAsync(DeviceSession session, DeviceViewModel device)
+    {
+        if (await session.ReadDpiAsync() is not { } dpi || !ReferenceEquals(SelectedDevice, device)
+            || dpi.Supported.Count == 0)
+            return;
+        _dpiOptions = [.. dpi.Supported.Select(s => (uint)s)];
+        DpiMin = _dpiOptions.Min();
+        DpiMax = _dpiOptions.Max();
+        DpiStep = SmallestGap(_dpiOptions);
+        DpiValue = dpi.Current;
+        DpiRangeText = $"{(uint)DpiMin}–{(uint)DpiMax} · step {(uint)DpiStep}";
+        LoadDpiPresets(device.ConfigKey);
+        ShowDpi = true;
+    }
+
+    private async Task LoadSmartShiftSectionAsync(DeviceSession session, DeviceViewModel device)
+    {
+        if (await session.ReadSmartShiftAsync() is not { } ss || !ReferenceEquals(SelectedDevice, device))
+            return;
+        WheelModeChoice = !ss.Ratchet ? WheelModeChoice.FreeSpin
+            : ss.AutoDisengage == 0xFF ? WheelModeChoice.Ratchet
+            : WheelModeChoice.SmartShift;
+        AutoDisengage = ss.AutoDisengage is 0 or 0xFF ? 16 : ss.AutoDisengage;
+        ShowSmartShift = true;
+    }
+
+    private async Task LoadScrollSectionAsync(DeviceSession session, DeviceViewModel device)
+    {
+        if (await session.ReadScrollInvertAsync() is not { } inverted || !ReferenceEquals(SelectedDevice, device))
+            return;
+        // The device's live state reflects the persisted preference (reapplied
+        // on connect, since the 0x2121 invert bit is volatile).
+        InvertScroll = inverted;
+        ShowScrollInvert = true;
+        // Smooth scrolling rides the same 0x2121 feature; its on/off is the
+        // persisted choice (the capture applies it, so the config is the truth).
+        SmoothScroll = device.ConfigKey is { } sck && _config.SmoothScroll(sck);
+        ShowSmoothScroll = true;
+    }
+
+    private async Task LoadBacklightSectionAsync(DeviceSession session, DeviceViewModel device)
+    {
+        if (await session.ReadBrightnessAsync() is not { } bright || !ReferenceEquals(SelectedDevice, device))
+            return;
+        BacklightMax = bright.Info.MaxBrightness == 0 ? 100 : bright.Info.MaxBrightness;
+        BacklightValue = bright.Current;
+        ShowBacklight = true;
+    }
+
+    /// <summary>Load the onboard-profile section; returns the active profile sector for the G-key read (1 when unknown).</summary>
+    private async Task<byte> LoadProfilesSectionAsync(DeviceSession session, DeviceViewModel device)
+    {
+        if (await session.ReadProfilesAsync() is not { } prof || !ReferenceEquals(SelectedDevice, device))
+            return 1;
+        _profileCount = prof.Info.ProfileCount;
+        ShowProfiles = prof.Info.ProfileCount >= 1;
+        // If the user's last choice was "No profile" (custom/host colours) but the
+        // device is now on an onboard profile — the classic sleep/wake revert, since
+        // host mode is volatile — restore the custom colours and show "No profile"
+        // instead of reflecting the firmware's fallback.
+        var wantNoProfile = device.ConfigKey is { } lck && _config.Lighting(lck) is { Profile: 0 };
+        if (wantNoProfile && prof.Current >= 1)
         {
-            if (await session.ReadDpiAsync() is { } dpi && ReferenceEquals(SelectedDevice, device) && dpi.Supported.Count > 0)
-            {
-                _dpiOptions = [.. dpi.Supported.Select(s => (uint)s)];
-                DpiMin = _dpiOptions.Min();
-                DpiMax = _dpiOptions.Max();
-                DpiStep = SmallestGap(_dpiOptions);
-                DpiValue = dpi.Current;
-                DpiRangeText = $"{(uint)DpiMin}–{(uint)DpiMax} · step {(uint)DpiStep}";
-                LoadDpiPresets(device.ConfigKey);
-                ShowDpi = true;
-            }
-            if (await session.ReadSmartShiftAsync() is { } ss && ReferenceEquals(SelectedDevice, device))
-            {
-                WheelModeChoice = !ss.Ratchet ? WheelModeChoice.FreeSpin
-                    : ss.AutoDisengage == 0xFF ? WheelModeChoice.Ratchet
-                    : WheelModeChoice.SmartShift;
-                AutoDisengage = ss.AutoDisengage is 0 or 0xFF ? 16 : ss.AutoDisengage;
-                ShowSmartShift = true;
-            }
-            if (await session.ReadScrollInvertAsync() is { } inverted && ReferenceEquals(SelectedDevice, device))
-            {
-                // The device's live state reflects the persisted preference (reapplied
-                // on connect, since the 0x2121 invert bit is volatile).
-                InvertScroll = inverted;
-                ShowScrollInvert = true;
-                // Smooth scrolling rides the same 0x2121 feature; its on/off is the
-                // persisted choice (the capture applies it, so the config is the truth).
-                SmoothScroll = device.ConfigKey is { } sck && _config.SmoothScroll(sck);
-                ShowSmoothScroll = true;
-            }
-            await BuildGestureSectionAsync(session, device);
-            if (await session.ReadHostsAsync() is { } hosts && ReferenceEquals(SelectedDevice, device))
-                RebuildHosts(hosts);
-            if (await session.ReadBrightnessAsync() is { } bright && ReferenceEquals(SelectedDevice, device))
-            {
-                BacklightMax = bright.Info.MaxBrightness == 0 ? 100 : bright.Info.MaxBrightness;
-                BacklightValue = bright.Current;
-                ShowBacklight = true;
-            }
-            byte gkeyProfile = 1;
-            if (await session.ReadProfilesAsync() is { } prof && ReferenceEquals(SelectedDevice, device))
-            {
-                _profileCount = prof.Info.ProfileCount;
-                ShowProfiles = prof.Info.ProfileCount >= 1;
-                // If the user's last choice was "No profile" (custom/host colours) but the
-                // device is now on an onboard profile — the classic sleep/wake revert, since
-                // host mode is volatile — restore the custom colours and show "No profile"
-                // instead of reflecting the firmware's fallback.
-                var wantNoProfile = device.ConfigKey is { } lck && _config.Lighting(lck) is { Profile: 0 };
-                if (wantNoProfile && prof.Current >= 1)
-                {
-                    await ReassertNoProfileLightingAsync(session, device.ConfigKey);
-                    RebuildProfiles(0);
-                }
-                else
-                {
-                    RebuildProfiles(prof.Current);
-                    if (prof.Current >= 1 && ReferenceEquals(SelectedDevice, device))
-                        await LoadProfileLightingAsync(prof.Current);
-                }
-                gkeyProfile = Math.Max(prof.Current, (byte)1);
-            }
-
-            // Read G-keys independently of the profile read: a failed/empty profile
-            // read must not also hide the G-keys (they share the control interface but
-            // not the read). They only need the active profile sector, which defaults
-            // to 1 when the profile read didn't yield one.
-            if (session.SupportsGKeys && ReferenceEquals(SelectedDevice, device))
-            {
-                _gkeyProfileSector = gkeyProfile;
-                GKeyProfile = _gkeyProfileSector;
-                if (await session.ReadGKeyBindingsAsync(_gkeyProfileSector) is { } bindings
-                    && ReferenceEquals(SelectedDevice, device))
-                {
-                    GKeys.Clear();
-                    for (var i = 0; i < bindings.Length; i++)
-                        GKeys.Add(new GKeyViewModel(i, bindings[i].Usage, bindings[i].Modifier, OnGKeyChanged));
-                    HasGKeysTab = true;
-                }
-            }
+            await ReassertNoProfileLightingAsync(session, device.ConfigKey);
+            RebuildProfiles(0);
         }
-        finally { _loadingControls = false; IsLoadingDevice = false; }
+        else
+        {
+            RebuildProfiles(prof.Current);
+            if (prof.Current >= 1 && ReferenceEquals(SelectedDevice, device))
+                await LoadProfileLightingAsync(prof.Current);
+        }
+        return Math.Max(prof.Current, (byte)1);
+    }
+
+    /// <summary>
+    /// Read G-keys independently of the profile read: a failed/empty profile
+    /// read must not also hide the G-keys (they share the control interface but
+    /// not the read). They only need the active profile sector, which defaults
+    /// to 1 when the profile read didn't yield one.
+    /// </summary>
+    private async Task LoadGKeysSectionAsync(DeviceSession session, DeviceViewModel device, byte gkeyProfile)
+    {
+        if (!session.SupportsGKeys || !ReferenceEquals(SelectedDevice, device))
+            return;
+        _gkeyProfileSector = gkeyProfile;
+        GKeyProfile = _gkeyProfileSector;
+        if (await session.ReadGKeyBindingsAsync(_gkeyProfileSector) is not { } bindings
+            || !ReferenceEquals(SelectedDevice, device))
+            return;
+        GKeys.Clear();
+        for (var i = 0; i < bindings.Length; i++)
+            GKeys.Add(new GKeyViewModel(i, bindings[i].Usage, bindings[i].Modifier, OnGKeyChanged));
+        HasGKeysTab = true;
     }
 
     /// <summary>Switch the device to another EasySwitch host (disconnects it from this PC).</summary>
@@ -1465,6 +1726,55 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
+    /// <summary>
+    /// Runs while the inventory sweep still holds a live HID++ channel to a
+    /// just-probed receiver device. A G915 on LIGHTSPEED naps ~1 s after the user
+    /// stops typing and then ignores all host traffic, so this — right after a
+    /// successful probe, typically while the wake keypress is still fresh — is the
+    /// one reliable moment to restore the persisted "No profile" per-key colours.
+    /// Also logs which power/backlight features exist, for the nap diagnosis.
+    /// </summary>
+    private async Task OnReceiverDeviceProbedAsync(PairedDevice paired, HidPP.Channel.HidppChannel channel, HidPP.Device.HidppDevice device)
+    {
+        if (paired.ModelInfo is not { } mi) return;
+        var key = mi.ConfigKey();
+        bool Has(ushort id) => device.FeatureIndex(id) is not null;
+        DiagnosticLog.Info("probe",
+            $"{key}: features — power 0x1830:{Has(0x1830)} backlight2 0x1982:{Has(0x1982)} illumination 0x1990:{Has(0x1990)}"
+            + $" onboard 0x8100:{Has(0x8100)} perkey 0x8081:{Has(0x8081)} rgb 0x8071:{Has(0x8071)}");
+
+        var session = DeviceSession.Attach(channel, device);
+        if (Has(0x8100)) await DumpProfileSectorsOnceAsync(session, key);
+
+        if (_config.Lighting(key) is not { Profile: 0 } lighting || lighting.PerKey.Count == 0) return;
+        await ReassertNoProfileLightingAsync(session, key);
+        DiagnosticLog.Info("lightwake", $"{key}: No-profile colours restored during the sweep's probe");
+    }
+
+    // One-shot diagnostic: dump onboard profile sector 1 next to its factory ROM twin
+    // (sector 0x0101) and log which bytes differ — to locate the corrupted power-save
+    // timeout that makes the G915 blank its lights ~1 s after the last keystroke
+    // (state written into the keyboard around the 2026-07 Windows update; survives
+    // power-cycles). Retried on later wakes until one full dump succeeds.
+    private bool _profileDumpDone;
+    private async Task DumpProfileSectorsOnceAsync(DeviceSession session, string key)
+    {
+        if (_profileDumpDone) return;
+        var live = await session.ReadFullSectorAsync(0x0001, 255);
+        if (live is null) return;
+        DiagnosticLog.Info("probe", $"{key}: profile sector 0x0001: {Convert.ToHexString(live)}");
+        var rom = await session.ReadFullSectorAsync(0x0101, 255);
+        if (rom is not null)
+        {
+            DiagnosticLog.Info("probe", $"{key}: ROM sector 0x0101: {Convert.ToHexString(rom)}");
+            var diffs = new List<string>();
+            for (var i = 0; i < 253 && diffs.Count < 200; i++)
+                if (live[i] != rom[i]) diffs.Add($"[{i}]{rom[i]:x2}→{live[i]:x2}");
+            DiagnosticLog.Info("probe", $"{key}: profile-vs-ROM diff ({diffs.Count} bytes): {string.Join(" ", diffs)}");
+        }
+        _profileDumpDone = true;
+    }
+
     /// <summary>Re-apply a device's persisted "No profile" custom lighting onto a session (config-driven).</summary>
     private async Task ReassertNoProfileLightingAsync(DeviceSession session, string? configKey)
     {
@@ -1515,6 +1825,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 && _config.Lighting(ck) is { Profile: 0 } l && l.PerKey.Count > 0);
             if (target?.ConfigKey is not { } key || target.Route is not { } route)
             {
+                // A keyboard the sweep only partially probed has no config key, so it can
+                // never match above and its colours silently stay unrestored — call it out.
+                if (Devices.FirstOrDefault(d => d.ConfigKey is null && d.Device.Kind == DeviceKind.Keyboard) is { } partial)
+                    DiagnosticLog.Info("lightwake",
+                        $"keepalive: {partial.Device.Codename ?? "keyboard"} has no config key (partial probe) — colours not restored");
                 await ReleaseKeepaliveSessionAsync();
                 return;
             }

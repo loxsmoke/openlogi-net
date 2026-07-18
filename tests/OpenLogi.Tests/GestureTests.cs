@@ -14,17 +14,17 @@ public class GestureTests
     [Fact]
     public void DetectSwipeCommitsCleanDirection()
     {
-        Assert.Equal(GestureDirection.Right, Gestures.DetectSwipe(120, 5));
-        Assert.Equal(GestureDirection.Left, Gestures.DetectSwipe(-120, 5));
-        Assert.Equal(GestureDirection.Down, Gestures.DetectSwipe(5, 120));
-        Assert.Equal(GestureDirection.Up, Gestures.DetectSwipe(5, -120));
+        Assert.Equal(GestureDirection.Right, Gestures.DetectSwipe(200, 5));
+        Assert.Equal(GestureDirection.Left, Gestures.DetectSwipe(-200, 5));
+        Assert.Equal(GestureDirection.Down, Gestures.DetectSwipe(5, 200));
+        Assert.Equal(GestureDirection.Up, Gestures.DetectSwipe(5, -200));
     }
 
     [Fact]
     public void DetectSwipeRejectsDiagonal()
     {
-        Assert.Null(Gestures.DetectSwipe(60, 60));
-        Assert.Null(Gestures.DetectSwipe(-60, -60));
+        Assert.Null(Gestures.DetectSwipe(200, 200));
+        Assert.Null(Gestures.DetectSwipe(-200, -200));
     }
 
     [Fact]
@@ -33,10 +33,12 @@ public class GestureTests
         Assert.Equal(GestureDirection.Right, Gestures.DetectSwipe(Gestures.SwipeThreshold, 0));
         Assert.Null(Gestures.DetectSwipe(Gestures.SwipeThreshold - 1, 0));
 
-        Assert.Equal(GestureDirection.Right, Gestures.DetectSwipe(200, 69));
-        Assert.Null(Gestures.DetectSwipe(200, 71));
-        Assert.Equal(GestureDirection.Right, Gestures.DetectSwipe(100, 39));
-        Assert.Null(Gestures.DetectSwipe(100, 41));
+        // Near the threshold the deadzone floor governs the cross band…
+        Assert.Equal(GestureDirection.Right, Gestures.DetectSwipe(200, Gestures.SwipeDeadzone - 1));
+        Assert.Null(Gestures.DetectSwipe(200, Gestures.SwipeDeadzone + 1));
+        // …and for long sweeps the 35% proportional band takes over (0.35 × 400 = 140).
+        Assert.Equal(GestureDirection.Right, Gestures.DetectSwipe(400, 139));
+        Assert.Null(Gestures.DetectSwipe(400, 141));
     }
 
     [Fact]
@@ -196,10 +198,17 @@ public class GestureTests
     }
 
     // ── Chained gestures within one hold ─────────────────────────────────────
-    // Re-arming requires a change of direction: press → left → right fires both
-    // without releasing, while one long sweep stays worth exactly one gesture.
+    // Re-arming requires a change of direction — press → left → right fires both
+    // without releasing, while one long sweep stays worth exactly one gesture —
+    // AND RearmTravelFactor× the travel, so the wobble of releasing the button
+    // after a swipe can't fire the reverse.
 
     private const int Travel = Gestures.SwipeThreshold + 10;
+    private const int RearmTravel = Gestures.SwipeThreshold * Gestures.RearmTravelFactor + 10;
+    /// <summary>Drag steps that cross the first-stroke threshold at 10/step.</summary>
+    private const int FirstSteps = Gestures.SwipeThreshold / 10 + 1;
+    /// <summary>Drag steps that comfortably cross the chained-stroke (re-arm) threshold at 10/step.</summary>
+    private const int RearmSteps = RearmTravel / 10;
 
     /// <summary>Drag in <paramref name="steps"/> increments, collecting whatever fires.</summary>
     private static List<GestureDirection> Drag(SwipeAccumulator acc, int dx, int dy, int steps)
@@ -216,9 +225,9 @@ public class GestureTests
         var acc = new SwipeAccumulator();
         acc.Begin();
         acc.BackdateHoldForTest();
-        Assert.Equal([GestureDirection.Left], Drag(acc, -10, 0, 6));
-        Assert.Equal([GestureDirection.Right], Drag(acc, 10, 0, 6));
-        Assert.Equal([GestureDirection.Left], Drag(acc, -10, 0, 6));
+        Assert.Equal([GestureDirection.Left], Drag(acc, -10, 0, FirstSteps));
+        Assert.Equal([GestureDirection.Right], Drag(acc, 10, 0, RearmSteps));
+        Assert.Equal([GestureDirection.Left], Drag(acc, -10, 0, RearmSteps));
         Assert.Null(acc.End()); // swipes fired — the release is not a click
     }
 
@@ -228,8 +237,8 @@ public class GestureTests
         var acc = new SwipeAccumulator();
         acc.Begin();
         acc.BackdateHoldForTest();
-        Assert.Equal([GestureDirection.Left], Drag(acc, -10, 0, 6));
-        Assert.Equal([GestureDirection.Up], Drag(acc, 0, -10, 6));
+        Assert.Equal([GestureDirection.Left], Drag(acc, -10, 0, FirstSteps));
+        Assert.Equal([GestureDirection.Up], Drag(acc, 0, -10, RearmSteps));
     }
 
     [Fact]
@@ -251,7 +260,7 @@ public class GestureTests
         acc.BackdateHoldForTest();
         // A hand sweeping left naturally curves upward: dominant-left deltas that
         // each carry some upward drift. The drift must not bank into an Up.
-        Assert.Equal([GestureDirection.Left], Drag(acc, -10, -4, 40));
+        Assert.Equal([GestureDirection.Left], Drag(acc, -10, -4, FirstSteps + 10));
         Assert.Null(acc.End());
     }
 
@@ -262,8 +271,9 @@ public class GestureTests
         acc.Begin();
         acc.BackdateHoldForTest();
         var fired = new List<GestureDirection>();
-        // Sub-threshold leftward travel speckled with 1-unit rightward jitter.
-        for (var i = 0; i < 12; i++)
+        // Sub-threshold leftward travel speckled with 1-unit rightward jitter
+        // (net -9 per pair, so the threshold is crossed around pair 17).
+        for (var i = 0; i < FirstSteps + 5; i++)
         {
             if (acc.Accumulate(-10, 0) is { } a) fired.Add(a);
             if (acc.Accumulate(1, 0) is { } b) fired.Add(b);
@@ -277,10 +287,10 @@ public class GestureTests
         var acc = new SwipeAccumulator();
         acc.Begin();
         acc.BackdateHoldForTest();
-        Assert.Equal([GestureDirection.Left], Drag(acc, -10, 0, 6));
+        Assert.Equal([GestureDirection.Left], Drag(acc, -10, 0, FirstSteps));
         Drag(acc, -10, 0, 8); // hand drifts on past the commit before reversing
-        // The reversal commits on its own fresh threshold — the drift is not owed back.
-        Assert.Equal([GestureDirection.Right], Drag(acc, 10, 0, 6));
+        // The reversal commits on its own fresh (re-arm) threshold — the drift is not owed back.
+        Assert.Equal([GestureDirection.Right], Drag(acc, 10, 0, RearmSteps));
     }
 
     [Fact]
@@ -289,7 +299,7 @@ public class GestureTests
         var acc = new SwipeAccumulator();
         acc.Begin();
         acc.BackdateHoldForTest();
-        Assert.Equal([GestureDirection.Left], Drag(acc, -10, 0, 6));
+        Assert.Equal([GestureDirection.Left], Drag(acc, -10, 0, FirstSteps));
         Assert.Empty(Drag(acc, -10, 0, 20)); // still left — re-arm needs a direction change
     }
 
@@ -305,8 +315,8 @@ public class GestureTests
         var acc = new SwipeAccumulator();
         acc.Begin();
         acc.BackdateHoldForTest();
-        Assert.Equal([GestureDirection.Left], Drag(acc, -10, 0, 6));
-        Assert.Equal(GestureDirection.Right, acc.Accumulate(Travel, 0));
+        Assert.Equal([GestureDirection.Left], Drag(acc, -10, 0, FirstSteps));
+        Assert.Equal(GestureDirection.Right, acc.Accumulate(RearmTravel, 0));
         Assert.Null(acc.End());
     }
 
@@ -316,8 +326,26 @@ public class GestureTests
         var acc = new SwipeAccumulator();
         acc.Begin();
         acc.BackdateHoldForTest();
-        Assert.Equal([GestureDirection.Left], Drag(acc, -10, 0, 6));
+        Assert.Equal([GestureDirection.Left], Drag(acc, -10, 0, FirstSteps));
         acc.Accumulate(Gestures.SwipeThreshold - 10, 0); // reversal never reaches threshold
         Assert.Null(acc.End());
+    }
+
+    /// <summary>
+    /// The wobble of letting go of the button travels beyond the FIRST-stroke
+    /// threshold but nowhere near a deliberate return stroke. It must fire nothing —
+    /// neither mid-hold (re-arm needs RearmTravelFactor× the travel) nor at release
+    /// (End never settles once a stroke has committed). HARDWARE-OBSERVED on an
+    /// MX Anywhere 3S: swipe-then-release fired the gesture and then its reverse.
+    /// </summary>
+    [Fact]
+    public void ReleaseWobbleAfterASwipeDoesNotFireTheReverse()
+    {
+        var acc = new SwipeAccumulator();
+        acc.Begin();
+        acc.BackdateHoldForTest();
+        Assert.Equal([GestureDirection.Left], Drag(acc, -10, 0, FirstSteps));
+        Assert.Null(acc.Accumulate(Travel, 0)); // release jerk: over the base threshold…
+        Assert.Null(acc.End());                 // …but never a chained stroke, and not a click
     }
 }

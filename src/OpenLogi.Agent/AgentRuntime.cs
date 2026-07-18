@@ -1,6 +1,8 @@
+using System.Threading.Channels;
 using OpenLogi.Core.Actions;
 using OpenLogi.Core.Config;
 using OpenLogi.Core.Gestures;
+using OpenLogi.Core.Logging;
 using OpenLogi.Input;
 
 namespace OpenLogi.Agent;
@@ -21,7 +23,29 @@ public sealed class AgentRuntime : IDisposable
     private string? _selectedConfigKey;
     private MouseHook? _hook;
 
-    public AgentRuntime(Config config) => _config = config;
+    // Actions are injected from a single background consumer so a slow SendInput or
+    // foreground-app lookup can never stall the callers — the HID++ event pumps
+    // (a stalled pump queues gesture events and replays them, stale, in a burst
+    // later) or the low-level mouse hook (which Windows removes if it blocks too
+    // long). Bounded + DropOldest: if injection wedges anyway, stale gestures are
+    // discarded rather than replayed.
+    private readonly Channel<System.Action> _injections = Channel.CreateBounded<System.Action>(
+        new BoundedChannelOptions(32) { SingleReader = true, FullMode = BoundedChannelFullMode.DropOldest });
+
+    public AgentRuntime(Config config)
+    {
+        _config = config;
+        _ = InjectionPumpAsync();
+    }
+
+    private async Task InjectionPumpAsync()
+    {
+        await foreach (var work in _injections.Reader.ReadAllAsync().ConfigureAwait(false))
+        {
+            try { work(); }
+            catch (Exception ex) { DiagnosticLog.Warn("agent", $"action injection failed: {ex.Message}"); }
+        }
+    }
 
     /// <summary>The device whose bindings are active (the carousel selection).</summary>
     public void SetSelectedDevice(string? configKey)
@@ -49,8 +73,10 @@ public sealed class AgentRuntime : IDisposable
         var appBundle = MouseHook.FrontmostProcessPath();
         var bindings = BindingMaps.BindingsFor(_config, configKey, appBundle);
         var (disposition, inject) = ButtonDispatch.Resolve(button.Id, button.Pressed, bindings);
+        // The disposition must be decided synchronously (it suppresses the native
+        // click), but the injection itself must not run inside the hook callback.
         if (inject is { } action)
-            ActionInjector.Execute(action);
+            _injections.Writer.TryWrite(() => ActionInjector.Execute(action));
         return disposition;
     }
 
@@ -61,13 +87,14 @@ public sealed class AgentRuntime : IDisposable
     /// this is per-mouse (unlike the global OS hook). Already diverted at the device,
     /// so there is no native click to suppress.
     /// </summary>
-    public void DispatchDivertedButton(string? configKey, ButtonId button)
-    {
-        var appBundle = MouseHook.FrontmostProcessPath();
-        var bindings = BindingMaps.BindingsFor(_config, configKey, appBundle);
-        if (bindings.TryGetValue(button, out var action))
-            ActionInjector.Execute(action);
-    }
+    public void DispatchDivertedButton(string? configKey, ButtonId button) =>
+        _injections.Writer.TryWrite(() =>
+        {
+            var appBundle = MouseHook.FrontmostProcessPath();
+            var bindings = BindingMaps.BindingsFor(_config, configKey, appBundle);
+            if (bindings.TryGetValue(button, out var action))
+                ActionInjector.Execute(action);
+        });
 
     /// <summary>
     /// Fire the action bound to a committed gesture <paramref name="direction"/> on
@@ -77,12 +104,13 @@ public sealed class AgentRuntime : IDisposable
     /// diverted DPI button, the gesture is already captured at the device, so there
     /// is no native input to suppress.
     /// </summary>
-    public void DispatchGesture(string? configKey, ButtonId button, GestureDirection direction)
-    {
-        var bindings = BindingMaps.GestureBindingsFor(_config, configKey, button);
-        if (bindings.TryGetValue(direction, out var action) && action.Kind != ActionKind.None)
-            ActionInjector.Execute(action);
-    }
+    public void DispatchGesture(string? configKey, ButtonId button, GestureDirection direction) =>
+        _injections.Writer.TryWrite(() =>
+        {
+            var bindings = BindingMaps.GestureBindingsFor(_config, configKey, button);
+            if (bindings.TryGetValue(direction, out var action) && action.Kind != ActionKind.None)
+                ActionInjector.Execute(action);
+        });
 
     /// <summary>
     /// Re-inject diverted hi-res wheel motion as OS scrolling. <paramref name="wheelData"/>
@@ -99,5 +127,6 @@ public sealed class AgentRuntime : IDisposable
             _hook?.Dispose();
             _hook = null;
         }
+        _injections.Writer.TryComplete();
     }
 }

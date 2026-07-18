@@ -3,6 +3,7 @@ using OpenLogi.Core.Logging;
 using OpenLogi.HidPP.Channel;
 using OpenLogi.HidPP.Device;
 using OpenLogi.HidPP.Feature;
+using OpenLogi.HidPP.Protocol;
 using OpenLogi.HidPP.Receiver;
 
 namespace OpenLogi.Hid;
@@ -19,79 +20,113 @@ namespace OpenLogi.Hid;
 public static class HidInventory
 {
     /// <summary>
+    /// Called right after a receiver-paired device's HID++ 2.0 probe succeeds, while
+    /// the probe channel is still live. A wireless keyboard that naps seconds after
+    /// the user stops typing (G915 on LIGHTSPEED) is often reachable at no other
+    /// moment — this is the caller's chance to act (restore lighting, read config)
+    /// before the channel closes.
+    /// </summary>
+    public delegate Task PostProbeHook(PairedDevice device, HidppChannel channel, HidppDevice hidpp);
+
+    /// <summary>
     /// Enumerate all receivers (with their paired devices) and directly-attached HID++
     /// devices. <paramref name="nodeSource"/> defaults to the local machine; tests pass a
     /// scripted source to model a specific receiver's interface layout without hardware.
+    /// <paramref name="nodeFilter"/> scopes the sweep to matching HID nodes — e.g. just
+    /// the receiver that reported a wake, so the refresh takes ~1 s instead of paying
+    /// every other node's ping timeouts.
     /// </summary>
-    public static async Task<IReadOnlyList<DeviceInventory>> EnumerateAsync(IHidNodeSource? nodeSource = null)
+    public static async Task<IReadOnlyList<DeviceInventory>> EnumerateAsync(
+        IHidNodeSource? nodeSource = null, PostProbeHook? postProbe = null, Func<IHidNode, bool>? nodeFilter = null)
     {
         var result = new List<DeviceInventory>();
-        var nodes = (nodeSource ?? LocalHidNodeSource.Instance).Enumerate();
-        DiagnosticLog.Info("sweep", $"{nodes.Count} Logitech HID++ node(s)");
+        // Receivers first: a wake-triggered rescan must reach the just-woken wireless
+        // device before its RF link parks again (a G915 parks within seconds of the
+        // wake keypress), and every non-receiver node ahead of it can burn seconds of
+        // ping timeouts. Stable sort — relative order is otherwise preserved.
+        var nodes = (nodeSource ?? LocalHidNodeSource.Instance).Enumerate()
+            .Where(n => nodeFilter?.Invoke(n) ?? true)
+            .OrderByDescending(n => Receivers.IsReceiverPid(n.VendorId, n.ProductId))
+            .ToList();
+        DiagnosticLog.Info("sweep", $"{nodes.Count} Logitech HID++ node(s){(nodeFilter is null ? "" : " (scoped)")}");
         foreach (var hidNode in nodes)
         {
-            var node = NodeTag(hidNode);
-            HidppChannel channel;
-            try
-            {
-                channel = await HidppChannel.FromRawChannelAsync(hidNode.Open()).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                // Node we can't open / doesn't speak HID++.
-                DiagnosticLog.Warn("sweep", $"{node}: open failed: {ex.Message}");
-                continue;
-            }
-
-            await using (channel)
-            {
-                // Receiver registers ride the short (7-byte) HID++ reports; a
-                // receiver's long-only interface answers pings but times out on
-                // every register op (3×5 s — HARDWARE-VERIFIED on 046d:c547).
-                if (Receivers.IsReceiverPid(channel.VendorId, channel.ProductId) && !channel.SupportsShort)
-                {
-                    DiagnosticLog.Info("sweep", $"{node}: receiver interface without short reports — skipped");
-                    continue;
-                }
-                try
-                {
-                    var detected = Receivers.Detect(channel);
-                    var inventory = detected switch
-                    {
-                        DetectedReceiver.Bolt b => await BuildBoltInventoryAsync(channel, b.Receiver, DeviceInterfaceFor(nodes, channel)).ConfigureAwait(false),
-                        // LIGHTSPEED shares Unifying's register set; only the name and
-                        // the uid differ (no serial register → synthetic uid, no read).
-                        DetectedReceiver.Unifying u => await BuildUnifyingInventoryAsync(channel, u.Receiver, u.Name).ConfigureAwait(false),
-                        DetectedReceiver.Lightspeed l => await BuildUnifyingInventoryAsync(channel, l.Receiver, l.Name,
-                            Receivers.LightspeedSyntheticUid(channel), DeviceInterfaceFor(nodes, channel)).ConfigureAwait(false),
-                        _ => await BuildDirectInventoryAsync(channel).ConfigureAwait(false),
-                    };
-                    if (inventory is not null)
-                    {
-                        DiagnosticLog.Info("sweep",
-                            $"{node} → {inventory.Receiver.Name}, {inventory.Paired.Count} device(s)");
-                        foreach (var p in inventory.Paired)
-                            DiagnosticLog.Info("sweep",
-                                $"  slot {p.Slot}: {p.Codename ?? "(unnamed)"} ({p.Kind}, {(p.Online ? "online" : "offline")}"
-                                + $"{(p.Wpid is { } w ? $", wpid {w:x4}" : "")}"
-                                + $"{(p.Battery?.Percentage is { } b ? $", batt {b}%" : "")})");
-                        result.Add(inventory);
-                    }
-                    else
-                    {
-                        DiagnosticLog.Info("sweep", $"{node}: no receiver match, no HID++ 2.0 device at 0xff");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    // A single unresponsive node must not abort the whole sweep.
-                    DiagnosticLog.Error("sweep", $"{node}: sweep failed", ex);
-                }
-            }
+            if (await SweepNodeAsync(hidNode, nodes, postProbe).ConfigureAwait(false) is { } inventory)
+                result.Add(inventory);
         }
         var deduped = Deduplicate(result);
         DiagnosticLog.Info("sweep", $"done: {deduped.Count} receiver(s)/device(s) usable");
         return deduped;
+    }
+
+    /// <summary>
+    /// Open one HID node and build its inventory (receiver + paired devices, or a
+    /// direct HID++ 2.0 device). <c>null</c> when the node can't be opened, isn't
+    /// usable, or fails mid-sweep — a single bad node must not abort the whole sweep.
+    /// </summary>
+    private static async Task<DeviceInventory?> SweepNodeAsync(
+        IHidNode hidNode, IReadOnlyList<IHidNode> nodes, PostProbeHook? postProbe)
+    {
+        var node = NodeTag(hidNode);
+        HidppChannel channel;
+        try
+        {
+            channel = await HidppChannel.FromRawChannelAsync(hidNode.Open()).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            // Node we can't open / doesn't speak HID++.
+            DiagnosticLog.Warn("sweep", $"{node}: open failed: {ex.Message}");
+            return null;
+        }
+
+        await using (channel)
+        {
+            // Receiver registers ride the short (7-byte) HID++ reports; a
+            // receiver's long-only interface answers pings but times out on
+            // every register op (3×5 s — HARDWARE-VERIFIED on 046d:c547).
+            if (Receivers.IsReceiverPid(channel.VendorId, channel.ProductId) && !channel.SupportsShort)
+            {
+                DiagnosticLog.Info("sweep", $"{node}: receiver interface without short reports — skipped");
+                return null;
+            }
+            try
+            {
+                var detected = Receivers.Detect(channel);
+                var inventory = detected switch
+                {
+                    DetectedReceiver.Bolt b => await BuildBoltInventoryAsync(channel, b.Receiver, DeviceInterfaceFor(nodes, channel), postProbe).ConfigureAwait(false),
+                    // LIGHTSPEED shares Unifying's register set; only the name and
+                    // the uid differ (no serial register → synthetic uid, no read).
+                    DetectedReceiver.Unifying u => await BuildUnifyingInventoryAsync(channel, u.Receiver, u.Name, postProbe: postProbe).ConfigureAwait(false),
+                    DetectedReceiver.Lightspeed l => await BuildUnifyingInventoryAsync(channel, l.Receiver, l.Name,
+                        Receivers.LightspeedSyntheticUid(channel), DeviceInterfaceFor(nodes, channel), postProbe).ConfigureAwait(false),
+                    _ => await BuildDirectInventoryAsync(channel).ConfigureAwait(false),
+                };
+                if (inventory is not null)
+                    LogInventory(node, inventory);
+                else
+                    DiagnosticLog.Info("sweep", $"{node}: no receiver match, no HID++ 2.0 device at 0xff");
+                return inventory;
+            }
+            catch (Exception ex)
+            {
+                // A single unresponsive node must not abort the whole sweep.
+                DiagnosticLog.Error("sweep", $"{node}: sweep failed", ex);
+                return null;
+            }
+        }
+    }
+
+    private static void LogInventory(string node, DeviceInventory inventory)
+    {
+        DiagnosticLog.Info("sweep",
+            $"{node} → {inventory.Receiver.Name}, {inventory.Paired.Count} device(s)");
+        foreach (var p in inventory.Paired)
+            DiagnosticLog.Info("sweep",
+                $"  slot {p.Slot}: {p.Codename ?? "(unnamed)"} ({p.Kind}, {(p.Online ? "online" : "offline")}"
+                + $"{(p.Wpid is { } w ? $", wpid {w:x4}" : "")}"
+                + $"{(p.Battery?.Percentage is { } b ? $", batt {b}%" : "")})");
     }
 
     /// <summary>
@@ -168,7 +203,7 @@ public static class HidInventory
     }
 
     private static async Task<DeviceInventory> BuildBoltInventoryAsync(
-        HidppChannel channel, BoltReceiver receiver, IHidNode? deviceInterface = null)
+        HidppChannel channel, BoltReceiver receiver, IHidNode? deviceInterface = null, PostProbeHook? postProbe = null)
     {
         var uid = await TryAsync(receiver.GetUniqueIdAsync).ConfigureAwait(false);
         if (uid is null)
@@ -197,7 +232,7 @@ public static class HidInventory
             {
                 // Codename comes from the receiver's pairing registers (control channel).
                 var codename = await TryAsync(() => receiver.GetDeviceCodenameAsync(conn.Index)).ConfigureAwait(false);
-                paired.Add(await ProbeAsync(probeChannel, conn.Index, MapBolt(conn.Kind), conn.Online, conn.Wpid, codename).ConfigureAwait(false));
+                paired.Add(await ProbeAsync(probeChannel, conn.Index, MapBolt(conn.Kind), conn.Online, conn.Wpid, codename, postProbe).ConfigureAwait(false));
             }
 
             return new DeviceInventory
@@ -214,7 +249,7 @@ public static class HidInventory
 
     private static async Task<DeviceInventory> BuildUnifyingInventoryAsync(
         HidppChannel channel, UnifyingReceiver receiver, string name, string? uidOverride = null,
-        IHidNode? deviceInterface = null)
+        IHidNode? deviceInterface = null, PostProbeHook? postProbe = null)
     {
         var uid = uidOverride ?? await TryAsync(receiver.GetUniqueIdAsync).ConfigureAwait(false);
         if (uid is null)
@@ -251,7 +286,7 @@ public static class HidInventory
                 string? codename = null;
                 try { codename = await receiver.GetDeviceCodenameAsync(conn.Index).ConfigureAwait(false); }
                 catch (Exception ex) { DiagnosticLog.Debug("sweep", $"  slot {conn.Index}: codename read (0xb5/0x4n) failed: {ex.Message}"); }
-                paired.Add(await ProbeAsync(probeChannel, conn.Index, MapUnifying(conn.Kind), conn.Online, conn.Wpid, codename).ConfigureAwait(false));
+                paired.Add(await ProbeAsync(probeChannel, conn.Index, MapUnifying(conn.Kind), conn.Online, conn.Wpid, codename, postProbe).ConfigureAwait(false));
             }
 
             return new DeviceInventory
@@ -303,19 +338,57 @@ public static class HidInventory
     }
 
     private static async Task<PairedDevice> ProbeAsync(
-        HidppChannel channel, byte slot, DeviceKind kind, bool online, ushort? wpid, string? codename)
+        HidppChannel channel, byte slot, DeviceKind kind, bool online, ushort? wpid, string? codename,
+        PostProbeHook? postProbe = null)
     {
         if (!online)
-            return new PairedDevice { Slot = slot, Codename = codename, Wpid = wpid, Kind = kind, Online = false };
-
-        HidppDevice device;
-        try { device = await HidppDevice.NewAsync(channel, slot).ConfigureAwait(false); }
-        catch (Exception ex)
         {
-            DiagnosticLog.Warn("sweep", $"  slot {slot}: HID++ 2.0 probe failed ({ex.Message}) — listed without capabilities");
+            // The receiver's link-established flag is instantaneous radio state, and a
+            // device that parked its RF link to save power announces "offline" while
+            // fully awake — a G915 parks within ~1-2 s of the last keystroke
+            // (HARDWARE-OBSERVED on 046d:c547), so the wake-triggered rescan would list
+            // the keyboard as asleep right after the keypress that woke it. Pinging
+            // settles it: the receiver re-establishes a parked link to deliver host
+            // traffic, while a truly sleeping slot fast-NACKs (ResourceError → null) or
+            // stays silent. Spaced retries, because delivery to a parked slot can lag
+            // its polling cadence; the NACK path fails fast, so a sleeping slot costs
+            // roughly just the delays.
+            var reachable = false;
+            for (var attempt = 0; attempt < 3 && !reachable; attempt++)
+            {
+                if (attempt > 0) await Task.Delay(400).ConfigureAwait(false);
+                try { reachable = await V20.DetermineVersionAsync(channel, slot, pingAttempts: 1).ConfigureAwait(false) is not null; }
+                catch { /* stays unreachable */ }
+            }
+            if (!reachable)
+                return new PairedDevice { Slot = slot, Codename = codename, Wpid = wpid, Kind = kind, Online = false };
+            DiagnosticLog.Info("sweep", $"  slot {slot}: announced offline but answers a ping — link parked, treating as online");
+            online = true;
+        }
+
+        // A just-woken wireless device parks/unparks its link, so a probe attempt can
+        // land in a parked moment and fast-NACK — retry a few times (the delays are
+        // the dominant cost) instead of losing the whole identity for this sweep.
+        HidppDevice? device = null;
+        Exception? failure = null;
+        for (var attempt = 0; attempt < 3 && device is null; attempt++)
+        {
+            if (attempt > 0) await Task.Delay(400).ConfigureAwait(false);
+            try { device = await HidppDevice.NewAsync(channel, slot).ConfigureAwait(false); }
+            catch (Exception ex) { failure = ex; }
+        }
+        if (device is null)
+        {
+            DiagnosticLog.Warn("sweep", $"  slot {slot}: HID++ 2.0 probe failed ({failure?.Message}) — listed without capabilities");
             return new PairedDevice { Slot = slot, Codename = codename, Wpid = wpid, Kind = kind, Online = online };
         }
-        return await ProbeOnDeviceAsync(device, slot, kind, online, wpid, codename).ConfigureAwait(false);
+        var result = await ProbeOnDeviceAsync(device, slot, kind, online, wpid, codename).ConfigureAwait(false);
+        if (postProbe is not null)
+        {
+            try { await postProbe(result, channel, device).ConfigureAwait(false); }
+            catch (Exception ex) { DiagnosticLog.Warn("sweep", $"  slot {slot}: post-probe hook failed: {ex.Message}"); }
+        }
+        return result;
     }
 
     private static async Task<PairedDevice> ProbeOnDeviceAsync(
