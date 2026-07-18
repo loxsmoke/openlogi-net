@@ -1113,6 +1113,23 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 return true;
             }
             if (captures.Count == 0) { await session.DisposeAsync(); return true; } // nothing capturable
+
+            // The persistent capture session doubles as the gallery tile's live battery
+            // feed. The scan-time snapshot goes stale the moment the user plugs in a
+            // charge cable (no HID node changes, so nothing rescans) — seed a fresh
+            // reading now and ride 0x1004 broadcasts for charger/level changes; the
+            // monitor is disposed with the capture set. Events resolve the tile by
+            // config key at delivery time, because keyboard-only rescans replace the
+            // DeviceViewModels while the captures (and this monitor) live on.
+            if (await session.ReadBatteryAsync() is { } liveBattery) mouse.LiveBattery = liveBattery;
+            if (ck is not null && session.StartBatteryMonitor(info =>
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        if (Devices.FirstOrDefault(d => d.ConfigKey == ck) is { } tile)
+                            tile.LiveBattery = info;
+                    })) is { } monitor)
+                captures.Add(monitor);
+
             _mouseCaptures.Add(new MouseCapture(mouse, session, new CompositeCapture(captures)));
             return true;
         }
