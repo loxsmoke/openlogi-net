@@ -4,21 +4,6 @@ using OpenLogi.HidPP.Protocol;
 
 namespace OpenLogi.HidPP.Device;
 
-/// <summary>Discriminator for <see cref="DeviceException"/>.</summary>
-public enum DeviceErrorKind
-{
-    /// <summary>No device with the specified index is connected.</summary>
-    DeviceNotFound,
-    /// <summary>The device only supports HID++1.0.</summary>
-    UnsupportedProtocolVersion,
-}
-
-/// <summary>A device-specific error. Ported from Rust <c>device::DeviceError</c>.</summary>
-public sealed class DeviceException(DeviceErrorKind kind, string message) : Exception(message)
-{
-    public DeviceErrorKind Kind { get; } = kind;
-}
-
 /// <summary>
 /// A single HID++ peripheral on a <see cref="HidppChannel"/> (not a receiver).
 /// Ported from Rust <c>device::Device</c>. The Rust type-erased feature registry

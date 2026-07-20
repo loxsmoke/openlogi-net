@@ -1,27 +1,5 @@
 namespace OpenLogi.HidPP.Channel;
 
-/// <summary>The kind of a <see cref="ChannelException"/>. Mirrors Rust <c>channel::ChannelError</c>.</summary>
-public enum ChannelErrorKind
-{
-    /// <summary>The raw channel implementation returned an error.</summary>
-    Implementation,
-    /// <summary>The HID channel does not support HID++.</summary>
-    HidppNotSupported,
-    /// <summary>The channel does not support the given message type (short/long).</summary>
-    MessageTypeNotSupported,
-    /// <summary>No response was received following a request.</summary>
-    NoResponse,
-    /// <summary>The request timed out before the device responded.</summary>
-    Timeout,
-}
-
-/// <summary>An error creating or interacting with a HID(++) channel.</summary>
-public sealed class ChannelException(ChannelErrorKind kind, string? message = null, Exception? inner = null)
-    : Exception(message ?? kind.ToString(), inner)
-{
-    public ChannelErrorKind Kind { get; } = kind;
-}
-
 /// <summary>
 /// A HID communication channel supporting HID++. Maps incoming reports to
 /// previously sent requests by predicate. Ported from Rust

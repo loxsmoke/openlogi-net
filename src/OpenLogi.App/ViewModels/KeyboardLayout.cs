@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using System.Linq;
-
 namespace OpenLogi.App.ViewModels;
 
 /// <summary>How a key behaves in the picker.</summary>
