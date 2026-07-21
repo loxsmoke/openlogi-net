@@ -8,6 +8,58 @@ namespace OpenLogi.Core;
 public static class UpdateCheck
 {
     /// <summary>
+    /// How long a release must have been public before we offer it. Fresh releases are
+    /// the ones most likely to be pulled or hot-fixed, so the banner stays quiet for a
+    /// day and users aren't pushed onto a build nobody has shaken out yet.
+    /// </summary>
+    public static readonly TimeSpan SoakPeriod = TimeSpan.FromHours(24);
+
+    /// <summary>
+    /// True once <paramref name="publishedAt"/> is at least <see cref="SoakPeriod"/> in the
+    /// past. <paramref name="now"/> is a parameter rather than <c>DateTimeOffset.UtcNow</c>
+    /// so the boundary is unit-testable; a future timestamp (clock skew) is never eligible.
+    /// </summary>
+    public static bool IsEligible(DateTimeOffset publishedAt, DateTimeOffset now) =>
+        now - publishedAt >= SoakPeriod;
+
+    /// <summary>
+    /// Name of the installer asset attached to a release — must stay in step with
+    /// <c>OutputBaseFilename</c> in <c>build/OpenLogi.iss</c>.
+    /// </summary>
+    public static string SetupAssetName(string version) => $"{Brand.AppName}-{version}-setup.exe";
+
+    /// <summary>
+    /// What the update banner should do in response to a check.
+    /// </summary>
+    public enum BannerState
+    {
+        /// <summary>No usable answer — leave whatever is on screen alone.</summary>
+        Unchanged,
+        /// <summary>Nothing should be offered right now; retract any existing offer.</summary>
+        Hidden,
+        /// <summary>Offer the release.</summary>
+        Shown,
+    }
+
+    /// <summary>
+    /// Decide what the banner shows, given the single release GitHub calls "latest".
+    /// </summary>
+    /// <remarks>
+    /// <see cref="BannerState.Hidden"/> retracts unconditionally, which is what makes a
+    /// rapid follow-up release safe: when 0.66.1 lands three hours after 0.66.0, the next
+    /// check sees an ineligible 0.66.1 and pulls the already-showing 0.66.0 offer, rather
+    /// than leaving a long-running session pointed at the build 0.66.1 replaced. A null
+    /// <paramref name="latest"/> means "no newer release" or a transient outage — the two
+    /// are indistinguishable from here, and neither justifies retracting a real offer.
+    /// </remarks>
+    public static BannerState Decide(ReleaseInfo? latest, string? dismissed, DateTimeOffset now)
+    {
+        if (latest is null) return BannerState.Unchanged;
+        if (latest.Version == dismissed) return BannerState.Hidden;
+        return IsEligible(latest.PublishedAt, now) ? BannerState.Shown : BannerState.Hidden;
+    }
+
+    /// <summary>
     /// Parse a release tag like "v0.3.0", "0.3.0", or "v0.3.0-beta" into a 3-part
     /// <see cref="Version"/> (any pre-release / build-metadata suffix is dropped), or
     /// <c>null</c> if it has no dotted-numeric core.
@@ -39,3 +91,11 @@ public static class UpdateCheck
     private static Version Normalize(Version v) =>
         new(v.Major, v.Minor, v.Build < 0 ? 0 : v.Build);
 }
+
+/// <summary>
+/// The facts about a newer release the update banner needs: its normalized version, when
+/// it went public (for the soak gate), and where to get the installer. <see cref="SetupUrl"/>
+/// is null when the release has no matching setup.exe asset — the Install action is then
+/// unavailable and only the GitHub link makes sense.
+/// </summary>
+public sealed record ReleaseInfo(string Version, DateTimeOffset PublishedAt, string? SetupUrl, long SetupSize);

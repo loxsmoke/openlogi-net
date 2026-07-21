@@ -1,7 +1,12 @@
+using System.ComponentModel;
 using System.Reflection;
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using OpenLogi.App.Services;
 using OpenLogi.Core;
+using OpenLogi.Core.Logging;
 
 namespace OpenLogi.App.ViewModels;
 
@@ -22,35 +27,150 @@ public partial class MainWindowViewModel
 
     /// <summary>
     /// When the user has opted in, ask GitHub for the latest release and show the
-    /// update banner if it's newer than this build (and not a version already
-    /// dismissed). Silent on every failure; a no-op when update checks are off.
+    /// update banner if it's newer than this build, has cleared the soak period, and
+    /// isn't a version already dismissed. Silent on every failure; a no-op when update
+    /// checks are off.
     /// </summary>
+    /// <remarks>
+    /// Only ever considers <c>/releases/latest</c> — a single release, gated on its own
+    /// age. It never picks the newest release that happens to have soaked, so a hotfix
+    /// released hours after a bad build keeps <em>both</em> hidden until the hotfix itself
+    /// ages in, rather than offering the build it replaced.
+    /// </remarks>
     public async Task CheckForUpdatesAsync()
     {
         if (!_config.AppSettings.CheckForUpdates) return;
+        // Never move the banner out from under an install/download in flight.
+        if (UpdateBusy) return;
         if (Assembly.GetExecutingAssembly().GetName().Version is not { } current) return;
-        var newer = await UpdateService.CheckAsync(current);
-        if (newer is null || newer == _config.AppSettings.DismissedUpdate) return;
-        _latestUpdate = newer;
-        UpdateBannerText = $"Update available: v{newer}";
-        UpdateAvailable = true;
+
+        var release = await UpdateService.CheckAsync(current);
+        switch (UpdateCheck.Decide(release, _config.AppSettings.DismissedUpdate, DateTimeOffset.UtcNow))
+        {
+            case UpdateCheck.BannerState.Unchanged:
+                return;
+
+            case UpdateCheck.BannerState.Hidden:
+                _latestRelease = null;
+                UpdateAvailable = false;
+                return;
+
+            case UpdateCheck.BannerState.Shown:
+                _latestRelease = release;
+                UpdateBannerText = $"Update available: v{release!.Version}";
+                // Install only makes sense when there's an installer to run and we're
+                // running from an install it can upgrade in place.
+                CanInstallUpdate = release.SetupUrl is not null && UpdateInstaller.IsInstalledBySetup();
+                UpdateAvailable = true;
+                return;
+        }
     }
 
-    /// <summary>Open the releases page to download the available update.</summary>
+    /// <summary>
+    /// Re-check daily while the app stays open. The launch-time check can land inside a
+    /// release's soak period, and a machine that is never restarted would otherwise
+    /// never see it.
+    /// </summary>
+    private void StartUpdateTimer() =>
+        _updateTimer ??= new System.Threading.Timer(
+            _ => Dispatcher.UIThread.Post(() => _ = CheckForUpdatesAsync()),
+            null, UpdateCheck.SoakPeriod, UpdateCheck.SoakPeriod);
+
+    /// <summary>
+    /// Download the installer and run it silently, then quit so it can replace our files
+    /// (build/OpenLogi.iss restarts the app afterwards via <c>/RELAUNCH</c>).
+    /// </summary>
     [RelayCommand]
-    private void DownloadUpdate()
+    private async Task InstallUpdateAsync()
     {
-        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Brand.ReleasesUrl) { UseShellExecute = true }); }
+        if (_latestRelease is not { } release || UpdateBusy) return;
+        var previousText = UpdateBannerText;
+
+        var path = await DownloadInstallerAsync(release, UpdateInstaller.UpdateStagingDir());
+        if (path is null) return;
+
+        try
+        {
+            UpdateBannerText = $"Installing v{release.Version} — {Brand.AppName} will restart…";
+            UpdateInstaller.Launch(path);
+        }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            // User declined the UAC prompt. Put the banner back and stay running.
+            UpdateBannerText = previousText;
+            UpdateBusy = false;
+            return;
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLog.Warn("update", $"launching installer failed: {ex.Message}");
+            UpdateBannerText = "Couldn't start the installer — try Download instead.";
+            CanInstallUpdate = false;
+            UpdateBusy = false;
+            return;
+        }
+
+        // Shut down through the lifetime so Dispose() still runs (HID teardown, log seal)
+        // rather than killing the process out from under it.
+        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            desktop.Shutdown();
+    }
+
+    /// <summary>Save the installer to the user's Downloads folder without running it.</summary>
+    [RelayCommand]
+    private async Task DownloadUpdateAsync()
+    {
+        if (_latestRelease is not { } release || UpdateBusy) return;
+
+        var path = await DownloadInstallerAsync(release, UpdateInstaller.DownloadsFolder());
+        if (path is null) return;
+
+        UpdateInstaller.Reveal(path);
+        UpdateBannerText = $"v{release.Version} saved to Downloads";
+    }
+
+    /// <summary>Open the release notes for the offered version (not just "latest").</summary>
+    [RelayCommand]
+    private void ViewReleaseOnGitHub()
+    {
+        var url = _latestRelease is { } release ? Brand.ReleaseTagUrl(release.Version) : Brand.ReleasesUrl;
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }); }
         catch { /* no browser / blocked — ignore */ }
+    }
+
+    /// <summary>
+    /// Shared download half of Install and Download: drives the banner text and progress
+    /// bar, and on failure leaves the banner explaining itself with Install withdrawn so
+    /// the user is steered to the GitHub link. Returns the file path, or null on failure.
+    /// </summary>
+    private async Task<string?> DownloadInstallerAsync(ReleaseInfo release, string destDir)
+    {
+        UpdateBusy = true;
+        UpdateProgress = 0;
+        UpdateBannerText = $"Downloading v{release.Version}…";
+
+        var progress = new Progress<double>(p => UpdateProgress = p);
+        var path = await UpdateInstaller.DownloadAsync(release, destDir, progress);
+
+        if (path is null)
+        {
+            UpdateBannerText = $"Download of v{release.Version} failed — try View on GitHub.";
+            CanInstallUpdate = false;
+            UpdateBusy = false;
+            return null;
+        }
+
+        UpdateBusy = false;
+        return path;
     }
 
     /// <summary>Hide the banner and remember this version so it won't reappear for it.</summary>
     [RelayCommand]
     private void DismissUpdate()
     {
-        if (_latestUpdate is not null)
+        if (_latestRelease is { } release)
         {
-            _config.AppSettings.DismissedUpdate = _latestUpdate;
+            _config.AppSettings.DismissedUpdate = release.Version;
             SaveConfig();
         }
         UpdateAvailable = false;

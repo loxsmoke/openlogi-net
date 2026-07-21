@@ -77,11 +77,23 @@
         <!-- Update banner (shown when the launch-time check finds a newer release) -->
         <Border DockPanel.Dock="Top" Padding="16,10" Background="#1F3B82F6"
                 IsVisible="{Binding UpdateAvailable}">
-            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto">
                 <TextBlock Grid.Column="0" Text="⬆" FontSize="16" VerticalAlignment="Center" Margin="0,0,10,0"/>
                 <TextBlock Grid.Column="1" Text="{Binding UpdateBannerText}" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                <Button Grid.Column="2" Content="Download" Margin="0,0,8,0" Command="{Binding DownloadUpdateCommand}"/>
-                <Button Grid.Column="3" Content="✕" Command="{Binding DismissUpdateCommand}"
+                <!-- Download/install progress; replaces nothing, just appears mid-row while busy. -->
+                <ProgressBar Grid.Column="2" Width="120" Minimum="0" Maximum="1" Margin="0,0,12,0"
+                             VerticalAlignment="Center" Value="{Binding UpdateProgress}"
+                             IsVisible="{Binding UpdateBusy}"/>
+                <!-- Install is hidden for portable/dev builds, which have no in-place upgrade path. -->
+                <Button Grid.Column="3" Content="Install" Margin="0,0,8,0"
+                        Command="{Binding InstallUpdateCommand}"
+                        IsVisible="{Binding CanInstallUpdate}" IsEnabled="{Binding !UpdateBusy}"/>
+                <Button Grid.Column="4" Content="Download" Margin="0,0,8,0"
+                        Command="{Binding DownloadUpdateCommand}" IsEnabled="{Binding !UpdateBusy}"/>
+                <Button Grid.Column="5" Content="View on GitHub" Margin="0,0,8,0"
+                        Command="{Binding ViewReleaseOnGitHubCommand}" IsEnabled="{Binding !UpdateBusy}"
+                        Background="Transparent" BorderThickness="0"/>
+                <Button Grid.Column="6" Content="✕" Command="{Binding DismissUpdateCommand}"
                         Background="Transparent" BorderThickness="0"/>
             </Grid>
         </Border>

@@ -119,10 +119,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     // Drives the thin indeterminate loading line under the device-detail header.
     [ObservableProperty] private bool _isLoadingDevice;
 
-    // Launch-time update check: banner shown when GitHub reports a newer release.
+    // Update check: banner shown when GitHub reports a newer release that has cleared
+    // the soak period. CanInstallUpdate gates the Install button (needs an installed
+    // build + a setup.exe asset); UpdateBusy covers both Install and Download so the
+    // whole button row disables while either is running.
     [ObservableProperty] private bool _updateAvailable;
     [ObservableProperty] private string _updateBannerText = "";
-    private string? _latestUpdate;
+    [ObservableProperty] private bool _canInstallUpdate;
+    [ObservableProperty] private bool _updateBusy;
+    [ObservableProperty] private double _updateProgress;
+    private ReleaseInfo? _latestRelease;
+    private System.Threading.Timer? _updateTimer;
 
     // Receiver-contention banner: Logitech software running alongside us can take
     // over the receiver (same warning the About window shows). Re-evaluated on each
@@ -332,6 +339,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             // needs this resume signal to get its persisted preferences re-pushed.
             try { Microsoft.Win32.SystemEvents.PowerModeChanged += OnPowerModeChanged; }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"power events unavailable: {ex.Message}"); }
+
+            // The check at launch can miss a release that is still inside its soak period,
+            // so a long-lived session re-checks daily rather than waiting for a restart.
+            try { StartUpdateTimer(); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"update timer unavailable: {ex.Message}"); }
         }
     }
 
@@ -589,6 +601,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             _ = _receiverWatcher.DisposeAsync();
         }
         _lightingKeepaliveTimer?.Dispose();
+        _updateTimer?.Dispose();
         _ = _keepaliveSession?.DisposeAsync();
         _ = _batteryMonitor?.DisposeAsync();
         foreach (var mc in _mouseCaptures)
