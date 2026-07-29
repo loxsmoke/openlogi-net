@@ -24,9 +24,18 @@ public sealed class AppSettings
     public string? Language { get; set; }
     public int ThumbwheelSensitivity { get; set; } = DefaultThumbwheelSensitivity;
 
+    /// <summary>
+    /// Briefly enlarge the mouse pointer when the mouse is shaken, the way macOS
+    /// does, so a lost cursor is easy to spot. Off by default — it changes a
+    /// system-wide setting (the Windows pointer size) while active. How far it grows
+    /// is fixed (see <c>ShakeZoom</c>), so there is nothing else to store.
+    /// </summary>
+    public bool ShakeToLocate { get; set; }
+
     /// <summary>True when nothing diverges from the default (so the block is omitted).</summary>
     public bool IsDefault() =>
         !LaunchAtLogin && !CheckForUpdates && !UpdatePromptSeen && DismissedUpdate is null
         && ShowInMenuBar && AutoDownloadAssets && !MinimizeToTray && !SuppressLogging
-        && Language is null && ThumbwheelSensitivity == DefaultThumbwheelSensitivity;
+        && Language is null && ThumbwheelSensitivity == DefaultThumbwheelSensitivity
+        && !ShakeToLocate;
 }

@@ -15,6 +15,9 @@ public abstract record MouseEvent
 
     /// <summary>A scroll tick. <c>DeltaY &gt; 0</c> is scroll-up; <c>DeltaX &gt; 0</c> is right.</summary>
     public sealed record Scroll(float DeltaX, float DeltaY, bool FromTrackpad = false, EventDevice? Device = null) : MouseEvent;
+
+    /// <summary>The pointer moved to a screen position (physical pixels, +x right, +y down).</summary>
+    public sealed record Move(int X, int Y) : MouseEvent;
 }
 
 /// <summary>What the hook callback wants the OS to do with a captured event.</summary>

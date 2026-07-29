@@ -142,6 +142,7 @@ public sealed class MouseHook : IDisposable
         {
             Native.WM_MOUSEWHEEL => new MouseEvent.Scroll(0.0f, SignedHighWord(data.mouseData) / WheelDelta),
             Native.WM_MOUSEHWHEEL => new MouseEvent.Scroll(SignedHighWord(data.mouseData) / WheelDelta, 0.0f),
+            Native.WM_MOUSEMOVE => new MouseEvent.Move(data.pt.X, data.pt.Y),
             _ => null,
         };
     }

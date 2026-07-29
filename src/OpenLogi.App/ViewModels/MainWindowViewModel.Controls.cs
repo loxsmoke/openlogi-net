@@ -160,4 +160,16 @@ public partial class MainWindowViewModel
         // not on the next reconnect.
         await RestartGestureCaptureForSelectedAsync();
     }
+
+    /// <summary>
+    /// Shake-to-locate is app-wide, so it needs no device call — the running agent
+    /// reads the setting per pointer event, and the guard makes the read-back that
+    /// seeds the checkbox at startup a no-op rather than a config write.
+    /// </summary>
+    partial void OnShakeToLocateChanged(bool value)
+    {
+        if (value == _config.AppSettings.ShakeToLocate) return;
+        _config.AppSettings.ShakeToLocate = value;
+        SaveConfig();
+    }
 }

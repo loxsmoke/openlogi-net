@@ -6,8 +6,10 @@ namespace OpenLogi.App.ViewModels;
 
 /// <summary>
 /// Backs the Settings window: launch-at-login, opt-in update check, asset
-/// auto-download, and thumb-wheel sensitivity. Bound to the shared <see cref="Config"/>;
-/// changes apply immediately (autostart writes the registry) and save.
+/// auto-download, tray behaviour and logging. Bound to the shared
+/// <see cref="Config"/>; changes apply immediately (autostart writes the registry)
+/// and save. Pointer behaviour — shake-to-locate — lives on the Pointer tab, next to
+/// the rest of the mouse pointer settings.
 /// </summary>
 public sealed partial class SettingsViewModel : ObservableObject
 {

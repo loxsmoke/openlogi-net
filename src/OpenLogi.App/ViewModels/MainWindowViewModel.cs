@@ -157,10 +157,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private double _imageWidth;
 
     // DPI live controls (slider over the device's supported range + presets).
-    [ObservableProperty][NotifyPropertyChangedFor(nameof(ShowPointerTuning))] private bool _showDpi;
-
-    /// <summary>The Pointer tuning card is shown when the device offers DPI control or native scroll-direction invert.</summary>
-    public bool ShowPointerTuning => ShowDpi || ShowScrollInvert;
+    // The card around them is always shown — shake-to-locate rides along in it and is
+    // app-wide — so only the DPI section itself follows the device's capabilities.
+    [ObservableProperty] private bool _showDpi;
     [ObservableProperty] private double _dpiMin;
     [ObservableProperty] private double _dpiMax;
     [ObservableProperty] private double _dpiStep = 50;
@@ -189,13 +188,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public bool IsRatchet { get => WheelModeChoice == WheelModeChoice.Ratchet; set { if (value) WheelModeChoice = WheelModeChoice.Ratchet; } }
 
     // Native scroll-direction invert (HiResWheel 0x2121).
-    [ObservableProperty][NotifyPropertyChangedFor(nameof(ShowPointerTuning))] private bool _showScrollInvert;
+    [ObservableProperty] private bool _showScrollInvert;
     [ObservableProperty] private bool _invertScroll;
 
     // Hi-res smooth scrolling (also HiResWheel 0x2121): the wheel is diverted to
     // HID++ events and re-injected as fine-grained OS scrolling while the app runs.
     [ObservableProperty] private bool _showSmoothScroll;
     [ObservableProperty] private bool _smoothScroll;
+
+    // Shake to locate. App-wide rather than per-device — it rides the OS mouse hook,
+    // which sees the one pointer whichever mouse moved it — but it is a pointer
+    // setting, so it sits with the others on the Pointer tab rather than in Settings.
+    [ObservableProperty] private bool _shakeToLocate;
 
     // Hosts (EasySwitch / multi-host).
     [ObservableProperty] private bool _showHosts;
@@ -305,6 +309,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public MainWindowViewModel()
     {
         _agent = new AgentRuntime(_config);
+        // The setting is app-wide, so it is read once here rather than per device load.
+        ShakeToLocate = _config.AppSettings.ShakeToLocate;
         if (!Design.IsDesignMode)
         {
             // A failed hook install (e.g. no interactive desktop) must not crash

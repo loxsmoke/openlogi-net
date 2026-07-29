@@ -488,10 +488,10 @@
                 <TabItem Header="Pointer" IsVisible="{Binding HasPointerTab}">
                     <ScrollViewer>
                         <WrapPanel Margin="8">
-                            <!-- Pointer tuning (DPI) + native scroll-direction invert (HiResWheel 0x2121) -->
+                            <!-- Scroll direction + shake-to-locate + Pointer tuning (DPI). Always shown:
+                                 shake-to-locate is app-wide, so the card is never empty. -->
                             <Border Margin="8" Padding="16" Background="#11000000" CornerRadius="8"
-                                    MinWidth="340" MaxWidth="340" VerticalAlignment="Stretch"
-                                    IsVisible="{Binding ShowPointerTuning}">
+                                    MinWidth="340" MaxWidth="340" VerticalAlignment="Stretch">
                                 <StackPanel Spacing="10">
                                     <!-- Scroll direction (extra bottom margin separates it from Pointer tuning below) -->
                                     <StackPanel Spacing="6" Margin="0,0,0,8" IsVisible="{Binding ShowScrollInvert}">
@@ -505,6 +505,14 @@
                                         <TextBlock Text="Smooth scrolling" FontSize="15" FontWeight="SemiBold"/>
                                         <CheckBox Content="High-resolution smooth scrolling" IsChecked="{Binding SmoothScroll}"/>
                                         <TextBlock Text="Scrolls in fine sub-line steps instead of whole lines. The app translates the wheel while it runs; standard scrolling returns when it quits."
+                                                   Opacity="0.5" FontSize="11" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <!-- Shake to locate: app-wide (the OS pointer), not a device feature -->
+                                    <StackPanel Spacing="6" Margin="0,0,0,8">
+                                        <TextBlock Text="Find the pointer" FontSize="15" FontWeight="SemiBold"/>
+                                        <CheckBox Content="Enlarge the pointer when the mouse is shaken"
+                                                  IsChecked="{Binding ShakeToLocate}"/>
+                                        <TextBlock Text="Wiggle the mouse back and forth and the pointer grows — up to 3× — then shrinks smoothly back once you stop. Changes the Windows pointer size while active."
                                                    Opacity="0.5" FontSize="11" TextWrapping="Wrap"/>
                                     </StackPanel>
                                     <StackPanel Spacing="10" IsVisible="{Binding ShowDpi}">

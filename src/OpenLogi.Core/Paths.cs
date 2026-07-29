@@ -33,6 +33,14 @@ public static class Paths
     /// <summary>Directory for the device-render asset cache.</summary>
     public static string AssetCacheDir() => Path.Combine(DataDir(), "assets");
 
+    /// <summary>
+    /// Marker file recording that shake-to-locate has swapped the system cursors for
+    /// enlarged copies. Written before the swap and deleted once they are restored, so
+    /// a crash mid-shake is undone on the next launch rather than leaving the user with
+    /// a giant pointer for the rest of the session.
+    /// </summary>
+    public static string CursorSizeRestorePath() => Path.Combine(DataDir(), "cursor-size.restore");
+
     /// <summary>Directory for diagnostic logs (<c>%LOCALAPPDATA%\OpenLogi\logs</c>).</summary>
     public static string LogDir() => Path.Combine(DataDir(), "logs");
 

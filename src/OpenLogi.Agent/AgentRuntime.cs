@@ -23,6 +23,15 @@ public sealed class AgentRuntime : IDisposable
     private string? _selectedConfigKey;
     private MouseHook? _hook;
 
+    // Shake-to-locate. Constructed either way (it costs nothing idle) and only fed
+    // while the setting is on, which is read per event so the Settings toggle takes
+    // effect immediately.
+    private readonly CursorLocator _cursorLocator = new();
+
+    // Buttons currently held, as a bitmask of ButtonId. Read and written only on the
+    // hook thread. Injected events never reach the hook, so downs and ups stay paired.
+    private int _buttonsDown;
+
     // Actions are injected from a single background consumer so a slow SendInput or
     // foreground-app lookup can never stall the callers — the HID++ event pumps
     // (a stalled pump queues gesture events and replays them, stale, in a burst
@@ -64,8 +73,22 @@ public sealed class AgentRuntime : IDisposable
 
     private EventDisposition OnMouseEvent(MouseEvent ev)
     {
+        if (ev is MouseEvent.Move move)
+        {
+            // Movement is only ever observed, never suppressed: it feeds shake-to-locate.
+            // A wiggle with a button held is a drag — scrubbing a slider, panning a map,
+            // sketching — not someone looking for the pointer, so it is not fed at all.
+            if (_config.AppSettings.ShakeToLocate && _buttonsDown == 0) _cursorLocator.PointerMoved(move.X, move.Y);
+            else _cursorLocator.Reset();
+            return EventDisposition.PassThrough;
+        }
+
         if (ev is not MouseEvent.Button button)
-            return EventDisposition.PassThrough; // scroll / move / interrupt pass through
+            return EventDisposition.PassThrough; // scroll / interrupt pass through
+
+        var bit = 1 << (int)button.Id;
+        if (button.Pressed) _buttonsDown |= bit;
+        else _buttonsDown &= ~bit;
 
         string? configKey;
         lock (_gate) configKey = _selectedConfigKey;
@@ -127,6 +150,7 @@ public sealed class AgentRuntime : IDisposable
             _hook?.Dispose();
             _hook = null;
         }
+        _cursorLocator.Dispose();
         _injections.Writer.TryComplete();
     }
 }

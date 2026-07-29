@@ -1,4 +1,5 @@
 using OpenLogi.Core.Config;
+using OpenLogi.Core.Cursor;
 using OpenLogi.Input;
 
 namespace OpenLogi.Tests.Input;
@@ -42,12 +43,58 @@ public class MouseHookTranslateTests
     }
 
     [Fact]
+    public void TranslatesMovesToScreenPositions()
+    {
+        var moved = new Native.MSLLHOOKSTRUCT { pt = new Native.POINT { X = 1280, Y = 720 } };
+        var ev = Assert.IsType<MouseEvent.Move>(MouseHook.TranslateEvent(Native.WM_MOUSEMOVE, moved));
+        Assert.Equal(1280, ev.X);
+        Assert.Equal(720, ev.Y);
+    }
+
+    [Fact]
     public void TranslatesXButtonsToBackForward()
     {
         var back = new Native.MSLLHOOKSTRUCT { mouseData = (uint)Native.XBUTTON1 << 16 };
         var forward = new Native.MSLLHOOKSTRUCT { mouseData = (uint)Native.XBUTTON2 << 16 };
         Assert.Equal(ButtonId.Back, Assert.IsType<MouseEvent.Button>(MouseHook.TranslateEvent(Native.WM_XBUTTONDOWN, back)).Id);
         Assert.Equal(ButtonId.Forward, Assert.IsType<MouseEvent.Button>(MouseHook.TranslateEvent(Native.WM_XBUTTONDOWN, forward)).Id);
+    }
+}
+
+/// <summary>The pure part of shake-to-locate's pointer resize (the rest needs a desktop).</summary>
+public class CursorSizeTests
+{
+    [Fact]
+    public void ScalesTheUsersOwnPointerSize()
+    {
+        Assert.Equal(96, CursorSize.TargetSize(CursorSize.DefaultBaseSize, 3));
+        Assert.Equal(192, CursorSize.TargetSize(64, 3)); // a user who already runs a big pointer
+    }
+
+    [Fact]
+    public void FractionalFramesLandOnTheSizeStep()
+    {
+        // Mid-animation scales resolve to a step of the ladder, so consecutive frames
+        // often round to the size already on screen and cost nothing to "apply".
+        Assert.Equal(48, CursorSize.TargetSize(CursorSize.DefaultBaseSize, 1.5));
+        Assert.Equal(68, CursorSize.TargetSize(CursorSize.DefaultBaseSize, 2.18)); // 69.8 → nearest step
+        Assert.Equal(0, CursorSize.TargetSize(CursorSize.DefaultBaseSize, 2.6) % CursorSize.SizeStep);
+        Assert.Equal(CursorSize.DefaultBaseSize, CursorSize.TargetSize(CursorSize.DefaultBaseSize, 0.5)); // never below 1×
+    }
+
+    [Fact]
+    public void FullScaleStaysOnANativeCursorSize()
+    {
+        // The stock cursor files carry native 32/48/64/96/128 images; 3× of the default
+        // is 96, so the fully grown pointer is drawn from one of them rather than scaled.
+        Assert.Equal(96, CursorSize.TargetSize(CursorSize.DefaultBaseSize, ShakeZoom.MaxScale));
+    }
+
+    [Fact]
+    public void NeverExceedsWhatWindowsAccepts()
+    {
+        Assert.Equal(CursorSize.MaxBaseSize, CursorSize.TargetSize(64, 8));
+        Assert.Equal(CursorSize.MaxBaseSize, CursorSize.TargetSize(CursorSize.MaxBaseSize, 2));
     }
 }
 

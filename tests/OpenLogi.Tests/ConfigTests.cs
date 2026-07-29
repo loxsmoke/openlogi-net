@@ -336,6 +336,20 @@ public class ConfigTests
     }
 
     [Fact]
+    public void AppSettingsShakeToLocateRoundtrips()
+    {
+        var cfg = new Config();
+        cfg.AppSettings.ShakeToLocate = true;
+        Assert.True(WriteAndRead(cfg).AppSettings.ShakeToLocate);
+    }
+
+    [Fact]
+    public void ShakeToLocateIsOffByDefault()
+    {
+        Assert.False(new Config().AppSettings.ShakeToLocate);
+    }
+
+    [Fact]
     public void UnsupportedNewerSchemaIsRejected()
     {
         var dir = Directory.CreateTempSubdirectory("openlogi-cfg");

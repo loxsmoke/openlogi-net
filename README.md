@@ -56,6 +56,9 @@ It ships two binaries:
   Note: running Logitech software (Options+, G HUB, Logi Bolt app) alongside
   may interfere with this setting — both sides write the same volatile wheel
   mode on the device, so whichever wrote last wins.
+- **Shake to locate the pointer** — wiggle the mouse back and forth and the
+  pointer grows, macOS-style, up to 3× while you keep shaking, then eases
+  smoothly back once you stop. Off by default; on the Pointer tab.
 - **RGB lighting** — solid colors, per-key colors, brightness, and built-in
   effects on supported keyboards.
 - **Onboard profiles** — read, switch, and write the device's onboard

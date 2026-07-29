@@ -50,6 +50,7 @@ public static class ConfigCodec
             ["auto_download_assets"] = s.AutoDownloadAssets,
             ["minimize_to_tray"] = s.MinimizeToTray,
             ["suppress_logging"] = s.SuppressLogging,
+            ["shake_to_locate"] = s.ShakeToLocate,
         };
         if (s.DismissedUpdate is not null)
             t["dismissed_update"] = s.DismissedUpdate;
@@ -265,6 +266,7 @@ public static class ConfigCodec
         SuppressLogging = GetBool(t, "suppress_logging", false),
         Language = GetString(t, "language"),
         ThumbwheelSensitivity = (int)GetLong(t, "thumbwheel_sensitivity", AppSettings.DefaultThumbwheelSensitivity),
+        ShakeToLocate = GetBool(t, "shake_to_locate", false),
     };
 
     private static DeviceConfig ParseDevice(TomlTable t)
