@@ -8,12 +8,27 @@ namespace OpenLogi.Tests.HidPP;
 /// <c>MockRawHidChannel</c>: records written reports, can auto-respond on write,
 /// and can push unsolicited incoming reports.
 /// </summary>
-public sealed class MockRawHidChannel : IRawHidChannel
+public sealed class MockRawHidChannel : IRawHidChannel, IDisposable
 {
     private readonly Channel<byte[]> _incoming = System.Threading.Channels.Channel.CreateUnbounded<byte[]>();
     private readonly List<byte[]> _written = [];
     private readonly Queue<byte[]> _responsesOnWrite = new();
     private readonly object _lock = new();
+    private Exception? _readFailure;
+    private int _readAttempts;
+
+    /// <summary>Whether <see cref="Dispose"/> ran (the channel owns and closes its raw channel).</summary>
+    public bool Disposed { get; private set; }
+
+    /// <summary>How many times <see cref="ReadReportAsync"/> was entered.</summary>
+    public int ReadAttempts => Volatile.Read(ref _readAttempts);
+
+    /// <summary>
+    /// While set, <see cref="ReadReportAsync"/> throws it immediately — modelling
+    /// a stale Windows HID handle, which fails every read without waiting. Clear
+    /// with <c>null</c> to model the handle recovering (BLE device waking).
+    /// </summary>
+    public void FailReads(Exception? failure) => Volatile.Write(ref _readFailure, failure);
 
     public ushort VendorId { get; init; } = 0x046d;
     public ushort ProductId { get; init; } = 0xc539;
@@ -50,6 +65,8 @@ public sealed class MockRawHidChannel : IRawHidChannel
 
     public async Task<int> ReadReportAsync(Memory<byte> buf, CancellationToken cancellationToken)
     {
+        Interlocked.Increment(ref _readAttempts);
+        if (Volatile.Read(ref _readFailure) is { } failure) throw failure;
         var report = await _incoming.Reader.ReadAsync(cancellationToken);
         var len = Math.Min(report.Length, buf.Length);
         report.AsSpan(0, len).CopyTo(buf.Span);
@@ -57,6 +74,8 @@ public sealed class MockRawHidChannel : IRawHidChannel
     }
 
     public (bool SupportsShort, bool SupportsLong)? SupportsShortLongHidpp() => Support;
+
+    public void Dispose() => Disposed = true;
 
     public Task<int> GetReportDescriptorAsync(Memory<byte> buf) =>
         throw new InvalidOperationException("mock declares HID++ support");

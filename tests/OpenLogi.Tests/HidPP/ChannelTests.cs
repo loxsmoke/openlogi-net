@@ -166,6 +166,51 @@ public class ChannelTests
         Assert.Equal(1, Volatile.Read(ref removedCalls));
     }
 
+    [Fact]
+    public async Task FailingReadsBackOffInsteadOfSpinningAndRecover()
+    {
+        // Regression: a stale HID handle (BLE device napping, unplug, resume)
+        // fails every read instantly, and the read loop retried hot — a full core
+        // per dead channel. It must back off between failed reads, and must keep
+        // the channel alive: the same handle starts working again when a BLE
+        // device wakes, and captures rely on riding that out.
+        var raw = new MockRawHidChannel();
+        raw.FailReads(new IOException("the device is not connected"));
+        await using var channel = await HidppChannel.FromRawChannelAsync(raw);
+
+        await Task.Delay(TimeSpan.FromSeconds(1));
+        var attempts = raw.ReadAttempts;
+        Assert.InRange(attempts, 2, 10); // hot-spinning made thousands per second
+
+        // Handle recovers (device woke): the channel must resume matching responses.
+        raw.FailReads(null);
+        var response = MockRawHidChannel.ShortMsg(0x20);
+        raw.QueueResponse(response);
+        var actual = await channel.SendWithTimeoutAsync(
+            MockRawHidChannel.ShortMsg(0x10), c => c == response, TimeSpan.FromSeconds(3));
+        Assert.Equal(response, actual);
+    }
+
+    [Fact]
+    public async Task DisposeClosesRawChannel()
+    {
+        // Regression: the channel owned the raw HID stream but never closed it,
+        // leaking one OS handle per channel for the process lifetime.
+        var raw = new MockRawHidChannel();
+        var channel = await HidppChannel.FromRawChannelAsync(raw);
+        await channel.DisposeAsync();
+        Assert.True(raw.Disposed);
+    }
+
+    [Fact]
+    public async Task RejectedRawChannelIsDisposed()
+    {
+        var raw = new MockRawHidChannel { Support = (false, false) };
+        var ex = await Assert.ThrowsAsync<ChannelException>(() => HidppChannel.FromRawChannelAsync(raw));
+        Assert.Equal(ChannelErrorKind.HidppNotSupported, ex.Kind);
+        Assert.True(raw.Disposed);
+    }
+
     private static async Task WaitForEventCount(List<(HidppMessage, bool)> events, object eventsLock, int count)
     {
         var started = Stopwatch.StartNew();

@@ -1,3 +1,5 @@
+using OpenLogi.Core.Logging;
+
 namespace OpenLogi.HidPP.Channel;
 
 /// <summary>
@@ -9,6 +11,12 @@ public sealed class HidppChannel : IAsyncDisposable
 {
     /// <summary>Default time budget for <see cref="SendAsync"/> (write + response wait).</summary>
     public static readonly TimeSpan SendResponseTimeout = TimeSpan.FromSeconds(5);
+
+    /// <summary>First pause after a failed read; doubles per consecutive failure.</summary>
+    public static readonly TimeSpan InitialReadFailureBackoff = TimeSpan.FromMilliseconds(250);
+
+    /// <summary>Ceiling for the read-failure backoff.</summary>
+    public static readonly TimeSpan MaxReadFailureBackoff = TimeSpan.FromSeconds(1);
 
     public bool SupportsShort { get; }
     public bool SupportsLong { get; }
@@ -41,15 +49,23 @@ public sealed class HidppChannel : IAsyncDisposable
         _readLoop = Task.Run(() => ReadLoopAsync(_cts.Token));
     }
 
-    /// <summary>Construct a HID++ channel from a raw channel, or throw if HID++ is unsupported.</summary>
-    public static async Task<HidppChannel> FromRawChannelAsync(IRawHidChannel raw)
+    /// <summary>
+    /// Construct a HID++ channel from a raw channel, or throw if HID++ is
+    /// unsupported. Takes ownership of <paramref name="raw"/> either way: a
+    /// rejected channel is disposed here rather than leaking its HID handle.
+    /// </summary>
+    public static Task<HidppChannel> FromRawChannelAsync(IRawHidChannel raw)
     {
-        var support = raw.SupportsShortLongHidpp()
-            ?? throw new NotSupportedException(
-                "report-descriptor parsing is not implemented yet; the raw channel must report short/long support directly (section 4)");
-        if (!support.SupportsShort && !support.SupportsLong)
-            throw new ChannelException(ChannelErrorKind.HidppNotSupported);
-        return new HidppChannel(raw, support.SupportsShort, support.SupportsLong);
+        var support = raw.SupportsShortLongHidpp();
+        if (support is null || (!support.Value.SupportsShort && !support.Value.SupportsLong))
+        {
+            (raw as IDisposable)?.Dispose();
+            throw support is null
+                ? new NotSupportedException(
+                    "report-descriptor parsing is not implemented yet; the raw channel must report short/long support directly (section 4)")
+                : new ChannelException(ChannelErrorKind.HidppNotSupported);
+        }
+        return Task.FromResult(new HidppChannel(raw, support.Value.SupportsShort, support.Value.SupportsLong));
     }
 
     // ── Software id ──────────────────────────────────────────────────────────
@@ -207,19 +223,44 @@ public sealed class HidppChannel : IAsyncDisposable
         // reports (ids 0x20/0x21, up to 32 bytes) and Windows reads always return
         // the collection maximum, so a 20-byte buffer would truncate real traffic.
         var buf = new byte[64];
+        var backoff = TimeSpan.Zero;
+        var firstBurst = true;
         while (!ct.IsCancellationRequested)
         {
             int len;
             try
             {
                 len = await _raw.ReadReportAsync(buf, ct).ConfigureAwait(false);
+                if (backoff != TimeSpan.Zero)
+                {
+                    backoff = TimeSpan.Zero;
+                    Log(firstBurst, "reads recovered");
+                    firstBurst = false;
+                }
             }
             catch (OperationCanceledException)
             {
                 break;
             }
-            catch
+            catch (Exception e)
             {
+                // A stale HID handle (BLE device napping, unplug, sleep/resume
+                // re-enumeration) fails INSTANTLY on every read — no timeout wait —
+                // so a bare retry spun a full core per such channel. Back off
+                // instead of giving up: a BLE device's handle starts working again
+                // when it wakes (LIVE-OBSERVED via the capture keepalive), and for
+                // a handle that never recovers one failed read per second is noise.
+                if (backoff == TimeSpan.Zero)
+                {
+                    backoff = InitialReadFailureBackoff;
+                    Log(firstBurst, $"read failed ({e.Message}) — retrying with backoff");
+                }
+                else if (backoff < MaxReadFailureBackoff)
+                {
+                    backoff = TimeSpan.FromTicks(Math.Min(backoff.Ticks * 2, MaxReadFailureBackoff.Ticks));
+                }
+                try { await Task.Delay(backoff, ct).ConfigureAwait(false); }
+                catch (OperationCanceledException) { break; }
                 continue;
             }
 
@@ -246,12 +287,30 @@ public sealed class HidppChannel : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// A channel's first failure burst is the interesting one — log it at Info.
+    /// Later bursts are routine (a BLE device naps between every use) and would
+    /// flood the log, so they drop to Debug.
+    /// </summary>
+    private void Log(bool firstBurst, string text)
+    {
+        if (firstBurst) DiagnosticLog.Info("channel", $"{VendorId:x4}:{ProductId:x4}: {text}");
+        else DiagnosticLog.Debug("channel", $"{VendorId:x4}:{ProductId:x4}: {text}");
+    }
+
     public async ValueTask DisposeAsync()
     {
         await _cts.CancelAsync().ConfigureAwait(false);
         try { await _readLoop.ConfigureAwait(false); }
         catch (OperationCanceledException) { /* expected */ }
         _cts.Dispose();
+        // The channel owns its raw channel (see FromRawChannelAsync) — close it
+        // here, or the HID handle stays open for the rest of the process.
+        switch (_raw)
+        {
+            case IAsyncDisposable ad: await ad.DisposeAsync().ConfigureAwait(false); break;
+            case IDisposable d: d.Dispose(); break;
+        }
     }
 
     private sealed record PendingMessage(long Id, Func<HidppMessage, bool> Predicate, TaskCompletionSource<HidppMessage> Tcs);

@@ -17,9 +17,12 @@ public interface IRawHidChannel
     Task<int> WriteReportAsync(ReadOnlyMemory<byte> src);
 
     /// <summary>
-    /// Read a raw report into <paramref name="buf"/>; returns bytes read. An
-    /// error is transient (the read loop logs and retries); a permanent failure
-    /// may park forever (the loop always races this against cancellation).
+    /// Read a raw report into <paramref name="buf"/>; returns bytes read.
+    /// Implementations absorb their own read timeouts internally (looping so
+    /// cancellation is observed promptly). Any exception thrown here is treated
+    /// by the read loop as a failed read and retried with exponential backoff —
+    /// a stale handle (device asleep, unplugged, or re-enumerated) fails
+    /// instantly on every call, so the loop must never retry it hot.
     /// </summary>
     Task<int> ReadReportAsync(Memory<byte> buf, CancellationToken cancellationToken);
 
