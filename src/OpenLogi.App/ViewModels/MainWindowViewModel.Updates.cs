@@ -13,20 +13,10 @@ namespace OpenLogi.App.ViewModels;
 // Launch-time update check + the Logitech-software receiver-contention warning.
 public partial class MainWindowViewModel
 {
-    /// <summary>
-    /// Record the user's answer to the first-run "check for updates?" prompt (so it's
-    /// asked only once), then run the check immediately if they opted in.
-    /// </summary>
-    public async Task ApplyUpdateConsentAsync(bool enable)
-    {
-        _config.AppSettings.CheckForUpdates = enable;
-        _config.AppSettings.UpdatePromptSeen = true;
-        SaveConfig();
-        await CheckForUpdatesAsync();
-    }
+    public event Action<string>? UpdateOfferShown;
 
     /// <summary>
-    /// When the user has opted in, ask GitHub for the latest release and show the
+    /// When update checks are enabled, ask GitHub for the latest release and show the
     /// update banner if it's newer than this build, has cleared the soak period, and
     /// isn't a version already dismissed. Silent on every failure; a no-op when update
     /// checks are off.
@@ -56,12 +46,14 @@ public partial class MainWindowViewModel
                 return;
 
             case UpdateCheck.BannerState.Shown:
+                var notify = _latestRelease?.Version != release!.Version || !UpdateAvailable;
                 _latestRelease = release;
                 UpdateBannerText = $"Update available: v{release!.Version}";
                 // Install only makes sense when there's an installer to run and we're
                 // running from an install it can upgrade in place.
                 CanInstallUpdate = release.SetupUrl is not null && UpdateInstaller.IsInstalledBySetup();
                 UpdateAvailable = true;
+                if (notify) UpdateOfferShown?.Invoke(release.Version);
                 return;
         }
     }

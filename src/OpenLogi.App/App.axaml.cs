@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Markup.Xaml;
@@ -40,10 +41,15 @@ public partial class App : Application
                 DiagnosticLog.Info("env", $"config {Paths.ConfigPath()}");
             });
 
+            var startFromLogin = Environment.GetCommandLineArgs()
+                .Skip(1)
+                .Any(arg => string.Equals(arg, Autostart.StartupArgument, StringComparison.OrdinalIgnoreCase));
+            Autostart.RefreshCurrentEntry();
             var viewModel = new MainWindowViewModel();
             desktop.MainWindow = new MainWindow
             {
                 DataContext = viewModel,
+                StartHiddenToTray = startFromLogin,
             };
             // Tear down the OS mouse hook cleanly when the app quits, then seal
             // the log so a missing end marker always means a crash.

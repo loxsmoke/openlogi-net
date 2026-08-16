@@ -1,22 +1,29 @@
 using System;
+using System.Drawing;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Platform;
+using Avalonia.Threading;
 using OpenLogi.App.ViewModels;
+using WinForms = System.Windows.Forms;
 
 namespace OpenLogi.App.Views;
 
 public partial class MainWindow : Window
 {
-    private TrayIcon? _tray;
+    private WinForms.NotifyIcon? _tray;
     // Set once the user confirmed quitting (or quit from the tray menu), so the
     // resumed close isn't intercepted again.
     private bool _exitConfirmed;
     // Guards against stacking dialogs when the close button is clicked repeatedly.
     private bool _exitPromptOpen;
+    private bool _startHiddenApplied;
+    private string? _lastTrayUpdateVersion;
+    private MainWindowViewModel? _subscribedViewModel;
+
+    public bool StartHiddenToTray { get; init; }
 
     public MainWindow()
     {
@@ -24,47 +31,63 @@ public partial class MainWindow : Window
         var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3);
         Title = version is null ? "OpenLogi.net" : $"OpenLogi.net {version}";
         InitTray();
+        DataContextChanged += OnDataContextChanged;
         Opened += OnOpened;
     }
 
-    // First launch: ask once whether to enable update checks (UpdatePromptSeen gates
-    // re-prompting). Then, if opted in, run the launch-time check which drives the banner.
+    private void OnDataContextChanged(object? sender, EventArgs e)
+    {
+        if (_subscribedViewModel is not null)
+            _subscribedViewModel.UpdateOfferShown -= OnUpdateOfferShown;
+
+        _subscribedViewModel = DataContext as MainWindowViewModel;
+        if (_subscribedViewModel is not null)
+            _subscribedViewModel.UpdateOfferShown += OnUpdateOfferShown;
+    }
+
+    // Launch/open update check. The setting defaults on for new configs and can be
+    // changed in Settings; the check itself is silent on failure.
     private async void OnOpened(object? sender, EventArgs e)
     {
         if (DataContext is not MainWindowViewModel vm) return;
-        if (!vm.Configuration.AppSettings.UpdatePromptSeen)
+        if (StartHiddenToTray && !_startHiddenApplied)
         {
-            var enable = await new UpdateConsentWindow().ShowDialog<bool>(this);
-            await vm.ApplyUpdateConsentAsync(enable);
+            _startHiddenApplied = true;
+            HideToTray();
+            if (vm.Configuration.AppSettings.CheckForUpdates)
+                await vm.CheckForUpdatesAsync();
+            return;
         }
-        else
-        {
-            await vm.CheckForUpdatesAsync();
-        }
+
+        await vm.CheckForUpdatesAsync();
     }
 
     // System-tray icon (hidden until the window is minimized to tray).
     private void InitTray()
     {
-        var open = new NativeMenuItem("Open OpenLogi.net");
-        open.Click += (_, _) => RestoreFromTray();
-        var quit = new NativeMenuItem("Quit");
-        quit.Click += (_, _) =>
+        var menu = new WinForms.ContextMenuStrip();
+        menu.Items.Add("Open OpenLogi.net", null, (_, _) => Dispatcher.UIThread.Post(RestoreFromTray));
+        menu.Items.Add("Quit", null, (_, _) => Dispatcher.UIThread.Post(() =>
         {
             // Quit from the tray menu is already an explicit choice (and the window
             // may be hidden, so there's nothing to own a dialog) — skip the prompt.
             _exitConfirmed = true;
             (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown();
-        };
+        }));
 
-        _tray = new TrayIcon
+        _tray = new WinForms.NotifyIcon
         {
-            Icon = new WindowIcon(AssetLoader.Open(new Uri("avares://OpenLogi.App/Assets/icon.ico"))),
-            ToolTipText = "OpenLogi.net",
-            IsVisible = false,
-            Menu = new NativeMenu { Items = { open, quit } },
+            Icon = AppIcon(),
+            Text = "OpenLogi.net",
+            Visible = false,
+            ContextMenuStrip = menu,
         };
-        _tray.Clicked += (_, _) => RestoreFromTray();
+        _tray.MouseClick += (_, e) =>
+        {
+            if (e.Button == WinForms.MouseButtons.Left)
+                Dispatcher.UIThread.Post(RestoreFromTray);
+        };
+        _tray.BalloonTipClicked += (_, _) => Dispatcher.UIThread.Post(RestoreFromTray);
     }
 
     private bool MinimizeToTrayEnabled() =>
@@ -94,7 +117,7 @@ public partial class MainWindow : Window
 
     private void HideToTray()
     {
-        if (_tray is not null) _tray.IsVisible = true;
+        if (_tray is not null) _tray.Visible = true;
         ShowInTaskbar = false; // hide from the taskbar; the tray icon restores it
         Hide();
     }
@@ -144,7 +167,33 @@ public partial class MainWindow : Window
         WindowState = WindowState.Normal;
         ShowInTaskbar = true;
         Activate();
-        if (_tray is not null) _tray.IsVisible = false;
+        if (_tray is not null) _tray.Visible = false;
+    }
+
+    private void OnUpdateOfferShown(string version)
+    {
+        if (_tray is null || _lastTrayUpdateVersion == version || IsVisible) return;
+
+        _lastTrayUpdateVersion = version;
+        _tray.Visible = true;
+        _tray.ShowBalloonTip(
+            10000,
+            "OpenLogi.net update available",
+            $"Version {version} is ready. Click to open OpenLogi.net.",
+            WinForms.ToolTipIcon.Info);
+    }
+
+    private static System.Drawing.Icon AppIcon() =>
+        Environment.ProcessPath is { } path
+            ? System.Drawing.Icon.ExtractAssociatedIcon(path) ?? SystemIcons.Application
+            : SystemIcons.Application;
+
+    protected override void OnClosed(EventArgs e)
+    {
+        if (_subscribedViewModel is not null)
+            _subscribedViewModel.UpdateOfferShown -= OnUpdateOfferShown;
+        _tray?.Dispose();
+        base.OnClosed(e);
     }
 
     // Opens the per-key color editor (keyboards with PerKeyLighting 0x8081).

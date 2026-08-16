@@ -119,6 +119,22 @@ Grab the latest installer or portable build from the
 Both builds are self-contained — the .NET runtime is bundled, so nothing else
 needs to be installed.
 
+### Update checks
+
+Update checks are enabled by default. The setting can be changed in Settings.
+
+When enabled, OpenLogi.net checks GitHub on launch/open and then every 24 hours
+while the app remains running. Releases are offered only after they have been
+public for at least 24 hours, so brand-new releases and hotfixes can soak before
+users see them. The app only considers GitHub's `/releases/latest` response; if
+a fresh hotfix supersedes an older release, the older offer is withdrawn until
+the hotfix itself ages past the 24-hour gate.
+
+When an eligible update is found, the app shows an in-window banner with Install,
+Download, View on GitHub, and Dismiss actions. If the window is hidden in the
+system tray when a new update offer appears, OpenLogi.net also shows a tray
+notification for that version; clicking the notification restores the app.
+
 ## CLI usage
 
 The CLI is a single executable; run it with a subcommand:

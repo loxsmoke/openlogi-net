@@ -309,6 +309,24 @@ public class ConfigTests
     }
 
     [Fact]
+    public void CheckForUpdatesIsOnByDefault()
+    {
+        Assert.True(new Config().AppSettings.CheckForUpdates);
+
+        var parsed = ConfigCodec.Parse("schema_version = 3\n[app_settings]\n", "inline");
+        Assert.True(parsed.AppSettings.CheckForUpdates);
+    }
+
+    [Fact]
+    public void DisabledUpdateChecksRoundtrip()
+    {
+        var cfg = new Config();
+        cfg.AppSettings.CheckForUpdates = false;
+        var parsed = WriteAndRead(cfg);
+        Assert.False(parsed.AppSettings.CheckForUpdates);
+    }
+
+    [Fact]
     public void AppSettingsLaunchAtLoginRoundtrips()
     {
         var cfg = new Config();

@@ -257,8 +257,8 @@ public static class ConfigCodec
     private static AppSettings ParseAppSettings(TomlTable t) => new()
     {
         LaunchAtLogin = GetBool(t, "launch_at_login", false),
-        CheckForUpdates = GetBool(t, "check_for_updates", false),
-        UpdatePromptSeen = GetBool(t, "update_prompt_seen", false),
+        CheckForUpdates = GetBool(t, "check_for_updates", true),
+        UpdatePromptSeen = GetBool(t, "update_prompt_seen", true),
         DismissedUpdate = GetString(t, "dismissed_update"),
         ShowInMenuBar = GetBool(t, "show_in_menu_bar", true),
         AutoDownloadAssets = GetBool(t, "auto_download_assets", true),

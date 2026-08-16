@@ -21,7 +21,7 @@
         <CheckBox Content="Minimize to the system tray (hide from the taskbar)" IsChecked="{Binding MinimizeToTray}"/>
         <CheckBox Content="Suppress diagnostic logs" IsChecked="{Binding SuppressLogging}"/>
 
-        <TextBlock Text="Settings are saved to config.toml. Update checks are opt-in and off by default."
+        <TextBlock Text="Settings are saved to config.toml. Update checks are enabled by default."
                    TextWrapping="Wrap" Opacity="0.5" FontSize="12"/>
     </StackPanel>
 </Window>

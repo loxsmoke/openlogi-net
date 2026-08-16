@@ -8,8 +8,8 @@ public sealed class AppSettings
     public const int MaxThumbwheelSensitivity = 100;
 
     public bool LaunchAtLogin { get; set; }
-    public bool CheckForUpdates { get; set; }
-    public bool UpdatePromptSeen { get; set; }
+    public bool CheckForUpdates { get; set; } = true;
+    public bool UpdatePromptSeen { get; set; } = true;
     /// <summary>The latest-release version the user dismissed in the update banner; the banner stays hidden for it.</summary>
     public string? DismissedUpdate { get; set; }
     public bool ShowInMenuBar { get; set; } = true;
@@ -34,7 +34,7 @@ public sealed class AppSettings
 
     /// <summary>True when nothing diverges from the default (so the block is omitted).</summary>
     public bool IsDefault() =>
-        !LaunchAtLogin && !CheckForUpdates && !UpdatePromptSeen && DismissedUpdate is null
+        !LaunchAtLogin && CheckForUpdates && UpdatePromptSeen && DismissedUpdate is null
         && ShowInMenuBar && AutoDownloadAssets && !MinimizeToTray && !SuppressLogging
         && Language is null && ThumbwheelSensitivity == DefaultThumbwheelSensitivity
         && !ShakeToLocate;

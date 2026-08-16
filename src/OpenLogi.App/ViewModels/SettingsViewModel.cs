@@ -5,7 +5,7 @@ using OpenLogi.Core.Logging;
 namespace OpenLogi.App.ViewModels;
 
 /// <summary>
-/// Backs the Settings window: launch-at-login, opt-in update check, asset
+/// Backs the Settings window: launch-at-login, update checks, asset
 /// auto-download, tray behaviour and logging. Bound to the shared
 /// <see cref="Config"/>; changes apply immediately (autostart writes the registry)
 /// and save. Pointer behaviour — shake-to-locate — lives on the Pointer tab, next to
