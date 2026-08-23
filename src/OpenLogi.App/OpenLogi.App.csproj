@@ -13,9 +13,6 @@
     <UseWindowsForms>true</UseWindowsForms>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <!-- English is the neutral resource set, so an English UI culture skips the
-         satellite-assembly probe entirely instead of failing one per lookup. -->
-    <NeutralLanguage>en</NeutralLanguage>
   </PropertyGroup>
   <ItemGroup>
     <Using Remove="System.Drawing" />

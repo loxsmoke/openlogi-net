@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Avalonia.Data;
 using OpenLogi.App.Localization;
+using OpenLogi.Core.Localization;
 
 namespace OpenLogi.Tests.App;
 
@@ -135,7 +136,7 @@ public class LocalizationTests
     public void EveryKeyUsedInXamlExists()
     {
         var defined = ResourceKeys();
-        foreach (var file in Directory.EnumerateFiles(AppSourceRoot(), "*.axaml", SearchOption.AllDirectories))
+        foreach (var file in Directory.EnumerateFiles(SrcRoot(), "*.axaml", SearchOption.AllDirectories))
             foreach (Match match in Regex.Matches(File.ReadAllText(file), @"\{loc:Tr\s+(?:Key=)?([A-Za-z0-9_]+)"))
             {
                 var key = match.Groups[1].Value;
@@ -148,7 +149,7 @@ public class LocalizationTests
     public void NoOrphanedResourceKeys()
     {
         var source = string.Concat(Directory
-            .EnumerateFiles(AppSourceRoot(), "*.*", SearchOption.AllDirectories)
+            .EnumerateFiles(SrcRoot(), "*.*", SearchOption.AllDirectories)
             .Where(f => f.EndsWith(".axaml") || f.EndsWith(".cs"))
             .Select(File.ReadAllText));
 
@@ -159,19 +160,22 @@ public class LocalizationTests
 
     private static HashSet<string> ResourceKeys() =>
     [
-        .. XDocument.Load(Path.Combine(AppSourceRoot(), "Localization", "Strings.resx"))
+        .. XDocument.Load(Path.Combine(SrcRoot(), "OpenLogi.Core", "Localization", "Strings.resx"))
             .Root!.Elements("data")
             .Select(d => d.Attribute("name")!.Value),
     ];
 
-    /// <summary>Walk up from the test binaries to <c>src\OpenLogi.App</c>.</summary>
-    private static string AppSourceRoot()
+    /// <summary>The <c>src</c> tree — resource keys are used from Core as well as the app.</summary>
+    internal static string SrcRoot() => Directory.GetParent(SourceRoot("OpenLogi.Core"))!.FullName;
+
+    /// <summary>Walk up from the test binaries to a project directory under <c>src</c>.</summary>
+    internal static string SourceRoot(string project)
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
         {
-            var candidate = Path.Combine(dir.FullName, "src", "OpenLogi.App");
+            var candidate = Path.Combine(dir.FullName, "src", project);
             if (Directory.Exists(candidate)) return candidate;
         }
-        throw new DirectoryNotFoundException(@"could not locate src\OpenLogi.App from the test output directory");
+        throw new DirectoryNotFoundException($"could not locate src/{project} from the test output directory");
     }
 }

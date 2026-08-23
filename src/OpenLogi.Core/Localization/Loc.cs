@@ -3,7 +3,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Resources;
 
-namespace OpenLogi.App.Localization;
+namespace OpenLogi.Core.Localization;
 
 /// <summary>
 /// The app's string table. Avalonia has no built-in XAML localization (no
@@ -21,9 +21,11 @@ public sealed class Loc : INotifyPropertyChanged
 {
     /// <summary>
     /// Base name of the embedded resource set: root namespace + folder + file, as
-    /// the SDK names <c>Localization\Strings.resx</c>.
+    /// the SDK names <c>Localization\Strings.resx</c>. It lives in Core rather than
+    /// the app because the action, button and gesture labels users read most often
+    /// are Core's, and one table beats two.
     /// </summary>
-    private const string ResourceBaseName = "OpenLogi.App.Localization.Strings";
+    private const string ResourceBaseName = "OpenLogi.Core.Localization.Strings";
 
     private static readonly ResourceManager Resources = new(ResourceBaseName, typeof(Loc).Assembly);
 
@@ -61,6 +63,14 @@ public sealed class Loc : INotifyPropertyChanged
         try { return Resources.GetString(key, Culture) ?? key; }
         catch (MissingManifestResourceException) { return key; }
     }
+
+    /// <summary>
+    /// Look up a composite-format string and fill it in. Formatting follows
+    /// CurrentCulture (OS regional settings) while the text follows the UI
+    /// language, so a number lands in the reader's own notation.
+    /// </summary>
+    public string Format(string key, params object?[] args) =>
+        string.Format(CultureInfo.CurrentCulture, Get(key), args);
 
     /// <summary>
     /// Switch the UI language. Also sets the thread and default-thread UI cultures

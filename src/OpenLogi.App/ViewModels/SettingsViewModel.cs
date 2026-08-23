@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
 using OpenLogi.App.Localization;
+using OpenLogi.Core.Localization;
 using OpenLogi.Core.Config;
 using OpenLogi.Core.Logging;
 

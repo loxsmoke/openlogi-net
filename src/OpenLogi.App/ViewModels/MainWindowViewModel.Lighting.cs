@@ -4,6 +4,7 @@ using OpenLogi.Core;
 using OpenLogi.Core.DeviceInfo;
 using OpenLogi.Core.Logging;
 using OpenLogi.Hid;
+using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.ViewModels;
 
@@ -130,14 +131,16 @@ public partial class MainWindowViewModel
     private void OnGKeyChanged(int index, byte usage, byte modifier)
     {
         if (_session is null || _gkeyProfileSector < 1) return;
-        StatusText = $"Remapping G{index + 1}…";
+        StatusText = Loc.Current.Format("Status_RemappingGKey", index + 1);
         _ = WriteGKeyAsync(index, usage, modifier);
     }
 
     private async Task WriteGKeyAsync(int index, byte usage, byte modifier)
     {
         var ok = _session is not null && await _session.SetGKeyUsageAsync(_gkeyProfileSector, index, usage, modifier);
-        StatusText = ok ? $"G{index + 1} remapped (profile {_gkeyProfileSector})." : "G-key remap failed.";
+        StatusText = ok
+            ? Loc.Current.Format("Status_GKeyRemapped", index + 1, _gkeyProfileSector)
+            : Loc.Current["Status_GKeyRemapFailed"];
     }
 
     /// <summary>Persist the selected effect + colour + speed/brightness into the profile's flash (device-side).</summary>
@@ -153,10 +156,12 @@ public partial class MainWindowViewModel
             LightingEffect.Cycle => DeviceSession.EffectCycle,
             _ => DeviceSession.EffectFixed,
         };
-        StatusText = $"Saving lighting to profile {SelectedProfileForEdit}…";
+        StatusText = Loc.Current.Format("Status_SavingLighting", SelectedProfileForEdit);
         var ok = await _session.SetProfileEffectAsync((ushort)SelectedProfileForEdit, effect,
             c.R, c.G, c.B, (ushort)LightingSpeed, (byte)LightingBrightness);
-        StatusText = ok ? $"Saved to profile {SelectedProfileForEdit}." : "Profile save failed.";
+        StatusText = ok
+            ? Loc.Current.Format("Status_LightingSaved", SelectedProfileForEdit)
+            : Loc.Current["Status_LightingSaveFailed"];
     }
 
     /// <summary>Mark "No profile" active (a custom colour/effect is driving the keyboard).</summary>

@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:OpenLogi.App.Localization"
         xmlns:vm="using:OpenLogi.App.ViewModels"
         x:Class="OpenLogi.App.Views.KeyPickerWindow"
         x:Name="Root"
@@ -8,7 +9,7 @@
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         Icon="/Assets/keyboard.png"
-        Title="Pick a key">
+        Title="{loc:Tr KeyPicker_PickKey}">
     <Window.Styles>
         <Style Selector="Button.key">
             <Setter Property="Height" Value="38"/>
@@ -34,7 +35,7 @@
     </Window.Styles>
 
     <StackPanel Margin="16" Spacing="10">
-        <TextBlock Text="Click modifiers (Shift / Ctrl / Alt) to toggle them, then click a key. Greyed keys can't be targets."
+        <TextBlock Text="{loc:Tr KeyPicker_ClickModifiersShiftCtrlAlt}"
                    Opacity="0.6" TextWrapping="Wrap"/>
         <Border Background="#15000000" Padding="10" CornerRadius="6">
             <TextBlock Text="{Binding Preview}" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center"/>
@@ -62,8 +63,8 @@
         </ItemsControl>
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,6,0,0">
-            <Button Content="Cancel" Click="OnCancel"/>
-            <Button Content="OK" Click="OnOk"/>
+            <Button Content="{loc:Tr KeyPicker_Cancel}" Click="OnCancel"/>
+            <Button Content="{loc:Tr KeyPicker_OK}" Click="OnOk"/>
         </StackPanel>
     </StackPanel>
 </Window>

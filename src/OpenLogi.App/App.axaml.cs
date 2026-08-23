@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Markup.Xaml;
 using OpenLogi.App.Localization;
+using OpenLogi.Core.Localization;
 using OpenLogi.App.ViewModels;
 using OpenLogi.App.Views;
 using OpenLogi.Core;

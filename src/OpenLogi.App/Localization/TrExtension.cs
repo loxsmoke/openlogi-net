@@ -3,6 +3,7 @@ using System.Globalization;
 using Avalonia.Data;
 using Avalonia.Data.Converters;
 using Avalonia.Markup.Xaml;
+using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.Localization;
 

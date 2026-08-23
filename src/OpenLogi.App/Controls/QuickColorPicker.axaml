@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:OpenLogi.App.Localization"
              x:Class="OpenLogi.App.Controls.QuickColorPicker"
              x:Name="Root">
     <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
@@ -27,7 +28,7 @@
         <Border Classes="swatch" Background="#FFFFFF" Tag="#FFFFFF" PointerPressed="OnSwatch"/>
         <!-- "Off" — paints the key/base dark. Only shown when ShowOff is set (per-key editor). -->
         <Border Classes="swatch" Tag="#000000" PointerPressed="OnSwatch" Background="#1A1A1A"
-                IsVisible="{Binding ShowOff, ElementName=Root}" ToolTip.Tip="Off (turns the key off)">
+                IsVisible="{Binding ShowOff, ElementName=Root}" ToolTip.Tip="{loc:Tr QuickColor_OffTurnsKeyOff}">
             <Path Stretch="Fill" Margin="5" Stroke="#E53935" StrokeThickness="2"
                   StrokeLineCap="Round" Data="M0,0 L1,1"/>
         </Border>

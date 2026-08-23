@@ -1,4 +1,5 @@
 using Avalonia.Data.Converters;
+using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.ViewModels;
 
@@ -9,7 +10,7 @@ public static class Converters
     public static readonly IValueConverter EffectLabel =
         new FuncValueConverter<LightingEffect, string>(e => e switch
         {
-            LightingEffect.Cycle => "Cycle colors",
+            LightingEffect.Cycle => Loc.Current["Effect_Cycle"],
             _ => e.ToString(),
         });
 }

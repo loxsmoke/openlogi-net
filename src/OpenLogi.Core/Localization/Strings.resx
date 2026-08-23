@@ -1,0 +1,1068 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Neutral (English) string table. Keys are Window_Element; comments are the
+    translator's only context, so say where the string appears and what varies.
+    Adding a language means adding Strings.<culture>.resx beside this file and a
+    row in LanguageCatalog.All - no code changes.
+  -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <data name="Settings_Title" xml:space="preserve">
+    <value>Settings</value>
+    <comment>Settings window title, and the heading at the top of it.</comment>
+  </data>
+  <data name="Settings_Language" xml:space="preserve">
+    <value>Language</value>
+    <comment>Label beside the language dropdown.</comment>
+  </data>
+  <data name="Settings_Language_System" xml:space="preserve">
+    <value>System ({0})</value>
+    <comment>Language dropdown row meaning "follow the operating system's language". {0} is the language that currently resolves to, e.g. "System (English US)". The other rows are language names, which are never translated.</comment>
+  </data>
+  <data name="Settings_Language_Fallback" xml:space="preserve">
+    <value>Anything not translated falls back to English US.</value>
+    <comment>Hint under the language dropdown. "English US" is a language name - keep it as-is rather than translating it.</comment>
+  </data>
+  <data name="Settings_LaunchAtLogin" xml:space="preserve">
+    <value>Launch at login</value>
+    <comment>Checkbox: start the app when the user signs in to Windows.</comment>
+  </data>
+  <data name="Settings_CheckForUpdates" xml:space="preserve">
+    <value>Check for updates on launch</value>
+    <comment>Checkbox: look for a newer release at startup.</comment>
+  </data>
+  <data name="Settings_AutoDownloadAssets" xml:space="preserve">
+    <value>Automatically download device images</value>
+    <comment>Checkbox: fetch product photos for the device gallery.</comment>
+  </data>
+  <data name="Settings_MinimizeToTray" xml:space="preserve">
+    <value>Minimize to the system tray (hide from the taskbar)</value>
+    <comment>Checkbox. "System tray" is the Windows notification area.</comment>
+  </data>
+  <data name="Settings_SuppressLogging" xml:space="preserve">
+    <value>Suppress diagnostic logs</value>
+    <comment>Checkbox: stop writing the diagnostic log file.</comment>
+  </data>
+  <data name="Settings_Footer" xml:space="preserve">
+    <value>Settings are saved to config.toml. Update checks are enabled by default.</value>
+    <comment>Grey footnote under the settings list. "config.toml" is a filename - do not translate it.</comment>
+  </data>
+
+  <!-- QuickColorPicker -->
+  <data name="QuickColor_OffTurnsKeyOff" xml:space="preserve">
+    <value>Off (turns the key off)</value>
+    <comment>QuickColorPicker: Border tooltip.</comment>
+  </data>
+
+  <!-- AboutWindow -->
+  <data name="About_AboutOpenlogiNet" xml:space="preserve">
+    <value>About OpenLogi.net</value>
+    <comment>AboutWindow: Window title.</comment>
+  </data>
+  <data name="About_OpenlogiNet" xml:space="preserve">
+    <value>OpenLogi.net</value>
+    <comment>AboutWindow: TextBlock text.</comment>
+  </data>
+  <data name="About_LocalFirstAlternativeLogitechOptions" xml:space="preserve">
+    <value>A local-first alternative to Logitech Options+ for HID++ devices. No account, no telemetry.</value>
+    <comment>AboutWindow: TextBlock text.</comment>
+  </data>
+  <data name="About_Github" xml:space="preserve">
+    <value>GitHub</value>
+    <comment>AboutWindow: HyperlinkButton content.</comment>
+  </data>
+  <data name="About_Releases" xml:space="preserve">
+    <value>Releases</value>
+    <comment>AboutWindow: HyperlinkButton content.</comment>
+  </data>
+  <data name="About_LicensedUnderMIT" xml:space="preserve">
+    <value>Licensed under MIT</value>
+    <comment>AboutWindow: TextBlock text.</comment>
+  </data>
+  <data name="About_CopyInfo" xml:space="preserve">
+    <value>Copy info</value>
+    <comment>AboutWindow: Button content.</comment>
+  </data>
+  <data name="About_OpenLogs" xml:space="preserve">
+    <value>Open logs</value>
+    <comment>AboutWindow: Button content.</comment>
+  </data>
+  <data name="About_Close" xml:space="preserve">
+    <value>Close</value>
+    <comment>AboutWindow: Button content.</comment>
+  </data>
+
+  <!-- ConfirmWindow -->
+  <data name="Confirm_Confirm" xml:space="preserve">
+    <value>Confirm</value>
+    <comment>ConfirmWindow: Window title.</comment>
+  </data>
+  <data name="Confirm_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>ConfirmWindow: Button content.</comment>
+  </data>
+
+  <!-- ExitConfirmWindow -->
+  <data name="ExitConfirm_ExitOpenlogiNet" xml:space="preserve">
+    <value>Exit OpenLogi.net?</value>
+    <comment>ExitConfirmWindow: Window title.</comment>
+  </data>
+  <data name="ExitConfirm_WhileAppIsnTRunning" xml:space="preserve">
+    <value>While the app isn't running, button remaps, mouse gestures, per-app profiles, and smooth scrolling stop working — your devices fall back to their default behavior. You can minimize to the system tray instead to keep everything active.</value>
+    <comment>ExitConfirmWindow: TextBlock text.</comment>
+  </data>
+  <data name="ExitConfirm_MinimizeTray" xml:space="preserve">
+    <value>Minimize to tray</value>
+    <comment>ExitConfirmWindow: Button content.</comment>
+  </data>
+  <data name="ExitConfirm_Exit" xml:space="preserve">
+    <value>Exit</value>
+    <comment>ExitConfirmWindow: Button content.</comment>
+  </data>
+  <data name="ExitConfirm_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>ExitConfirmWindow: Button content.</comment>
+  </data>
+
+  <!-- KeyPickerWindow -->
+  <data name="KeyPicker_PickKey" xml:space="preserve">
+    <value>Pick a key</value>
+    <comment>KeyPickerWindow: Window title.</comment>
+  </data>
+  <data name="KeyPicker_ClickModifiersShiftCtrlAlt" xml:space="preserve">
+    <value>Click modifiers (Shift / Ctrl / Alt) to toggle them, then click a key. Greyed keys can't be targets.</value>
+    <comment>KeyPickerWindow: TextBlock text.</comment>
+  </data>
+  <data name="KeyPicker_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>KeyPickerWindow: Button content.</comment>
+  </data>
+  <data name="KeyPicker_OK" xml:space="preserve">
+    <value>OK</value>
+    <comment>KeyPickerWindow: Button content.</comment>
+  </data>
+
+  <!-- MainWindow -->
+  <data name="Main_OpenlogiNet" xml:space="preserve">
+    <value>OpenLogi.net</value>
+    <comment>MainWindow: Window title.</comment>
+  </data>
+  <data name="Main_Install" xml:space="preserve">
+    <value>Install</value>
+    <comment>MainWindow: Button content.</comment>
+  </data>
+  <data name="Main_Download" xml:space="preserve">
+    <value>Download</value>
+    <comment>MainWindow: Button content.</comment>
+  </data>
+  <data name="Main_ViewGithub" xml:space="preserve">
+    <value>View on GitHub</value>
+    <comment>MainWindow: Button content.</comment>
+  </data>
+  <data name="Main_Devices" xml:space="preserve">
+    <value>Devices</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_Refresh" xml:space="preserve">
+    <value>Refresh</value>
+    <comment>MainWindow: Button content.</comment>
+  </data>
+  <data name="Main_Settings" xml:space="preserve">
+    <value>Settings</value>
+    <comment>MainWindow: Button content.</comment>
+  </data>
+  <data name="Main_About" xml:space="preserve">
+    <value>About</value>
+    <comment>MainWindow: Button content.</comment>
+  </data>
+  <data name="Main_Devices2" xml:space="preserve">
+    <value>←  Devices</value>
+    <comment>MainWindow: Button content.</comment>
+  </data>
+  <data name="Main_Asleep" xml:space="preserve">
+    <value>☾ Asleep</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_ScanningDevices" xml:space="preserve">
+    <value>Scanning for devices…</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_NoDevicesDetected" xml:space="preserve">
+    <value>No devices detected</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_ConnectLogitechMouseKeyboardRefresh" xml:space="preserve">
+    <value>Connect a Logitech mouse or keyboard, then refresh.</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_Buttons" xml:space="preserve">
+    <value>Buttons</value>
+    <comment>MainWindow: TabItem header.</comment>
+  </data>
+  <data name="Main_GesturesEnabled" xml:space="preserve">
+    <value>Gestures Enabled</value>
+    <comment>MainWindow: CheckBox content.</comment>
+  </data>
+  <data name="Main_GesturesTurnMouseButtonInto" xml:space="preserve">
+    <value>Gestures turn a mouse button into five controls: hold it and swipe up / down / left / right for four actions (switch desktops, media, snap windows…), while a plain tap fires a fifth. The chosen button gives up its normal function.</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_Button" xml:space="preserve">
+    <value>Button</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_Gestures" xml:space="preserve">
+    <value>Gestures</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_Pointer" xml:space="preserve">
+    <value>Pointer</value>
+    <comment>MainWindow: TabItem header.</comment>
+  </data>
+  <data name="Main_ScrollDirection" xml:space="preserve">
+    <value>Scroll direction</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_InvertScrollDirection" xml:space="preserve">
+    <value>Invert scroll direction</value>
+    <comment>MainWindow: CheckBox content.</comment>
+  </data>
+  <data name="Main_ReversesWheelFirmwareNaturalScrolling" xml:space="preserve">
+    <value>Reverses the wheel in firmware (natural scrolling). Reapplied automatically when the mouse reconnects.</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_SmoothScrolling" xml:space="preserve">
+    <value>Smooth scrolling</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_HighResolutionSmoothScrolling" xml:space="preserve">
+    <value>High-resolution smooth scrolling</value>
+    <comment>MainWindow: CheckBox content.</comment>
+  </data>
+  <data name="Main_ScrollsFineSubLineSteps" xml:space="preserve">
+    <value>Scrolls in fine sub-line steps instead of whole lines. The app translates the wheel while it runs; standard scrolling returns when it quits.</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_FindPointer" xml:space="preserve">
+    <value>Find the pointer</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_EnlargePointerWhenMouseShaken" xml:space="preserve">
+    <value>Enlarge the pointer when the mouse is shaken</value>
+    <comment>MainWindow: CheckBox content.</comment>
+  </data>
+  <data name="Main_WiggleMouseBackForthPointer" xml:space="preserve">
+    <value>Wiggle the mouse back and forth and the pointer grows — up to 3× — then shrinks smoothly back once you stop. Changes the Windows pointer size while active.</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_PointerTuning" xml:space="preserve">
+    <value>Pointer tuning</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_DPI" xml:space="preserve">
+    <value>DPI</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_Presets" xml:space="preserve">
+    <value>PRESETS</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_Add" xml:space="preserve">
+    <value>+ Add</value>
+    <comment>MainWindow: Button content.</comment>
+  </data>
+  <data name="Main_SmartshiftSmartScrolling" xml:space="preserve">
+    <value>SmartShift / Smart Scrolling</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_WheelMode" xml:space="preserve">
+    <value>Wheel mode</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_FreeSpin" xml:space="preserve">
+    <value>Free spin</value>
+    <comment>MainWindow: RadioButton content.</comment>
+  </data>
+  <data name="Main_SmoothFrictionlessScrolling" xml:space="preserve">
+    <value>Smooth, frictionless scrolling.</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_Smartshift" xml:space="preserve">
+    <value>SmartShift</value>
+    <comment>MainWindow: RadioButton content.</comment>
+  </data>
+  <data name="Main_RatchetFreeSpinsFastFlick" xml:space="preserve">
+    <value>Ratchet that free-spins on a fast flick.</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_Ratchet" xml:space="preserve">
+    <value>Ratchet</value>
+    <comment>MainWindow: RadioButton content.</comment>
+  </data>
+  <data name="Main_AlwaysClicksLineByLine" xml:space="preserve">
+    <value>Always clicks line-by-line.</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_Sensitivity" xml:space="preserve">
+    <value>Sensitivity</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_HigherKeepsRatchetEngagedLonger" xml:space="preserve">
+    <value>Higher keeps the ratchet engaged longer before free-spin.</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_Lighting" xml:space="preserve">
+    <value>Lighting</value>
+    <comment>MainWindow: TabItem header.</comment>
+  </data>
+  <data name="Main_BacklightBrightness" xml:space="preserve">
+    <value>Backlight brightness</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_KeyboardProfile" xml:space="preserve">
+    <value>Keyboard profile</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_ProfileRunsKeyboardSBuilt" xml:space="preserve">
+    <value>A profile runs the keyboard's built-in lighting on the device (smooth, stays after this app closes). 'No profile' uses the custom color configured below.</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_Lighting2" xml:space="preserve">
+    <value>Lighting on</value>
+    <comment>MainWindow: CheckBox content.</comment>
+  </data>
+  <data name="Main_Effect" xml:space="preserve">
+    <value>Effect</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_BreathingSpeed" xml:space="preserve">
+    <value>Breathing speed</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_Color" xml:space="preserve">
+    <value>Color</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_ColorIntensity" xml:space="preserve">
+    <value>Color intensity</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_RestoreKeyboardDefault" xml:space="preserve">
+    <value>Restore keyboard default</value>
+    <comment>MainWindow: Button content.</comment>
+  </data>
+  <data name="Main_SaveLightingProfile" xml:space="preserve">
+    <value>Save lighting to this profile</value>
+    <comment>MainWindow: Button content.</comment>
+  </data>
+  <data name="Main_PerKeyColors" xml:space="preserve">
+    <value>Per-key colors…</value>
+    <comment>MainWindow: Button content.</comment>
+  </data>
+  <data name="Main_NoProfileColorAppliesLive" xml:space="preserve">
+    <value>With 'No profile', the color applies live; 'Restore keyboard default' hands lighting back to the onboard profile.</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_ChooseEffectColorSpeedSave" xml:space="preserve">
+    <value>Choose an effect, color and speed, then 'Save lighting to this profile' — it writes into the keyboard's onboard profile (persistent, device-side, smooth). Cycle colors uses the device's default speed.</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_GKeys" xml:space="preserve">
+    <value>G-Keys</value>
+    <comment>MainWindow: TabItem header.</comment>
+  </data>
+  <data name="Main_Change" xml:space="preserve">
+    <value>⌨ Change</value>
+    <comment>MainWindow: Button content.</comment>
+  </data>
+  <data name="Main_ReassignG1G5MacroKeys" xml:space="preserve">
+    <value>Reassign the G1–G5 macro keys for the active profile. Changes write to the keyboard's onboard profile and persist after the app closes.</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_Device" xml:space="preserve">
+    <value>Device</value>
+    <comment>MainWindow: TabItem header.</comment>
+  </data>
+  <data name="Main_Name" xml:space="preserve">
+    <value>Name</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_Type" xml:space="preserve">
+    <value>Type</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_Status" xml:space="preserve">
+    <value>Status</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_Battery" xml:space="preserve">
+    <value>Battery</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_Connection" xml:space="preserve">
+    <value>Connection</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_HostsEasyswitch" xml:space="preserve">
+    <value>Hosts (EasySwitch)</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_Switch" xml:space="preserve">
+    <value>Switch</value>
+    <comment>MainWindow: Button content.</comment>
+  </data>
+  <data name="Main_Forget" xml:space="preserve">
+    <value>Forget</value>
+    <comment>MainWindow: Button content.</comment>
+  </data>
+  <data name="Main_SwitchingMovesDeviceAnotherPaired" xml:space="preserve">
+    <value>Switching moves the device to another paired computer and disconnects it here.</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_ForgettingHostClearsItsPairing" xml:space="preserve">
+    <value>Forgetting a host clears its pairing — that computer must pair again to reconnect.</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_DeviceDoesnTSupportClearing" xml:space="preserve">
+    <value>This device doesn't support clearing host slots from software.</value>
+    <comment>MainWindow: TextBlock text.</comment>
+  </data>
+
+  <!-- PerKeyColorWindow -->
+  <data name="PerKeyColor_ColorKeys" xml:space="preserve">
+    <value>Color keys</value>
+    <comment>PerKeyColorWindow: Window title.</comment>
+  </data>
+  <data name="PerKeyColor_PressPhysicalKeyKeyboardPaint" xml:space="preserve">
+    <value>Press a physical key on the keyboard to paint it with the color below. Press the same key again to reset it to the base color.</value>
+    <comment>PerKeyColorWindow: TextBlock text.</comment>
+  </data>
+  <data name="PerKeyColor_PaintColor" xml:space="preserve">
+    <value>Paint color</value>
+    <comment>PerKeyColorWindow: TextBlock text.</comment>
+  </data>
+  <data name="PerKeyColor_BaseColor" xml:space="preserve">
+    <value>Base color</value>
+    <comment>PerKeyColorWindow: TextBlock text.</comment>
+  </data>
+  <data name="PerKeyColor_ResetAllKeysBaseAlt" xml:space="preserve">
+    <value>Reset all keys to base (Alt+R)</value>
+    <comment>PerKeyColorWindow: Button content.</comment>
+  </data>
+  <data name="PerKeyColor_SpecialKeysOSSwallowsThese" xml:space="preserve">
+    <value>Special keys (OS swallows these — click to paint)</value>
+    <comment>PerKeyColorWindow: TextBlock text.</comment>
+  </data>
+
+  <!-- Actions (action picker rows) -->
+  <data name="Action_BrowserBack" xml:space="preserve">
+    <value>Browser Back</value>
+    <comment>Action picker row for the BrowserBack action.</comment>
+  </data>
+  <data name="Action_BrowserForward" xml:space="preserve">
+    <value>Browser Forward</value>
+    <comment>Action picker row for the BrowserForward action.</comment>
+  </data>
+  <data name="Action_CaptureRegion" xml:space="preserve">
+    <value>Capture Region</value>
+    <comment>Action picker row for the CaptureRegion action.</comment>
+  </data>
+  <data name="Action_CloseTab" xml:space="preserve">
+    <value>Close Tab</value>
+    <comment>Action picker row for the CloseTab action.</comment>
+  </data>
+  <data name="Action_Copy" xml:space="preserve">
+    <value>Copy</value>
+    <comment>Action picker row for the Copy action.</comment>
+  </data>
+  <data name="Action_Cut" xml:space="preserve">
+    <value>Cut</value>
+    <comment>Action picker row for the Cut action.</comment>
+  </data>
+  <data name="Action_CycleDpiPresets" xml:space="preserve">
+    <value>Cycle DPI Presets</value>
+    <comment>Action picker row for the CycleDpiPresets action.</comment>
+  </data>
+  <data name="Action_Find" xml:space="preserve">
+    <value>Find</value>
+    <comment>Action picker row for the Find action.</comment>
+  </data>
+  <data name="Action_HorizontalScrollLeft" xml:space="preserve">
+    <value>Scroll Left</value>
+    <comment>Action picker row for the HorizontalScrollLeft action.</comment>
+  </data>
+  <data name="Action_HorizontalScrollRight" xml:space="preserve">
+    <value>Scroll Right</value>
+    <comment>Action picker row for the HorizontalScrollRight action.</comment>
+  </data>
+  <data name="Action_LeftClick" xml:space="preserve">
+    <value>Left Click</value>
+    <comment>Action picker row for the LeftClick action.</comment>
+  </data>
+  <data name="Action_LockScreen" xml:space="preserve">
+    <value>Lock Screen</value>
+    <comment>Action picker row for the LockScreen action.</comment>
+  </data>
+  <data name="Action_MaximizeWindow" xml:space="preserve">
+    <value>Maximize Window</value>
+    <comment>Action picker row for the MaximizeWindow action.</comment>
+  </data>
+  <data name="Action_MiddleClick" xml:space="preserve">
+    <value>Middle Click</value>
+    <comment>Action picker row for the MiddleClick action.</comment>
+  </data>
+  <data name="Action_MinimizeWindow" xml:space="preserve">
+    <value>Minimize Window</value>
+    <comment>Action picker row for the MinimizeWindow action.</comment>
+  </data>
+  <data name="Action_MouseBack" xml:space="preserve">
+    <value>Back (Button 4)</value>
+    <comment>Action picker row for the MouseBack action.</comment>
+  </data>
+  <data name="Action_MouseForward" xml:space="preserve">
+    <value>Forward (Button 5)</value>
+    <comment>Action picker row for the MouseForward action.</comment>
+  </data>
+  <data name="Action_MuteVolume" xml:space="preserve">
+    <value>Mute</value>
+    <comment>Action picker row for the MuteVolume action.</comment>
+  </data>
+  <data name="Action_NewTab" xml:space="preserve">
+    <value>New Tab</value>
+    <comment>Action picker row for the NewTab action.</comment>
+  </data>
+  <data name="Action_NextDesktop" xml:space="preserve">
+    <value>Next Desktop</value>
+    <comment>Action picker row for the NextDesktop action.</comment>
+  </data>
+  <data name="Action_NextTab" xml:space="preserve">
+    <value>Next Tab</value>
+    <comment>Action picker row for the NextTab action.</comment>
+  </data>
+  <data name="Action_NextTrack" xml:space="preserve">
+    <value>Next Track</value>
+    <comment>Action picker row for the NextTrack action.</comment>
+  </data>
+  <data name="Action_None" xml:space="preserve">
+    <value>Do Nothing</value>
+    <comment>Action picker row for the None action.</comment>
+  </data>
+  <data name="Action_Paste" xml:space="preserve">
+    <value>Paste</value>
+    <comment>Action picker row for the Paste action.</comment>
+  </data>
+  <data name="Action_PlayPause" xml:space="preserve">
+    <value>Play / Pause</value>
+    <comment>Action picker row for the PlayPause action.</comment>
+  </data>
+  <data name="Action_PrevTab" xml:space="preserve">
+    <value>Previous Tab</value>
+    <comment>Action picker row for the PrevTab action.</comment>
+  </data>
+  <data name="Action_PrevTrack" xml:space="preserve">
+    <value>Previous Track</value>
+    <comment>Action picker row for the PrevTrack action.</comment>
+  </data>
+  <data name="Action_PreviousDesktop" xml:space="preserve">
+    <value>Previous Desktop</value>
+    <comment>Action picker row for the PreviousDesktop action.</comment>
+  </data>
+  <data name="Action_Redo" xml:space="preserve">
+    <value>Redo</value>
+    <comment>Action picker row for the Redo action.</comment>
+  </data>
+  <data name="Action_ReloadPage" xml:space="preserve">
+    <value>Reload Page</value>
+    <comment>Action picker row for the ReloadPage action.</comment>
+  </data>
+  <data name="Action_ReopenTab" xml:space="preserve">
+    <value>Reopen Tab</value>
+    <comment>Action picker row for the ReopenTab action.</comment>
+  </data>
+  <data name="Action_RightClick" xml:space="preserve">
+    <value>Right Click</value>
+    <comment>Action picker row for the RightClick action.</comment>
+  </data>
+  <data name="Action_Save" xml:space="preserve">
+    <value>Save</value>
+    <comment>Action picker row for the Save action.</comment>
+  </data>
+  <data name="Action_Screenshot" xml:space="preserve">
+    <value>Screenshot</value>
+    <comment>Action picker row for the Screenshot action.</comment>
+  </data>
+  <data name="Action_ScrollDown" xml:space="preserve">
+    <value>Scroll Down</value>
+    <comment>Action picker row for the ScrollDown action.</comment>
+  </data>
+  <data name="Action_ScrollUp" xml:space="preserve">
+    <value>Scroll Up</value>
+    <comment>Action picker row for the ScrollUp action.</comment>
+  </data>
+  <data name="Action_SelectAll" xml:space="preserve">
+    <value>Select All</value>
+    <comment>Action picker row for the SelectAll action.</comment>
+  </data>
+  <data name="Action_SetDpiPreset" xml:space="preserve">
+    <value>DPI Preset {0}</value>
+    <comment>Action picker row for a specific DPI preset. {0} is the preset number, counting from 1.</comment>
+  </data>
+  <data name="Action_ShowDesktop" xml:space="preserve">
+    <value>Show Desktop</value>
+    <comment>Action picker row for the ShowDesktop action.</comment>
+  </data>
+  <data name="Action_SnapWindowLeft" xml:space="preserve">
+    <value>Snap Window Left</value>
+    <comment>Action picker row for the SnapWindowLeft action.</comment>
+  </data>
+  <data name="Action_SnapWindowRight" xml:space="preserve">
+    <value>Snap Window Right</value>
+    <comment>Action picker row for the SnapWindowRight action.</comment>
+  </data>
+  <data name="Action_StartMenu" xml:space="preserve">
+    <value>Start Menu</value>
+    <comment>Action picker row for the StartMenu action.</comment>
+  </data>
+  <data name="Action_TaskView" xml:space="preserve">
+    <value>Task View</value>
+    <comment>Action picker row for the TaskView action.</comment>
+  </data>
+  <data name="Action_ToggleSmartShift" xml:space="preserve">
+    <value>Toggle SmartShift</value>
+    <comment>Action picker row for the ToggleSmartShift action.</comment>
+  </data>
+  <data name="Action_Undo" xml:space="preserve">
+    <value>Undo</value>
+    <comment>Action picker row for the Undo action.</comment>
+  </data>
+  <data name="Action_VolumeDown" xml:space="preserve">
+    <value>Volume Down</value>
+    <comment>Action picker row for the VolumeDown action.</comment>
+  </data>
+  <data name="Action_VolumeUp" xml:space="preserve">
+    <value>Volume Up</value>
+    <comment>Action picker row for the VolumeUp action.</comment>
+  </data>
+
+  <!-- Mouse button names -->
+  <data name="Button_Back" xml:space="preserve">
+    <value>Back</value>
+    <comment>Name of the Back mouse button, in popovers and tooltips.</comment>
+  </data>
+  <data name="Button_DpiToggle" xml:space="preserve">
+    <value>DPI Toggle</value>
+    <comment>Name of the DpiToggle mouse button, in popovers and tooltips.</comment>
+  </data>
+  <data name="Button_Forward" xml:space="preserve">
+    <value>Forward</value>
+    <comment>Name of the Forward mouse button, in popovers and tooltips.</comment>
+  </data>
+  <data name="Button_GestureButton" xml:space="preserve">
+    <value>Gesture Button</value>
+    <comment>Name of the GestureButton mouse button, in popovers and tooltips.</comment>
+  </data>
+  <data name="Button_LeftClick" xml:space="preserve">
+    <value>Left Click</value>
+    <comment>Name of the LeftClick mouse button, in popovers and tooltips.</comment>
+  </data>
+  <data name="Button_MiddleClick" xml:space="preserve">
+    <value>Middle Click</value>
+    <comment>Name of the MiddleClick mouse button, in popovers and tooltips.</comment>
+  </data>
+  <data name="Button_RightClick" xml:space="preserve">
+    <value>Right Click</value>
+    <comment>Name of the RightClick mouse button, in popovers and tooltips.</comment>
+  </data>
+  <data name="Button_Thumbwheel" xml:space="preserve">
+    <value>Thumb Wheel</value>
+    <comment>Name of the Thumbwheel mouse button, in popovers and tooltips.</comment>
+  </data>
+  <data name="Button_ThumbwheelScrollDown" xml:space="preserve">
+    <value>Thumb Wheel Down</value>
+    <comment>Name of the ThumbwheelScrollDown mouse button, in popovers and tooltips.</comment>
+  </data>
+  <data name="Button_ThumbwheelScrollUp" xml:space="preserve">
+    <value>Thumb Wheel Up</value>
+    <comment>Name of the ThumbwheelScrollUp mouse button, in popovers and tooltips.</comment>
+  </data>
+
+  <!-- Gesture directions -->
+  <data name="Gesture_Click" xml:space="preserve">
+    <value>Click</value>
+    <comment>Gesture direction: Click.</comment>
+  </data>
+  <data name="Gesture_Down" xml:space="preserve">
+    <value>Down</value>
+    <comment>Gesture direction: Down.</comment>
+  </data>
+  <data name="Gesture_Left" xml:space="preserve">
+    <value>Left</value>
+    <comment>Gesture direction: Left.</comment>
+  </data>
+  <data name="Gesture_Right" xml:space="preserve">
+    <value>Right</value>
+    <comment>Gesture direction: Right.</comment>
+  </data>
+  <data name="Gesture_Up" xml:space="preserve">
+    <value>Up</value>
+    <comment>Gesture direction: Up.</comment>
+  </data>
+
+  <!-- Action picker group headers -->
+  <data name="Category_Browser" xml:space="preserve">
+    <value>Browser &amp; Tabs</value>
+    <comment>Group header in the action picker: Browser actions.</comment>
+  </data>
+  <data name="Category_Dpi" xml:space="preserve">
+    <value>DPI &amp; Wheel</value>
+    <comment>Group header in the action picker: Dpi actions.</comment>
+  </data>
+  <data name="Category_Editing" xml:space="preserve">
+    <value>Editing</value>
+    <comment>Group header in the action picker: Editing actions.</comment>
+  </data>
+  <data name="Category_Media" xml:space="preserve">
+    <value>Media &amp; Volume</value>
+    <comment>Group header in the action picker: Media actions.</comment>
+  </data>
+  <data name="Category_Mouse" xml:space="preserve">
+    <value>Mouse Buttons</value>
+    <comment>Group header in the action picker: Mouse actions.</comment>
+  </data>
+  <data name="Category_Navigation" xml:space="preserve">
+    <value>Windows &amp; Desktops</value>
+    <comment>Group header in the action picker: Navigation actions.</comment>
+  </data>
+  <data name="Category_Scroll" xml:space="preserve">
+    <value>Scrolling</value>
+    <comment>Group header in the action picker: Scroll actions.</comment>
+  </data>
+  <data name="Category_System" xml:space="preserve">
+    <value>System</value>
+    <comment>Group header in the action picker: System actions.</comment>
+  </data>
+
+  <!-- View models, dialogs, tray and notifications -->
+  <data name="Effect_Cycle" xml:space="preserve">
+    <value>Cycle colors</value>
+    <comment>Lighting effect name in the effect dropdown.</comment>
+  </data>
+  <data name="Device_Online" xml:space="preserve">
+    <value>Online</value>
+    <comment>Device tile status: the device is reachable.</comment>
+  </data>
+  <data name="Device_Asleep" xml:space="preserve">
+    <value>Asleep</value>
+    <comment>Device tile status: the device is paired but off its wireless link.</comment>
+  </data>
+  <data name="Connection_Bluetooth" xml:space="preserve">
+    <value>Bluetooth</value>
+    <comment>Tooltip on the tile's connection icon: Bluetooth.</comment>
+  </data>
+  <data name="Connection_Lightspeed" xml:space="preserve">
+    <value>LIGHTSPEED dongle</value>
+    <comment>Tooltip on the tile's connection icon: LIGHTSPEED dongle.</comment>
+  </data>
+  <data name="Connection_Unifying" xml:space="preserve">
+    <value>Unifying dongle</value>
+    <comment>Tooltip on the tile's connection icon: Unifying dongle.</comment>
+  </data>
+  <data name="Connection_Bolt" xml:space="preserve">
+    <value>Bolt dongle</value>
+    <comment>Tooltip on the tile's connection icon: Bolt dongle.</comment>
+  </data>
+  <data name="Connection_Usb" xml:space="preserve">
+    <value>USB</value>
+    <comment>Tooltip on the tile's connection icon: USB.</comment>
+  </data>
+  <data name="Capability_Buttons" xml:space="preserve">
+    <value>Buttons</value>
+    <comment>Capability listed on a device tile: Buttons.</comment>
+  </data>
+  <data name="Capability_Dpi" xml:space="preserve">
+    <value>DPI</value>
+    <comment>Capability listed on a device tile: DPI.</comment>
+  </data>
+  <data name="Capability_Lighting" xml:space="preserve">
+    <value>Lighting</value>
+    <comment>Capability listed on a device tile: Lighting.</comment>
+  </data>
+  <data name="Host_Unnamed" xml:space="preserve">
+    <value>Host {0}</value>
+    <comment>Fallback name for an EasySwitch host slot with no name. {0} is the slot number.</comment>
+  </data>
+  <data name="Host_Current" xml:space="preserve">
+    <value>current</value>
+    <comment>EasySwitch slot state: the computer being used right now. Lowercase - it joins a status line.</comment>
+  </data>
+  <data name="Host_Paired" xml:space="preserve">
+    <value>paired</value>
+    <comment>EasySwitch slot state: a computer is paired here. Lowercase - it joins a status line.</comment>
+  </data>
+  <data name="Host_Empty" xml:space="preserve">
+    <value>empty</value>
+    <comment>EasySwitch slot state: nothing paired. Lowercase - it joins a status line.</comment>
+  </data>
+  <data name="Binding_Gestures" xml:space="preserve">
+    <value>Gestures</value>
+    <comment>Summary shown on a button row that is assigned to gestures.</comment>
+  </data>
+  <data name="GestureOwner_GestureButton" xml:space="preserve">
+    <value>Gesture button</value>
+    <comment>Name of the dedicated gesture button, in the gesture-trigger dropdown.</comment>
+  </data>
+  <data name="GestureOwner_DpiToggle" xml:space="preserve">
+    <value>Wheel / DPI button</value>
+    <comment>Name of the wheel/DPI button, in the gesture-trigger dropdown.</comment>
+  </data>
+  <data name="Gestures_Summary" xml:space="preserve">
+    <value>Gestures: {0}</value>
+    <comment>One-line gesture summary. {0} is an action category name.</comment>
+  </data>
+  <data name="Status_SwitchingHost" xml:space="preserve">
+    <value>Switching to host {0}…</value>
+    <comment>Status line while moving the device to another paired computer. {0} is the host slot number.</comment>
+  </data>
+  <data name="Status_ForgettingHost" xml:space="preserve">
+    <value>Forgetting host {0}…</value>
+    <comment>Status line while clearing a host slot. {0} is the slot number.</comment>
+  </data>
+  <data name="Status_ForgetHostFailed" xml:space="preserve">
+    <value>Could not forget host {0}.</value>
+    <comment>Status line when clearing a host slot failed. {0} is the slot number.</comment>
+  </data>
+  <data name="Status_HostForgotten" xml:space="preserve">
+    <value>Host {0} forgotten — device disconnected.</value>
+    <comment>Status line after clearing the host slot in use. {0} is the slot number.</comment>
+  </data>
+  <data name="Status_RemappingGKey" xml:space="preserve">
+    <value>Remapping G{0}…</value>
+    <comment>Status line while writing a G-key remap. {0} is the G-key number.</comment>
+  </data>
+  <data name="Status_GKeyRemapped" xml:space="preserve">
+    <value>G{0} remapped (profile {1}).</value>
+    <comment>Status line after a G-key remap. {0} is the G-key number, {1} the onboard profile it was written to.</comment>
+  </data>
+  <data name="Status_GKeyRemapFailed" xml:space="preserve">
+    <value>G-key remap failed.</value>
+    <comment>Status line when writing a G-key remap did not succeed.</comment>
+  </data>
+  <data name="Status_SavingLighting" xml:space="preserve">
+    <value>Saving lighting to profile {0}…</value>
+    <comment>Status line while writing lighting into an onboard profile. {0} is the profile number.</comment>
+  </data>
+  <data name="Status_LightingSaved" xml:space="preserve">
+    <value>Saved to profile {0}.</value>
+    <comment>Status line after lighting was written to an onboard profile. {0} is the profile number.</comment>
+  </data>
+  <data name="Status_LightingSaveFailed" xml:space="preserve">
+    <value>Profile save failed.</value>
+    <comment>Status line when writing lighting to an onboard profile did not succeed.</comment>
+  </data>
+  <data name="Update_Available" xml:space="preserve">
+    <value>Update available: v{0}</value>
+    <comment>Update banner. {0} is the version number; the v prefix is literal.</comment>
+  </data>
+  <data name="Update_Installing" xml:space="preserve">
+    <value>Installing v{0} — {1} will restart…</value>
+    <comment>Update banner while the installer runs. {0} is the version, {1} the application name.</comment>
+  </data>
+  <data name="Update_InstallerFailed" xml:space="preserve">
+    <value>Couldn't start the installer — try Download instead.</value>
+    <comment>Update banner when the installer could not be launched. Download is the button beside it.</comment>
+  </data>
+  <data name="Update_SavedToDownloads" xml:space="preserve">
+    <value>v{0} saved to Downloads</value>
+    <comment>Update banner after saving the installer. {0} is the version; Downloads is the Windows folder.</comment>
+  </data>
+  <data name="Update_Downloading" xml:space="preserve">
+    <value>Downloading v{0}…</value>
+    <comment>Update banner during download. {0} is the version.</comment>
+  </data>
+  <data name="Update_DownloadFailed" xml:space="preserve">
+    <value>Download of v{0} failed — try View on GitHub.</value>
+    <comment>Update banner when the download failed. {0} is the version; View on GitHub is the button beside it.</comment>
+  </data>
+  <data name="LogiWarning_One" xml:space="preserve">
+    <value>{0} is running — Logitech software can take over the receiver; only one app at a time can reliably control your devices.</value>
+    <comment>Warning banner when one Logitech app is running. {0} is its name.</comment>
+  </data>
+  <data name="LogiWarning_Many" xml:space="preserve">
+    <value>{0} are running — Logitech software can take over the receiver; only one app at a time can reliably control your devices.</value>
+    <comment>Warning banner when several Logitech apps are running. {0} is a comma-separated list of names.</comment>
+  </data>
+  <data name="Status_RescanFailed" xml:space="preserve">
+    <value>Rescan failed: {0}</value>
+    <comment>Status line when a rescan threw. {0} is the error message (untranslated).</comment>
+  </data>
+  <data name="Preset_Custom" xml:space="preserve">
+    <value>Custom</value>
+    <comment>Gesture preset shown when the four swipes match no preset.</comment>
+  </data>
+  <data name="Preset_Disabled" xml:space="preserve">
+    <value>Disabled</value>
+    <comment>Gesture preset that turns all four swipes off.</comment>
+  </data>
+  <data name="Preset_WindowsDesktops" xml:space="preserve">
+    <value>Windows &amp; Desktops</value>
+    <comment>Gesture preset name: Windows &amp; Desktops.</comment>
+  </data>
+  <data name="Preset_MediaVolume" xml:space="preserve">
+    <value>Media &amp; Volume</value>
+    <comment>Gesture preset name: Media &amp; Volume.</comment>
+  </data>
+  <data name="Preset_ArrangeWindows" xml:space="preserve">
+    <value>Arrange Windows</value>
+    <comment>Gesture preset name: Arrange Windows.</comment>
+  </data>
+  <data name="Preset_BrowserTabs" xml:space="preserve">
+    <value>Browser Tabs</value>
+    <comment>Gesture preset name: Browser Tabs.</comment>
+  </data>
+  <data name="Preset_Scrolling" xml:space="preserve">
+    <value>Scrolling</value>
+    <comment>Gesture preset name: Scrolling.</comment>
+  </data>
+  <data name="Status_LoadingDevices" xml:space="preserve">
+    <value>Loading devices…</value>
+    <comment>Status line before the first device scan finishes.</comment>
+  </data>
+  <data name="Status_Scanning" xml:space="preserve">
+    <value>Scanning for Logitech devices…</value>
+    <comment>Status line during a device scan.</comment>
+  </data>
+  <data name="Status_NoDevicesFound" xml:space="preserve">
+    <value>No Logitech HID++ devices found.</value>
+    <comment>Status line when a scan found nothing.</comment>
+  </data>
+  <data name="Status_DeviceCount" xml:space="preserve">
+    <value>{0} device(s).</value>
+    <comment>Status line after a scan. {0} is how many devices were found.</comment>
+  </data>
+  <data name="Status_EnumerationFailed" xml:space="preserve">
+    <value>Enumeration failed: {0}</value>
+    <comment>Status line when the device scan threw. {0} is the error message (untranslated).</comment>
+  </data>
+  <data name="PerKey_Hint" xml:space="preserve">
+    <value>Pick a color, then press a key to paint it. Press it again to reset.</value>
+    <comment>Opening hint in the per-key colour editor.</comment>
+  </data>
+  <data name="PerKey_NotPaintable" xml:space="preserve">
+    <value>{0} isn't a paintable key.</value>
+    <comment>Shown when a pressed key has no lighting zone. {0} is the key name (untranslated).</comment>
+  </data>
+  <data name="PerKey_AllReset" xml:space="preserve">
+    <value>All keys reset to base.</value>
+    <comment>Shown after resetting every key to the base colour.</comment>
+  </data>
+  <data name="About_LogiWarning" xml:space="preserve">
+    <value>⚠ {0} — Logitech software can take over the receiver; only one app at a time can reliably control your devices.</value>
+    <comment>About window warning when Logitech software is running. {0} is a comma-separated list of app names.</comment>
+  </data>
+  <data name="About_Copied" xml:space="preserve">
+    <value>Copied ✓</value>
+    <comment>Momentary confirmation on the Copy info button.</comment>
+  </data>
+  <data name="Tray_Open" xml:space="preserve">
+    <value>Open OpenLogi.net</value>
+    <comment>Tray menu item that shows the window. OpenLogi.net is the product name.</comment>
+  </data>
+  <data name="Tray_Quit" xml:space="preserve">
+    <value>Quit</value>
+    <comment>Tray menu item that exits the app.</comment>
+  </data>
+  <data name="Notify_UpdateTitle" xml:space="preserve">
+    <value>OpenLogi.net update available</value>
+    <comment>Tray notification title. OpenLogi.net is the product name.</comment>
+  </data>
+  <data name="Notify_UpdateBody" xml:space="preserve">
+    <value>Version {0} is ready. Click to open OpenLogi.net.</value>
+    <comment>Tray notification body. {0} is the version number.</comment>
+  </data>
+  <data name="ForgetHost_CurrentTitle" xml:space="preserve">
+    <value>Forget host {0} — the one you're using?</value>
+    <comment>Confirmation title for clearing the host slot in use. {0} is the slot number.</comment>
+  </data>
+  <data name="ForgetHost_CurrentBody" xml:space="preserve">
+    <value>This device is connected to this computer through host {0}. Forgetting it disconnects the device now, and you'll have to pair it again to use it.</value>
+    <comment>Confirmation body for clearing the host slot in use. {0} is the slot number.</comment>
+  </data>
+  <data name="ForgetHost_Title" xml:space="preserve">
+    <value>Forget host {0}?</value>
+    <comment>Confirmation title for clearing an unused host slot. {0} is the slot number.</comment>
+  </data>
+  <data name="ForgetHost_Body" xml:space="preserve">
+    <value>The computer paired in this slot will have to pair again to reconnect.</value>
+    <comment>Confirmation body for clearing an unused host slot.</comment>
+  </data>
+  <data name="ForgetHost_Confirm" xml:space="preserve">
+    <value>Forget host</value>
+    <comment>Confirm button on the forget-host dialog.</comment>
+  </data>
+  <data name="Profile_None" xml:space="preserve">
+    <value>No profile</value>
+    <comment>Onboard-profile picker row meaning the app drives the colour itself.</comment>
+  </data>
+  <data name="Profile_Numbered" xml:space="preserve">
+    <value>Profile {0}</value>
+    <comment>Onboard-profile picker row. {0} is the profile number.</comment>
+  </data>
+</root>

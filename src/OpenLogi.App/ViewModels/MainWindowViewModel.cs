@@ -9,6 +9,7 @@ using OpenLogi.Core;
 using OpenLogi.Core.Config;
 using OpenLogi.Core.DeviceInfo;
 using OpenLogi.Hid;
+using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.ViewModels;
 
@@ -82,13 +83,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private (ButtonId Owner, Core.Actions.MouseAction[] Actions)? _lastGestureState;
 
     /// <summary>The Custom sentinel: selected when the swipes match no preset; applies nothing.</summary>
-    private static readonly GesturePreset CustomGesturePreset = new("Custom", null, null, null, null);
+    private static readonly GesturePreset CustomGesturePreset = new(Loc.Current["Preset_Custom"], null, null, null, null);
 
     /// <summary>
     /// "Disabled": all four swipes Do Nothing — the default for an unconfigured
     /// button, and the way to turn one button's swipes off (its Click keeps working).
     /// </summary>
-    private static readonly GesturePreset DisabledGesturePreset = new("Disabled",
+    private static readonly GesturePreset DisabledGesturePreset = new(Loc.Current["Preset_Disabled"],
         Core.Actions.MouseAction.None, Core.Actions.MouseAction.None,
         Core.Actions.MouseAction.None, Core.Actions.MouseAction.None);
 
@@ -96,21 +97,21 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public IReadOnlyList<GesturePreset> GestureCategories { get; } =
     [
         DisabledGesturePreset,
-        new("Windows & Desktops", Core.Actions.MouseAction.TaskView, Core.Actions.MouseAction.ShowDesktop,
+        new(Loc.Current["Preset_WindowsDesktops"], Core.Actions.MouseAction.TaskView, Core.Actions.MouseAction.ShowDesktop,
             Core.Actions.MouseAction.PreviousDesktop, Core.Actions.MouseAction.NextDesktop),
-        new("Media & Volume", Core.Actions.MouseAction.VolumeUp, Core.Actions.MouseAction.VolumeDown,
+        new(Loc.Current["Preset_MediaVolume"], Core.Actions.MouseAction.VolumeUp, Core.Actions.MouseAction.VolumeDown,
             Core.Actions.MouseAction.PrevTrack, Core.Actions.MouseAction.NextTrack),
-        new("Arrange Windows", Core.Actions.MouseAction.MaximizeWindow, Core.Actions.MouseAction.MinimizeWindow,
+        new(Loc.Current["Preset_ArrangeWindows"], Core.Actions.MouseAction.MaximizeWindow, Core.Actions.MouseAction.MinimizeWindow,
             Core.Actions.MouseAction.SnapWindowLeft, Core.Actions.MouseAction.SnapWindowRight),
-        new("Browser Tabs", Core.Actions.MouseAction.NewTab, Core.Actions.MouseAction.CloseTab,
+        new(Loc.Current["Preset_BrowserTabs"], Core.Actions.MouseAction.NewTab, Core.Actions.MouseAction.CloseTab,
             Core.Actions.MouseAction.PrevTab, Core.Actions.MouseAction.NextTab),
-        new("Scrolling", Core.Actions.MouseAction.ScrollUp, Core.Actions.MouseAction.ScrollDown,
+        new(Loc.Current["Preset_Scrolling"], Core.Actions.MouseAction.ScrollUp, Core.Actions.MouseAction.ScrollDown,
             Core.Actions.MouseAction.HorizontalScrollLeft, Core.Actions.MouseAction.HorizontalScrollRight),
         CustomGesturePreset,
     ];
 
     [ObservableProperty] private DeviceViewModel? _selectedDevice;
-    [ObservableProperty] private string _statusText = "Loading devices…";
+    [ObservableProperty] private string _statusText = Loc.Current["Status_LoadingDevices"];
 
     // Home-gallery states: scanning (loading) and "no devices found".
     [ObservableProperty] private bool _isScanning;
@@ -463,7 +464,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private async Task LoadAsync(bool reactivateMice = true)
     {
         _rescanPending = false; // this scan reflects the current device set
-        StatusText = "Scanning for Logitech devices…";
+        StatusText = Loc.Current["Status_Scanning"];
         IsScanning = true;
         NoDevices = false;
         Devices.Clear();
@@ -480,7 +481,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             // Stay on the home gallery; opening a card navigates to its detail.
             SelectedDevice = null;
             ShowingDevice = false;
-            StatusText = Devices.Count == 0 ? "No Logitech HID++ devices found." : $"{Devices.Count} device(s).";
+            StatusText = Devices.Count == 0
+                ? Loc.Current["Status_NoDevicesFound"]
+                : Loc.Current.Format("Status_DeviceCount", Devices.Count);
 
             // Activate every connected mouse's overrides as soon as the app is running,
             // without opening any page: the OS hook for Middle/Back/Forward (global) and
@@ -508,7 +511,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         catch (System.Exception e)
         {
-            StatusText = $"Enumeration failed: {e.Message}";
+            StatusText = Loc.Current.Format("Status_EnumerationFailed", e.Message);
         }
         finally
         {

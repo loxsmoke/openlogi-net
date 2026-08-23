@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:OpenLogi.App.Localization"
         xmlns:vm="using:OpenLogi.App.ViewModels"
         xmlns:ctrl="using:OpenLogi.App.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -10,7 +11,7 @@
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/icon.png"
         Width="900" Height="600" MinWidth="720" MinHeight="480"
-        Title="OpenLogi.net">
+        Title="{loc:Tr Main_OpenlogiNet}">
 
     <Design.DataContext>
         <vm:MainWindowViewModel/>
@@ -85,12 +86,12 @@
                              VerticalAlignment="Center" Value="{Binding UpdateProgress}"
                              IsVisible="{Binding UpdateBusy}"/>
                 <!-- Install is hidden for portable/dev builds, which have no in-place upgrade path. -->
-                <Button Grid.Column="3" Content="Install" Margin="0,0,8,0"
+                <Button Grid.Column="3" Content="{loc:Tr Main_Install}" Margin="0,0,8,0"
                         Command="{Binding InstallUpdateCommand}"
                         IsVisible="{Binding CanInstallUpdate}" IsEnabled="{Binding !UpdateBusy}"/>
-                <Button Grid.Column="4" Content="Download" Margin="0,0,8,0"
+                <Button Grid.Column="4" Content="{loc:Tr Main_Download}" Margin="0,0,8,0"
                         Command="{Binding DownloadUpdateCommand}" IsEnabled="{Binding !UpdateBusy}"/>
-                <Button Grid.Column="5" Content="View on GitHub" Margin="0,0,8,0"
+                <Button Grid.Column="5" Content="{loc:Tr Main_ViewGithub}" Margin="0,0,8,0"
                         Command="{Binding ViewReleaseOnGitHubCommand}" IsEnabled="{Binding !UpdateBusy}"
                         Background="Transparent" BorderThickness="0"/>
                 <Button Grid.Column="6" Content="✕" Command="{Binding DismissUpdateCommand}"
@@ -116,13 +117,13 @@
         <Border DockPanel.Dock="Top" Padding="16,12" Background="#10000000">
             <Panel>
                 <Grid IsVisible="{Binding !ShowingDevice}" ColumnDefinitions="*,Auto,Auto,Auto">
-                    <TextBlock Text="Devices" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
-                    <Button Grid.Column="1" Content="Refresh" Command="{Binding RefreshCommand}" Margin="0,0,8,0"/>
-                    <Button Grid.Column="2" Content="Settings" Click="OnSettings" Margin="0,0,8,0"/>
-                    <Button Grid.Column="3" Content="About" Click="OnAbout"/>
+                    <TextBlock Text="{loc:Tr Main_Devices}" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Content="{loc:Tr Main_Refresh}" Command="{Binding RefreshCommand}" Margin="0,0,8,0"/>
+                    <Button Grid.Column="2" Content="{loc:Tr Main_Settings}" Click="OnSettings" Margin="0,0,8,0"/>
+                    <Button Grid.Column="3" Content="{loc:Tr Main_About}" Click="OnAbout"/>
                 </Grid>
                 <Grid IsVisible="{Binding ShowingDevice}" ColumnDefinitions="Auto,*">
-                    <Button Content="←  Devices" Command="{Binding GoHomeCommand}"/>
+                    <Button Content="{loc:Tr Main_Devices2}" Command="{Binding GoHomeCommand}"/>
                     <TextBlock Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center"
                                FontSize="18" FontWeight="SemiBold"
                                Text="{Binding SelectedDevice.Name}"/>
@@ -164,7 +165,7 @@
                                                 <TextBlock Text="{Binding Battery}" Opacity="0.6" FontSize="11"
                                                            VerticalAlignment="Center"/>
                                             </StackPanel>
-                                            <TextBlock Text="☾ Asleep" IsVisible="{Binding IsAsleep}"
+                                            <TextBlock Text="{loc:Tr Main_Asleep}" IsVisible="{Binding IsAsleep}"
                                                        Opacity="0.5" FontSize="11" HorizontalAlignment="Center"/>
                                         </StackPanel>
                                         <Image Source="{Binding Image}" Stretch="Uniform" Opacity="{Binding TileImageOpacity}"
@@ -189,7 +190,7 @@
                 <StackPanel IsVisible="{Binding IsScanning}" HorizontalAlignment="Center"
                             VerticalAlignment="Center" Spacing="14">
                     <ProgressBar IsIndeterminate="True" Width="180"/>
-                    <TextBlock Text="Scanning for devices…" HorizontalAlignment="Center" Opacity="0.7"/>
+                    <TextBlock Text="{loc:Tr Main_ScanningDevices}" HorizontalAlignment="Center" Opacity="0.7"/>
                 </StackPanel>
 
                 <!-- No devices found -->
@@ -197,11 +198,11 @@
                             VerticalAlignment="Center" Spacing="10" MaxWidth="320">
                     <Image Source="/Assets/no-devices.png" Width="120" Height="120" Opacity="0.85"
                            HorizontalAlignment="Center" RenderOptions.BitmapInterpolationMode="HighQuality"/>
-                    <TextBlock Text="No devices detected" FontSize="18" FontWeight="SemiBold"
+                    <TextBlock Text="{loc:Tr Main_NoDevicesDetected}" FontSize="18" FontWeight="SemiBold"
                                HorizontalAlignment="Center"/>
-                    <TextBlock Text="Connect a Logitech mouse or keyboard, then refresh."
+                    <TextBlock Text="{loc:Tr Main_ConnectLogitechMouseKeyboardRefresh}"
                                TextWrapping="Wrap" TextAlignment="Center" Opacity="0.6"/>
-                    <Button Content="Refresh" HorizontalAlignment="Center" Margin="0,4,0,0"
+                    <Button Content="{loc:Tr Main_Refresh}" HorizontalAlignment="Center" Margin="0,4,0,0"
                             Command="{Binding RefreshCommand}"/>
                 </StackPanel>
             </Panel>
@@ -211,7 +212,7 @@
             <TabControl Margin="8,4"
                         SelectedIndex="{Binding InitialTabIndex, Mode=OneWay}">
                 <!-- Buttons tab: mouse diagram with leader-line labels -->
-                <TabItem Header="Buttons" IsVisible="{Binding HasButtonsTab}">
+                <TabItem Header="{loc:Tr Main_Buttons}" IsVisible="{Binding HasButtonsTab}">
                     <ScrollViewer HorizontalScrollBarVisibility="Auto">
                       <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Top">
                         <!-- Top-aligned so a growing/shrinking Gestures panel never re-centres the mouse -->
@@ -436,15 +437,15 @@
                             </Border.KeyBindings>
                             <StackPanel Spacing="10">
                                 <!-- Master switch: gestures on/off for ALL of this mouse's buttons -->
-                                <CheckBox Content="Gestures Enabled" FontWeight="SemiBold"
+                                <CheckBox Content="{loc:Tr Main_GesturesEnabled}" FontWeight="SemiBold"
                                           IsChecked="{Binding GesturesEnabled}"/>
                                 <!-- Always visible, so it's clear what enabling gestures buys -->
-                                <TextBlock Text="Gestures turn a mouse button into five controls: hold it and swipe up / down / left / right for four actions (switch desktops, media, snap windows…), while a plain tap fires a fifth. The chosen button gives up its normal function."
+                                <TextBlock Text="{loc:Tr Main_GesturesTurnMouseButtonInto}"
                                            TextWrapping="Wrap" Opacity="0.6" FontSize="12"/>
                                 <StackPanel Spacing="10" IsVisible="{Binding GesturesEnabled}">
                                     <!-- Same 104px label column + stretched dropdown on every row -->
                                     <Grid ColumnDefinitions="104,*" Margin="0,3">
-                                        <TextBlock Text="Button" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Tr Main_Button}" VerticalAlignment="Center"/>
                                         <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
                                                   ItemsSource="{Binding GestureOwnerChoices}"
                                                   SelectedItem="{Binding SelectedGestureOwner}">
@@ -463,7 +464,7 @@
                                             IsVisible="{Binding GestureOwnerSelected}"/>
                                     <!-- Gesture set preset; "Disabled" turns this button's swipes off -->
                                     <Grid ColumnDefinitions="104,*" Margin="0,3" IsVisible="{Binding GestureOwnerSelected}">
-                                        <TextBlock Text="Gestures" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Tr Main_Gestures}" VerticalAlignment="Center"/>
                                         <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
                                                   ItemsSource="{Binding GestureCategories}"
                                                   SelectedItem="{Binding SelectedGestureCategory}">
@@ -485,7 +486,7 @@
                 </TabItem>
 
                 <!-- Pointer tab: DPI + SmartShift cards -->
-                <TabItem Header="Pointer" IsVisible="{Binding HasPointerTab}">
+                <TabItem Header="{loc:Tr Main_Pointer}" IsVisible="{Binding HasPointerTab}">
                     <ScrollViewer>
                         <WrapPanel Margin="8">
                             <!-- Scroll direction + shake-to-locate + Pointer tuning (DPI). Always shown:
@@ -495,37 +496,37 @@
                                 <StackPanel Spacing="10">
                                     <!-- Scroll direction (extra bottom margin separates it from Pointer tuning below) -->
                                     <StackPanel Spacing="6" Margin="0,0,0,8" IsVisible="{Binding ShowScrollInvert}">
-                                        <TextBlock Text="Scroll direction" FontSize="15" FontWeight="SemiBold"/>
-                                        <CheckBox Content="Invert scroll direction" IsChecked="{Binding InvertScroll}"/>
-                                        <TextBlock Text="Reverses the wheel in firmware (natural scrolling). Reapplied automatically when the mouse reconnects."
+                                        <TextBlock Text="{loc:Tr Main_ScrollDirection}" FontSize="15" FontWeight="SemiBold"/>
+                                        <CheckBox Content="{loc:Tr Main_InvertScrollDirection}" IsChecked="{Binding InvertScroll}"/>
+                                        <TextBlock Text="{loc:Tr Main_ReversesWheelFirmwareNaturalScrolling}"
                                                    Opacity="0.5" FontSize="11" TextWrapping="Wrap"/>
                                     </StackPanel>
                                     <!-- Hi-res smooth scrolling (HiResWheel 0x2121, diverted + re-injected) -->
                                     <StackPanel Spacing="6" Margin="0,0,0,8" IsVisible="{Binding ShowSmoothScroll}">
-                                        <TextBlock Text="Smooth scrolling" FontSize="15" FontWeight="SemiBold"/>
-                                        <CheckBox Content="High-resolution smooth scrolling" IsChecked="{Binding SmoothScroll}"/>
-                                        <TextBlock Text="Scrolls in fine sub-line steps instead of whole lines. The app translates the wheel while it runs; standard scrolling returns when it quits."
+                                        <TextBlock Text="{loc:Tr Main_SmoothScrolling}" FontSize="15" FontWeight="SemiBold"/>
+                                        <CheckBox Content="{loc:Tr Main_HighResolutionSmoothScrolling}" IsChecked="{Binding SmoothScroll}"/>
+                                        <TextBlock Text="{loc:Tr Main_ScrollsFineSubLineSteps}"
                                                    Opacity="0.5" FontSize="11" TextWrapping="Wrap"/>
                                     </StackPanel>
                                     <!-- Shake to locate: app-wide (the OS pointer), not a device feature -->
                                     <StackPanel Spacing="6" Margin="0,0,0,8">
-                                        <TextBlock Text="Find the pointer" FontSize="15" FontWeight="SemiBold"/>
-                                        <CheckBox Content="Enlarge the pointer when the mouse is shaken"
+                                        <TextBlock Text="{loc:Tr Main_FindPointer}" FontSize="15" FontWeight="SemiBold"/>
+                                        <CheckBox Content="{loc:Tr Main_EnlargePointerWhenMouseShaken}"
                                                   IsChecked="{Binding ShakeToLocate}"/>
-                                        <TextBlock Text="Wiggle the mouse back and forth and the pointer grows — up to 3× — then shrinks smoothly back once you stop. Changes the Windows pointer size while active."
+                                        <TextBlock Text="{loc:Tr Main_WiggleMouseBackForthPointer}"
                                                    Opacity="0.5" FontSize="11" TextWrapping="Wrap"/>
                                     </StackPanel>
                                     <StackPanel Spacing="10" IsVisible="{Binding ShowDpi}">
-                                        <TextBlock Text="Pointer tuning" FontSize="15" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{loc:Tr Main_PointerTuning}" FontSize="15" FontWeight="SemiBold"/>
                                         <Grid ColumnDefinitions="*,Auto">
-                                            <TextBlock Grid.Column="0" Text="DPI" Opacity="0.7"/>
+                                            <TextBlock Grid.Column="0" Text="{loc:Tr Main_DPI}" Opacity="0.7"/>
                                             <TextBlock Grid.Column="1" Text="{Binding DpiText}" Foreground="#3B82F6" FontWeight="SemiBold"/>
                                         </Grid>
                                         <Slider Minimum="{Binding DpiMin}" Maximum="{Binding DpiMax}"
                                                 TickFrequency="{Binding DpiStep}" IsSnapToTickEnabled="True"
                                                 Value="{Binding DpiValue}"/>
                                         <TextBlock Text="{Binding DpiRangeText}" Opacity="0.5" FontSize="11"/>
-                                        <TextBlock Text="PRESETS" Opacity="0.5" FontSize="11" Margin="0,4,0,0"/>
+                                        <TextBlock Text="{loc:Tr Main_Presets}" Opacity="0.5" FontSize="11" Margin="0,4,0,0"/>
                                         <WrapPanel>
                                             <ItemsControl ItemsSource="{Binding DpiPresets}" x:CompileBindings="False">
                                                 <ItemsControl.ItemsPanel>
@@ -546,7 +547,7 @@
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
-                                            <Button Content="+ Add" Padding="10,4" Command="{Binding AddDpiPresetCommand}"/>
+                                            <Button Content="{loc:Tr Main_Add}" Padding="10,4" Command="{Binding AddDpiPresetCommand}"/>
                                         </WrapPanel>
                                     </StackPanel>
                                 </StackPanel>
@@ -556,32 +557,32 @@
                             <Border Margin="8" Padding="16" Background="#11000000" CornerRadius="8"
                                     MinWidth="340" VerticalAlignment="Stretch" IsVisible="{Binding ShowSmartShift}">
                                 <StackPanel Spacing="12">
-                                    <TextBlock Text="SmartShift / Smart Scrolling" FontSize="15" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{loc:Tr Main_SmartshiftSmartScrolling}" FontSize="15" FontWeight="SemiBold"/>
                                     <StackPanel Spacing="8">
-                                        <TextBlock Text="Wheel mode" Opacity="0.7"/>
+                                        <TextBlock Text="{loc:Tr Main_WheelMode}" Opacity="0.7"/>
                                         <StackPanel Spacing="2">
-                                            <RadioButton Content="Free spin" GroupName="WheelMode"
+                                            <RadioButton Content="{loc:Tr Main_FreeSpin}" GroupName="WheelMode"
                                                          IsChecked="{Binding IsFreeSpin}"/>
-                                            <TextBlock Text="Smooth, frictionless scrolling." Opacity="0.5" FontSize="11" Margin="28,0,0,0"/>
+                                            <TextBlock Text="{loc:Tr Main_SmoothFrictionlessScrolling}" Opacity="0.5" FontSize="11" Margin="28,0,0,0"/>
                                         </StackPanel>
                                         <StackPanel Spacing="2">
-                                            <RadioButton Content="SmartShift" GroupName="WheelMode"
+                                            <RadioButton Content="{loc:Tr Main_Smartshift}" GroupName="WheelMode"
                                                          IsChecked="{Binding IsSmartShift}"/>
-                                            <TextBlock Text="Ratchet that free-spins on a fast flick." Opacity="0.5" FontSize="11" Margin="28,0,0,0"/>
+                                            <TextBlock Text="{loc:Tr Main_RatchetFreeSpinsFastFlick}" Opacity="0.5" FontSize="11" Margin="28,0,0,0"/>
                                         </StackPanel>
                                         <StackPanel Spacing="2">
-                                            <RadioButton Content="Ratchet" GroupName="WheelMode"
+                                            <RadioButton Content="{loc:Tr Main_Ratchet}" GroupName="WheelMode"
                                                          IsChecked="{Binding IsRatchet}"/>
-                                            <TextBlock Text="Always clicks line-by-line." Opacity="0.5" FontSize="11" Margin="28,0,0,0"/>
+                                            <TextBlock Text="{loc:Tr Main_AlwaysClicksLineByLine}" Opacity="0.5" FontSize="11" Margin="28,0,0,0"/>
                                         </StackPanel>
                                     </StackPanel>
                                     <StackPanel Spacing="4" IsVisible="{Binding ShowSensitivity}">
                                         <Grid ColumnDefinitions="*,Auto">
-                                            <TextBlock Grid.Column="0" Text="Sensitivity" Opacity="0.7"/>
+                                            <TextBlock Grid.Column="0" Text="{loc:Tr Main_Sensitivity}" Opacity="0.7"/>
                                             <TextBlock Grid.Column="1" Text="{Binding AutoDisengage}" Foreground="#3B82F6" FontWeight="SemiBold"/>
                                         </Grid>
                                         <Slider Minimum="1" Maximum="50" Value="{Binding AutoDisengage}"/>
-                                        <TextBlock Text="Higher keeps the ratchet engaged longer before free-spin."
+                                        <TextBlock Text="{loc:Tr Main_HigherKeepsRatchetEngagedLonger}"
                                                    Opacity="0.5" FontSize="11" TextWrapping="Wrap"/>
                                     </StackPanel>
                                 </StackPanel>
@@ -591,13 +592,13 @@
                 </TabItem>
 
                 <!-- Lighting tab: backlight brightness + solid colour (keyboards) -->
-                <TabItem Header="Lighting" IsVisible="{Binding HasLightingTab}">
+                <TabItem Header="{loc:Tr Main_Lighting}" IsVisible="{Binding HasLightingTab}">
                     <ScrollViewer>
                         <StackPanel Margin="16" Spacing="16" MaxWidth="400">
                             <!-- Backlight brightness (BrightnessControl 0x8040) — hardware-verified -->
                             <StackPanel Spacing="4" IsVisible="{Binding ShowBacklight}">
                                 <Grid ColumnDefinitions="*,Auto">
-                                    <TextBlock Grid.Column="0" Text="Backlight brightness" FontWeight="SemiBold"/>
+                                    <TextBlock Grid.Column="0" Text="{loc:Tr Main_BacklightBrightness}" FontWeight="SemiBold"/>
                                     <TextBlock Grid.Column="1" Text="{Binding BacklightValue, StringFormat='{}{0:0}'}"
                                                Foreground="#3B82F6" FontWeight="SemiBold"/>
                                 </Grid>
@@ -606,7 +607,7 @@
 
                             <!-- Onboard profiles (0x8100) + "No profile" (custom colour) -->
                             <StackPanel Spacing="4" IsVisible="{Binding ShowProfiles}">
-                                <TextBlock Text="Keyboard profile" FontWeight="SemiBold"/>
+                                <TextBlock Text="{loc:Tr Main_KeyboardProfile}" FontWeight="SemiBold"/>
                                 <ItemsControl ItemsSource="{Binding Profiles}" x:CompileBindings="False">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
@@ -620,18 +621,18 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-                                <TextBlock Text="A profile runs the keyboard's built-in lighting on the device (smooth, stays after this app closes). 'No profile' uses the custom color configured below."
+                                <TextBlock Text="{loc:Tr Main_ProfileRunsKeyboardSBuilt}"
                                            TextWrapping="Wrap" Opacity="0.5" FontSize="12"/>
                             </StackPanel>
 
                             <!-- Color + effect -->
                             <StackPanel Spacing="10">
                                 <!-- No profile: just the on/off toggle (live solid color). -->
-                                <CheckBox Content="Lighting on" IsChecked="{Binding LightingEnabled}"
+                                <CheckBox Content="{loc:Tr Main_Lighting2}" IsChecked="{Binding LightingEnabled}"
                                           IsVisible="{Binding ShowLightingToggle}"/>
                                 <!-- Profile: pick the effect to save. -->
                                 <StackPanel Spacing="4" IsVisible="{Binding ShowEffect}">
-                                    <TextBlock Text="Effect" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{loc:Tr Main_Effect}" FontWeight="SemiBold"/>
                                     <ComboBox ItemsSource="{Binding LightingEffects}" SelectedItem="{Binding SelectedEffect}"
                                               Width="180" HorizontalAlignment="Left">
                                         <ComboBox.ItemTemplate>
@@ -642,17 +643,17 @@
                                     </ComboBox>
                                 </StackPanel>
                                 <StackPanel Spacing="4" IsVisible="{Binding ShowSpeed}">
-                                    <TextBlock Text="Breathing speed" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{loc:Tr Main_BreathingSpeed}" FontWeight="SemiBold"/>
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <Slider Minimum="500" Maximum="6000" Width="240" Value="{Binding LightingSpeed}"/>
                                         <TextBlock Text="{Binding LightingSpeed, StringFormat='{}{0} ms'}" VerticalAlignment="Center" Width="60"/>
                                     </StackPanel>
                                 </StackPanel>
                                 <StackPanel Spacing="10" IsVisible="{Binding ShowColor}">
-                                    <TextBlock Text="Color" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{loc:Tr Main_Color}" FontWeight="SemiBold"/>
                                     <ctrl:QuickColorPicker Color="{Binding LightingColor}" HorizontalAlignment="Left"/>
                                     <StackPanel Spacing="4">
-                                        <TextBlock Text="Color intensity" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{loc:Tr Main_ColorIntensity}" FontWeight="SemiBold"/>
                                         <StackPanel Orientation="Horizontal" Spacing="8">
                                             <Slider Minimum="0" Maximum="100" Width="240" Value="{Binding LightingBrightness}"/>
                                             <TextBlock Text="{Binding LightingBrightness}" VerticalAlignment="Center" Width="34"/>
@@ -660,24 +661,24 @@
                                     </StackPanel>
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Button Content="Restore keyboard default" IsVisible="{Binding !ProfileSelected}"
+                                    <Button Content="{loc:Tr Main_RestoreKeyboardDefault}" IsVisible="{Binding !ProfileSelected}"
                                             Command="{Binding RestoreKeyboardDefaultCommand}"/>
-                                    <Button Content="Save lighting to this profile" IsVisible="{Binding ProfileSelected}"
+                                    <Button Content="{loc:Tr Main_SaveLightingProfile}" IsVisible="{Binding ProfileSelected}"
                                             Command="{Binding SaveLightingToProfileCommand}"/>
-                                    <Button Content="Per-key colors…" IsVisible="{Binding ShowPerKeyButton}"
+                                    <Button Content="{loc:Tr Main_PerKeyColors}" IsVisible="{Binding ShowPerKeyButton}"
                                             Click="OnOpenPerKeyEditor"/>
                                 </StackPanel>
                                 <TextBlock TextWrapping="Wrap" Opacity="0.5" FontSize="12" IsVisible="{Binding !ProfileSelected}"
-                                           Text="With 'No profile', the color applies live; 'Restore keyboard default' hands lighting back to the onboard profile."/>
+                                           Text="{loc:Tr Main_NoProfileColorAppliesLive}"/>
                                 <TextBlock TextWrapping="Wrap" Opacity="0.5" FontSize="12" IsVisible="{Binding ProfileSelected}"
-                                           Text="Choose an effect, color and speed, then 'Save lighting to this profile' — it writes into the keyboard's onboard profile (persistent, device-side, smooth). Cycle colors uses the device's default speed."/>
+                                           Text="{loc:Tr Main_ChooseEffectColorSpeedSave}"/>
                             </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
 
                 <!-- G-Keys tab: remap the macro keys (per active profile) -->
-                <TabItem Header="G-Keys" IsVisible="{Binding HasGKeysTab}">
+                <TabItem Header="{loc:Tr Main_GKeys}" IsVisible="{Binding HasGKeysTab}">
                     <ScrollViewer>
                         <StackPanel Margin="16" Spacing="10" MaxWidth="380">
                             <TextBlock Text="{Binding GKeyProfile, StringFormat='Macro keys — profile {0}'}" FontWeight="SemiBold"/>
@@ -689,19 +690,19 @@
                                             <Border Grid.Column="1" Margin="4,0" Padding="10,5" CornerRadius="4" Background="#15000000">
                                                 <TextBlock Text="{Binding CurrentLabel}" VerticalAlignment="Center"/>
                                             </Border>
-                                            <Button Grid.Column="2" Content="⌨ Change" Click="OnPickGKey"/>
+                                            <Button Grid.Column="2" Content="{loc:Tr Main_Change}" Click="OnPickGKey"/>
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <TextBlock Text="Reassign the G1–G5 macro keys for the active profile. Changes write to the keyboard's onboard profile and persist after the app closes."
+                            <TextBlock Text="{loc:Tr Main_ReassignG1G5MacroKeys}"
                                        TextWrapping="Wrap" Opacity="0.5" FontSize="12"/>
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
 
                 <!-- Device tab: identity + info + hosts -->
-                <TabItem Header="Device">
+                <TabItem Header="{loc:Tr Main_Device}">
                     <ScrollViewer>
                         <StackPanel Spacing="16" Margin="16" MaxWidth="520">
                             <StackPanel Spacing="10" DataContext="{Binding SelectedDevice}" x:DataType="vm:DeviceViewModel">
@@ -709,26 +710,26 @@
                                        RenderOptions.BitmapInterpolationMode="HighQuality"
                                        IsVisible="{Binding Image, Converter={x:Static ObjectConverters.IsNotNull}}"/>
                                 <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
-                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Name" Opacity="0.6"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Tr Main_Name}" Opacity="0.6"/>
                                     <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Name}"/>
-                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Type" Opacity="0.6"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Tr Main_Type}" Opacity="0.6"/>
                                     <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Kind}"/>
-                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Status" Opacity="0.6"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="{loc:Tr Main_Status}" Opacity="0.6"/>
                                     <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Status}"/>
-                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Battery" Opacity="0.6"/>
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="{loc:Tr Main_Battery}" Opacity="0.6"/>
                                     <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="6">
                                         <ctrl:BatteryIcon Percent="{Binding BatteryPercent}" Charging="{Binding BatteryCharging}"
                                                           IsVisible="{Binding HasBattery}" VerticalAlignment="Center"/>
                                         <TextBlock Text="{Binding Battery}" VerticalAlignment="Center"/>
                                     </StackPanel>
-                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Connection" Opacity="0.6"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="{loc:Tr Main_Connection}" Opacity="0.6"/>
                                     <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding ReceiverName}"/>
                                 </Grid>
                             </StackPanel>
 
                             <!-- Hosts (EasySwitch) -->
                             <StackPanel Spacing="6" IsVisible="{Binding ShowHosts}">
-                                <TextBlock Text="Hosts (EasySwitch)" FontWeight="SemiBold"/>
+                                <TextBlock Text="{loc:Tr Main_HostsEasyswitch}" FontWeight="SemiBold"/>
                                 <ItemsControl ItemsSource="{Binding Hosts}" x:CompileBindings="False">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
@@ -745,11 +746,11 @@
                                                     </StackPanel>
                                                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6"
                                                                 VerticalAlignment="Center">
-                                                        <Button Content="Switch"
+                                                        <Button Content="{loc:Tr Main_Switch}"
                                                                 IsVisible="{Binding CanSwitch}"
                                                                 Command="{Binding DataContext.SwitchHostCommand, ElementName=Root}"
                                                                 CommandParameter="{Binding}"/>
-                                                        <Button Content="Forget"
+                                                        <Button Content="{loc:Tr Main_Forget}"
                                                                 IsVisible="{Binding CanClear}"
                                                                 Click="OnForgetHost"/>
                                                     </StackPanel>
@@ -758,16 +759,16 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-                                <TextBlock Text="Switching moves the device to another paired computer and disconnects it here."
+                                <TextBlock Text="{loc:Tr Main_SwitchingMovesDeviceAnotherPaired}"
                                            TextWrapping="Wrap" Opacity="0.5" FontSize="12"/>
                                 <TextBlock IsVisible="{Binding HostsSupportClear}"
-                                           Text="Forgetting a host clears its pairing — that computer must pair again to reconnect."
+                                           Text="{loc:Tr Main_ForgettingHostClearsItsPairing}"
                                            TextWrapping="Wrap" Opacity="0.5" FontSize="12"/>
                                 <Grid IsVisible="{Binding !HostsSupportClear}" ColumnDefinitions="Auto,*">
                                     <TextBlock Grid.Column="0" Text="⚠" FontSize="12" Foreground="#E3B341"
                                                Margin="0,0,6,0" VerticalAlignment="Top"/>
                                     <TextBlock Grid.Column="1" Opacity="0.6" FontSize="12" TextWrapping="Wrap"
-                                               Text="This device doesn't support clearing host slots from software."/>
+                                               Text="{loc:Tr Main_DeviceDoesnTSupportClearing}"/>
                                 </Grid>
                             </StackPanel>
                         </StackPanel>

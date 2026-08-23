@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
+using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.Localization;
 

@@ -1,3 +1,5 @@
+using OpenLogi.Core.Localization;
+
 namespace OpenLogi.Core.Gestures;
 
 public static class GestureDirectionExtensions
@@ -7,11 +9,11 @@ public static class GestureDirectionExtensions
 
     public static string Label(this GestureDirection d) => d switch
     {
-        GestureDirection.Up => "Up",
-        GestureDirection.Down => "Down",
-        GestureDirection.Left => "Left",
-        GestureDirection.Right => "Right",
-        GestureDirection.Click => "Click",
+        GestureDirection.Up => Loc.Current["Gesture_Up"],
+        GestureDirection.Down => Loc.Current["Gesture_Down"],
+        GestureDirection.Left => Loc.Current["Gesture_Left"],
+        GestureDirection.Right => Loc.Current["Gesture_Right"],
+        GestureDirection.Click => Loc.Current["Gesture_Click"],
         _ => d.ToString(),
     };
 

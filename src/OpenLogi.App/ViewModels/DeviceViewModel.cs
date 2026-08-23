@@ -2,6 +2,7 @@ using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using OpenLogi.Core.DeviceInfo;
 using OpenLogi.Hid;
+using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.ViewModels;
 
@@ -16,7 +17,7 @@ public sealed partial class DeviceViewModel(string receiverName, PairedDevice de
 
     public string Name => Device.Codename ?? Device.Kind.ToString();
     public string Kind => Device.Kind.ToString();
-    public string Status => Device.Online ? "Online" : "Asleep";
+    public string Status => Device.Online ? Loc.Current["Device_Online"] : Loc.Current["Device_Asleep"];
 
     /// <summary>
     /// True when the device is paired but not currently on its wireless link — a
@@ -37,11 +38,11 @@ public sealed partial class DeviceViewModel(string receiverName, PairedDevice de
     /// <summary>Tooltip for the connection icon.</summary>
     public string ConnectionLabel => Connection switch
     {
-        ConnectionKind.Bluetooth => "Bluetooth",
-        ConnectionKind.LightspeedDongle => "LIGHTSPEED dongle",
-        ConnectionKind.UnifyingDongle => "Unifying dongle",
-        ConnectionKind.BoltDongle => "Bolt dongle",
-        ConnectionKind.UsbCable => "USB",
+        ConnectionKind.Bluetooth => Loc.Current["Connection_Bluetooth"],
+        ConnectionKind.LightspeedDongle => Loc.Current["Connection_Lightspeed"],
+        ConnectionKind.UnifyingDongle => Loc.Current["Connection_Unifying"],
+        ConnectionKind.BoltDongle => Loc.Current["Connection_Bolt"],
+        ConnectionKind.UsbCable => Loc.Current["Connection_Usb"],
         _ => "",
     };
 
@@ -101,9 +102,9 @@ public sealed partial class DeviceViewModel(string receiverName, PairedDevice de
         get
         {
             var caps = new List<string>();
-            if (HasButtons) caps.Add("Buttons");
-            if (HasPointer) caps.Add("DPI");
-            if (HasLighting) caps.Add("Lighting");
+            if (HasButtons) caps.Add(Loc.Current["Capability_Buttons"]);
+            if (HasPointer) caps.Add(Loc.Current["Capability_Dpi"]);
+            if (HasLighting) caps.Add(Loc.Current["Capability_Lighting"]);
             return caps.Count > 0 ? string.Join(", ", caps) : "—";
         }
     }

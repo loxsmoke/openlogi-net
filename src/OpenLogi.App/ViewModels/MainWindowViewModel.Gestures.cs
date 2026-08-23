@@ -4,6 +4,7 @@ using OpenLogi.Core.Actions;
 using OpenLogi.Core.Config;
 using OpenLogi.Core.Gestures;
 using OpenLogi.Hid;
+using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.ViewModels;
 
@@ -85,8 +86,8 @@ public partial class MainWindowViewModel
     /// <summary>Friendly label for a button offered as a gesture trigger.</summary>
     private static string GestureOwnerLabel(ButtonId button) => button switch
     {
-        ButtonId.GestureButton => "Gesture button",
-        ButtonId.DpiToggle => "Wheel / DPI button",
+        ButtonId.GestureButton => Loc.Current["GestureOwner_GestureButton"],
+        ButtonId.DpiToggle => Loc.Current["GestureOwner_DpiToggle"],
         _ => button.Label(),
     };
 
@@ -312,7 +313,7 @@ public partial class MainWindowViewModel
 
         var categories = actions.Select(a => a.Category()).Distinct().ToList();
         if (categories.Count == 1)
-            return $"Gestures: {categories[0].Label()}";
+            return Loc.Current.Format("Gestures_Summary", categories[0].Label());
 
         var detail = "";
         foreach (var label in actions.Select(a => a.Label()).Distinct())

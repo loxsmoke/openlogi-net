@@ -1,3 +1,5 @@
+using OpenLogi.Core.Localization;
+
 namespace OpenLogi.App.ViewModels;
 
 /// <summary>
@@ -12,5 +14,7 @@ public sealed class ProfileSlotViewModel(int number, bool isCurrent)
     public bool IsCurrent { get; } = isCurrent;
     public bool CanSwitch => !IsCurrent;
 
-    public string Label => Number == 0 ? "No profile" : $"Profile {Number}";
+    public string Label => Number == 0
+        ? Loc.Current["Profile_None"]
+        : Loc.Current.Format("Profile_Numbered", Number);
 }

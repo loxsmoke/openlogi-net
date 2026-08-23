@@ -2,6 +2,7 @@ using Avalonia.Threading;
 using OpenLogi.Core.DeviceInfo;
 using OpenLogi.Core.Logging;
 using OpenLogi.Hid;
+using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.ViewModels;
 
@@ -118,7 +119,7 @@ public partial class MainWindowViewModel
         }
         catch (System.Exception e)
         {
-            StatusText = $"Rescan failed: {e.Message}";
+            StatusText = Loc.Current.Format("Status_RescanFailed", e.Message);
         }
         finally
         {

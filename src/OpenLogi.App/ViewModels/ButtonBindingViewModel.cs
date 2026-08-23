@@ -3,6 +3,7 @@ using OpenLogi.Core.Actions;
 using OpenLogi.Core.Config;
 using OpenLogi.Core.Gestures;
 using CoreAction = OpenLogi.Core.Actions.MouseAction;
+using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.ViewModels;
 
@@ -140,7 +141,7 @@ public sealed partial class ButtonBindingViewModel : ObservableObject
     public bool IsGesture => Directions is not null;
 
     /// <summary>The one-line summary shown on the diagram label: the bound action, or "Gestures".</summary>
-    public string SummaryLabel => IsGesture ? "Gestures" : Selected.Label;
+    public string SummaryLabel => IsGesture ? Loc.Current["Binding_Gestures"] : Selected.Label;
 
     [ObservableProperty]
     private ActionChoice _selected;

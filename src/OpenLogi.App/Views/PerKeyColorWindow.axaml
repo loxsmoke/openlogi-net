@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:OpenLogi.App.Localization"
         xmlns:vm="using:OpenLogi.App.ViewModels"
         xmlns:ctrl="using:OpenLogi.App.Controls"
         x:Class="OpenLogi.App.Views.PerKeyColorWindow"
@@ -8,17 +9,17 @@
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         Icon="/Assets/keyboard.png"
-        Title="Color keys">
+        Title="{loc:Tr PerKeyColor_ColorKeys}">
     <StackPanel Margin="16" Spacing="12">
         <TextBlock TextWrapping="Wrap"
-                   Text="Press a physical key on the keyboard to paint it with the color below. Press the same key again to reset it to the base color."/>
-        <TextBlock Text="Paint color" FontWeight="SemiBold"/>
+                   Text="{loc:Tr PerKeyColor_PressPhysicalKeyKeyboardPaint}"/>
+        <TextBlock Text="{loc:Tr PerKeyColor_PaintColor}" FontWeight="SemiBold"/>
         <ctrl:QuickColorPicker Color="{Binding SelectedColor}" ShowOff="True" HorizontalAlignment="Left"/>
-        <TextBlock Text="Base color" FontWeight="SemiBold"/>
+        <TextBlock Text="{loc:Tr PerKeyColor_BaseColor}" FontWeight="SemiBold"/>
         <ctrl:QuickColorPicker Color="{Binding BaseColor}" ShowOff="True" HorizontalAlignment="Left"/>
-        <Button Content="Reset all keys to base (Alt+R)" Click="OnResetAll"
+        <Button Content="{loc:Tr PerKeyColor_ResetAllKeysBaseAlt}" Click="OnResetAll"
                 Focusable="False" IsTabStop="False"/>
-        <TextBlock Text="Special keys (OS swallows these — click to paint)" FontWeight="SemiBold"/>
+        <TextBlock Text="{loc:Tr PerKeyColor_SpecialKeysOSSwallowsThese}" FontWeight="SemiBold"/>
         <ItemsControl ItemsSource="{Binding SpecialKeyRows}">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate><StackPanel Spacing="2"/></ItemsPanelTemplate>

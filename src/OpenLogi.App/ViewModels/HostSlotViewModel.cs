@@ -1,3 +1,5 @@
+using OpenLogi.Core.Localization;
+
 namespace OpenLogi.App.ViewModels;
 
 /// <summary>One EasySwitch host slot: its name, pairing status, bus, and whether it's current.</summary>
@@ -23,14 +25,14 @@ public sealed class HostSlotViewModel(int index, bool isCurrent, bool paired, st
     public bool CanClear => (Paired || IsCurrent) && supportsDelete;
 
     /// <summary>The host's name, or a generic label when unnamed/empty.</summary>
-    public string Title => !string.IsNullOrWhiteSpace(name) ? name! : $"Host {Number}";
+    public string Title => !string.IsNullOrWhiteSpace(name) ? name! : Loc.Current.Format("Host_Unnamed", Number);
 
     /// <summary>A short status line: current/paired/empty plus the bus type.</summary>
     public string Status
     {
         get
         {
-            var state = IsCurrent ? "current" : Paired ? "paired" : "empty";
+            var state = Loc.Current[IsCurrent ? "Host_Current" : Paired ? "Host_Paired" : "Host_Empty"];
             return string.IsNullOrEmpty(busType) || busType == "Undefined" ? state : $"{state} · {busType}";
         }
     }

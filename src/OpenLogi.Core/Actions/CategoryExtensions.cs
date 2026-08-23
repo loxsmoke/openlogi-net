@@ -1,3 +1,5 @@
+using OpenLogi.Core.Localization;
+
 namespace OpenLogi.Core.Actions;
 
 public static class CategoryExtensions
@@ -12,14 +14,14 @@ public static class CategoryExtensions
     /// <summary>Group-header label for the action picker.</summary>
     public static string Label(this Category c) => c switch
     {
-        Category.Editing => "Editing",
-        Category.Browser => "Browser & Tabs",
-        Category.Media => "Media & Volume",
-        Category.Mouse => "Mouse Buttons",
-        Category.Dpi => "DPI & Wheel",
-        Category.Scroll => "Scrolling",
-        Category.Navigation => "Windows & Desktops",
-        Category.System => "System",
+        Category.Editing => Loc.Current["Category_Editing"],
+        Category.Browser => Loc.Current["Category_Browser"],
+        Category.Media => Loc.Current["Category_Media"],
+        Category.Mouse => Loc.Current["Category_Mouse"],
+        Category.Dpi => Loc.Current["Category_Dpi"],
+        Category.Scroll => Loc.Current["Category_Scroll"],
+        Category.Navigation => Loc.Current["Category_Navigation"],
+        Category.System => Loc.Current["Category_System"],
         _ => c.ToString(),
     };
 }
