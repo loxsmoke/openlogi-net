@@ -77,6 +77,10 @@
     <value>System ({0})</value>
     <comment>Language dropdown row meaning "follow the operating system's language". {0} is the language that currently resolves to, e.g. "System (English US)". The other rows are language names, which are never translated.</comment>
   </data>
+  <data name="Settings_Language_Fallback" xml:space="preserve">
+    <value>Anything not translated falls back to English US.</value>
+    <comment>Hint under the language dropdown. "English US" is a language name - keep it as-is rather than translating it.</comment>
+  </data>
   <data name="Settings_LaunchAtLogin" xml:space="preserve">
     <value>Launch at login</value>
     <comment>Checkbox: start the app when the user signs in to Windows.</comment>

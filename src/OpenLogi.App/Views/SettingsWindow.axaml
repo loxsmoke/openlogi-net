@@ -17,18 +17,24 @@
         <TextBlock Text="{loc:Tr Settings_Title}" FontSize="18" FontWeight="Bold"/>
 
         <!-- Language rows are their own endonyms and never translated; only the
-             "System" row follows the current language. -->
-        <StackPanel Orientation="Horizontal" Spacing="12">
-            <TextBlock Text="{loc:Tr Settings_Language}" VerticalAlignment="Center"/>
-            <ComboBox ItemsSource="{Binding Languages}"
-                      SelectedItem="{Binding SelectedLanguage}"
-                      MinWidth="200">
-                <ComboBox.ItemTemplate>
-                    <DataTemplate x:DataType="loc:LanguageOption">
-                        <TextBlock Text="{Binding Display}"/>
-                    </DataTemplate>
-                </ComboBox.ItemTemplate>
-            </ComboBox>
+             "System" row follows the current language. The tighter inner spacing
+             keeps the fallback hint attached to the dropdown rather than reading
+             as another settings row. -->
+        <StackPanel Spacing="6">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock Text="{loc:Tr Settings_Language}" VerticalAlignment="Center"/>
+                <ComboBox ItemsSource="{Binding Languages}"
+                          SelectedItem="{Binding SelectedLanguage}"
+                          MinWidth="200">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="loc:LanguageOption">
+                            <TextBlock Text="{Binding Display}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+            <TextBlock Text="{loc:Tr Settings_Language_Fallback}"
+                       TextWrapping="Wrap" Opacity="0.5" FontSize="12"/>
         </StackPanel>
 
         <CheckBox Content="{loc:Tr Settings_LaunchAtLogin}" IsChecked="{Binding LaunchAtLogin}"/>
