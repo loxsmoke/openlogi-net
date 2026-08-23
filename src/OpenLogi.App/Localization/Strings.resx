@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Neutral (English) string table. Keys are Window_Element; comments are the
+    translator's only context, so say where the string appears and what varies.
+    Adding a language means adding Strings.<culture>.resx beside this file and a
+    row in LanguageCatalog.All - no code changes.
+  -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <data name="Settings_Title" xml:space="preserve">
+    <value>Settings</value>
+    <comment>Settings window title, and the heading at the top of it.</comment>
+  </data>
+  <data name="Settings_Language" xml:space="preserve">
+    <value>Language</value>
+    <comment>Label beside the language dropdown.</comment>
+  </data>
+  <data name="Settings_Language_System" xml:space="preserve">
+    <value>System</value>
+    <comment>Language dropdown row meaning "follow the operating system's language". The other rows are language names, which are never translated.</comment>
+  </data>
+  <data name="Settings_LaunchAtLogin" xml:space="preserve">
+    <value>Launch at login</value>
+    <comment>Checkbox: start the app when the user signs in to Windows.</comment>
+  </data>
+  <data name="Settings_CheckForUpdates" xml:space="preserve">
+    <value>Check for updates on launch</value>
+    <comment>Checkbox: look for a newer release at startup.</comment>
+  </data>
+  <data name="Settings_AutoDownloadAssets" xml:space="preserve">
+    <value>Automatically download device images</value>
+    <comment>Checkbox: fetch product photos for the device gallery.</comment>
+  </data>
+  <data name="Settings_MinimizeToTray" xml:space="preserve">
+    <value>Minimize to the system tray (hide from the taskbar)</value>
+    <comment>Checkbox. "System tray" is the Windows notification area.</comment>
+  </data>
+  <data name="Settings_SuppressLogging" xml:space="preserve">
+    <value>Suppress diagnostic logs</value>
+    <comment>Checkbox: stop writing the diagnostic log file.</comment>
+  </data>
+  <data name="Settings_Footer" xml:space="preserve">
+    <value>Settings are saved to config.toml. Update checks are enabled by default.</value>
+    <comment>Grey footnote under the settings list. "config.toml" is a filename - do not translate it.</comment>
+  </data>
+</root>

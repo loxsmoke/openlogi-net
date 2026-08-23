@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
+using OpenLogi.App.Localization;
 using OpenLogi.Core.Config;
 using OpenLogi.Core.Logging;
 
@@ -21,6 +23,10 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _autoDownloadAssets;
     [ObservableProperty] private bool _minimizeToTray;
     [ObservableProperty] private bool _suppressLogging;
+    [ObservableProperty] private LanguageOption _selectedLanguage;
+
+    /// <summary>Rows for the language dropdown: "System" plus every shipped language.</summary>
+    public IReadOnlyList<LanguageOption> Languages => LanguageCatalog.All;
 
     public SettingsViewModel(Config config)
     {
@@ -32,6 +38,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         AutoDownloadAssets = config.AppSettings.AutoDownloadAssets;
         MinimizeToTray = config.AppSettings.MinimizeToTray;
         SuppressLogging = config.AppSettings.SuppressLogging;
+        SelectedLanguage = LanguageCatalog.OptionFor(config.AppSettings.Language);
         _loading = false;
     }
 
@@ -75,6 +82,17 @@ public sealed partial class SettingsViewModel : ObservableObject
         DiagnosticLog.Suppressed = value;
         if (!value) DiagnosticLog.Info("env", "logging re-enabled in settings");
         _config.AppSettings.SuppressLogging = value;
+        Save();
+    }
+
+    partial void OnSelectedLanguageChanged(LanguageOption value)
+    {
+        if (_loading) return;
+        // null Code is the System row, which is also how "follow the OS" is stored:
+        // no language key in config.toml.
+        _config.AppSettings.Language = value.Code;
+        Loc.Current.SetCulture(LanguageCatalog.Resolve(value.Code));
+        DiagnosticLog.Info("env", $"language set to {value.Code ?? "system"} → {Loc.Current.Culture.Name}");
         Save();
     }
 

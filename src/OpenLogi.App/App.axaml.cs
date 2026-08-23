@@ -6,6 +6,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Markup.Xaml;
+using OpenLogi.App.Localization;
 using OpenLogi.App.ViewModels;
 using OpenLogi.App.Views;
 using OpenLogi.Core;
@@ -27,8 +28,17 @@ public partial class App : Application
         {
             // Apply log suppression before anything (the sweep starts with the
             // view model). Missing key / unreadable config ⇒ logging stays on.
-            try { DiagnosticLog.Suppressed = Config.LoadOrDefault().AppSettings.SuppressLogging; }
-            catch { /* keep logging */ }
+            AppSettings? settings = null;
+            try { settings = Config.LoadOrDefault().AppSettings; }
+            catch { /* keep logging, fall back to the OS language */ }
+            if (settings is not null) DiagnosticLog.Suppressed = settings.SuppressLogging;
+
+            // Resolve the UI language before the first window is constructed: a
+            // window built under the wrong culture would keep it until recreated.
+            var culture = LanguageCatalog.Resolve(settings?.Language);
+            Loc.Current.SetCulture(culture);
+            DiagnosticLog.Info("env",
+                $"language {settings?.Language ?? "system"} (OS {Loc.SystemUiCulture.Name}) → {culture.Name}");
 
             // Env header for the diagnostic log, off the UI thread (the Logitech
             // check enumerates processes). May interleave with sweep lines — fine.
