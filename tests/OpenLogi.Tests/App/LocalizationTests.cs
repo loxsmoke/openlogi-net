@@ -18,11 +18,23 @@ namespace OpenLogi.Tests.App;
 public class LocalizationTests
 {
     [Fact]
-    public void NeutralStringsResolve()
+    public void NeutralStringsResolve() => InCulture("en-US", () =>
     {
         Assert.Equal("Settings", Loc.Current["Settings_Title"]);
         Assert.Equal("Launch at login", Loc.Current["Settings_LaunchAtLogin"]);
-    }
+    });
+
+    [Fact]
+    public void TranslatedStringsResolve() => InCulture("de", () =>
+    {
+        Assert.Equal("Einstellungen", Loc.Current["Settings_Title"]);
+        // The satellite serves every de-* region, and Format works through it too.
+        Assert.Equal("Profil 2", Loc.Current.Format("Profile_Numbered", 2));
+    });
+
+    [Fact]
+    public void RegionalVariantUsesTheSatelliteForItsLanguage() => InCulture("de-AT", () =>
+        Assert.Equal("Einstellungen", Loc.Current["Settings_Title"]));
 
     [Fact]
     public void MissingKeyRendersTheKeyItself()
@@ -35,50 +47,77 @@ public class LocalizationTests
     [Fact]
     public void SystemSettingResolvesThroughTheOsLanguage()
     {
-        // English is all we ship, so every OS language lands there today.
-        Assert.Equal("en-US", LanguageCatalog.Resolve(null).Name);
-        Assert.Equal("en-US", LanguageCatalog.Resolve("").Name);
-        Assert.Equal("en-US", LanguageCatalog.Resolve("   ").Name);
+        // Asserted against the OS language rather than a fixed answer: this must
+        // hold on a German machine too, where System means German.
+        var system = LanguageCatalog.Resolve(null);
+        Assert.Contains(system, LanguageCatalog.Shipped);
+        Assert.Equal(system, LanguageCatalog.Resolve(""));
+        Assert.Equal(system, LanguageCatalog.Resolve("   "));
     }
 
     [Fact]
-    public void ShippedLanguageIsHonoured() =>
-        Assert.Equal("en-US", LanguageCatalog.Resolve("en-US").Name);
-
-    [Fact]
-    public void RegionalVariantUsesTheShippedLanguage() =>
-        // en-GB has no resources of its own; en-US serves it.
-        Assert.Equal("en-US", LanguageCatalog.Resolve("en-GB").Name);
-
-    [Fact]
-    public void UnshippedLanguageFallsBackToEnglish()
+    public void ShippedLanguageIsHonoured()
     {
-        // Covers a hand-edited config.toml and a language dropped from a later build.
-        Assert.Equal("en-US", LanguageCatalog.Resolve("de-DE").Name);
-        Assert.Equal("en-US", LanguageCatalog.Resolve("not-a-culture").Name);
+        Assert.Equal("en-US", LanguageCatalog.Resolve("en-US").Name);
+        Assert.Equal("de", LanguageCatalog.Resolve("de").Name);
+    }
+
+    [Fact]
+    public void RegionalVariantUsesTheShippedLanguage()
+    {
+        // Neither has resources of its own; the shipped language for it serves.
+        Assert.Equal("en-US", LanguageCatalog.Resolve("en-GB").Name);
+        Assert.Equal("de", LanguageCatalog.Resolve("de-CH").Name);
+    }
+
+    [Fact]
+    public void UnshippedLanguageFallsBackToTheSystemChoice()
+    {
+        // A hand-edited config.toml, or a language dropped from a later build:
+        // treated as if nothing was set, which is English unless the OS says otherwise.
+        Assert.Equal(LanguageCatalog.Resolve(null), LanguageCatalog.Resolve("fr-FR"));
+        Assert.Equal(LanguageCatalog.Resolve(null), LanguageCatalog.Resolve("not-a-culture"));
     }
 
     [Fact]
     public void OptionForMapsThePersistedSetting()
     {
         Assert.Same(LanguageCatalog.System, LanguageCatalog.OptionFor(null));
-        Assert.Same(LanguageCatalog.System, LanguageCatalog.OptionFor("de-DE"));
+        Assert.Same(LanguageCatalog.System, LanguageCatalog.OptionFor("fr-FR"));
         Assert.Equal("en-US", LanguageCatalog.OptionFor("en-US").Code);
         Assert.Equal("en-US", LanguageCatalog.OptionFor("EN-us").Code);
+        Assert.Equal("de", LanguageCatalog.OptionFor("de").Code);
     }
 
     [Fact]
     public void SystemRowNamesTheLanguageItResolvesTo()
     {
-        // English is all we ship, so System lands there whatever the OS is set to.
+        // Named against what System actually resolves to on this machine, so the
+        // row stays honest on a German desktop as well as an English one.
+        var resolved = LanguageCatalog.Resolve(null).Name;
+        var expected = LanguageCatalog.All.Single(o => o.Code == resolved).Display;
+
         Assert.Null(LanguageCatalog.System.Code);
-        Assert.Equal("English US", LanguageCatalog.SystemLanguageName);
-        Assert.Equal("System (English US)", LanguageCatalog.System.Display);
+        Assert.Equal(expected, LanguageCatalog.SystemLanguageName);
+        Assert.Equal($"System ({expected})", LanguageCatalog.System.Display);
     }
 
     [Fact]
-    public void LanguageRowsAreNotTranslated() =>
+    public void LanguageRowsAreNotTranslated() => InCulture("de", () =>
+    {
+        // Endonyms: each language names itself, whatever the UI language is.
         Assert.Equal("English US", LanguageCatalog.All.Single(o => o.Code == "en-US").Display);
+        Assert.Equal("Deutsch", LanguageCatalog.All.Single(o => o.Code == "de").Display);
+    });
+
+    /// <summary>Run <paramref name="body"/> with the UI language pinned, then restore it.</summary>
+    private static void InCulture(string name, System.Action body)
+    {
+        var original = Loc.Current.Culture;
+        Loc.Current.SetCulture(CultureInfo.GetCultureInfo(name));
+        try { body(); }
+        finally { Loc.Current.SetCulture(original); }
+    }
 
     [Fact]
     public void SystemRowSurvivesAMissingFormatString()
@@ -101,8 +140,8 @@ public class LocalizationTests
         Assert.Equal(BindingMode.OneWay, binding.Mode);
         Assert.Equal("Settings_Title",
             Assert.IsType<string>(binding.ConverterParameter));
-        Assert.Equal("Settings",
-            binding.Converter!.Convert(null, typeof(string), binding.ConverterParameter, CultureInfo.InvariantCulture));
+        InCulture("en-US", () => Assert.Equal("Settings",
+            binding.Converter!.Convert(null, typeof(string), binding.ConverterParameter, CultureInfo.InvariantCulture)));
     }
 
     [Fact]

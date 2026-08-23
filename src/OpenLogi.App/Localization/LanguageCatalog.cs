@@ -58,8 +58,12 @@ public static class LanguageCatalog
     /// <summary>Used whenever nothing better matches — the neutral resource set.</summary>
     public static readonly CultureInfo Fallback = CultureInfo.GetCultureInfo("en-US");
 
-    /// <summary>Cultures with a shipped translation. English only, for now.</summary>
-    public static readonly IReadOnlyList<CultureInfo> Shipped = [Fallback];
+    /// <summary>
+    /// Cultures with a shipped translation. German is the neutral <c>de</c>, not a
+    /// regional variant, so one satellite serves de-DE, de-AT and de-CH alike.
+    /// </summary>
+    public static readonly IReadOnlyList<CultureInfo> Shipped =
+        [Fallback, CultureInfo.GetCultureInfo("de")];
 
     /// <summary>Follow the OS UI language.</summary>
     public static readonly LanguageOption System = new(null, null);
@@ -69,6 +73,7 @@ public static class LanguageCatalog
     [
         System,
         new("en-US", "English US"),
+        new("de", "Deutsch"),
     ];
 
     /// <summary>

@@ -60,8 +60,9 @@ public class TranslationCoverageTests
         // Avalonia control names looked up by name, not shown to anyone.
         "Shell", "Fill",
 
-        // Language endonym: a language names itself in its own language.
-        "English US",
+        // Language endonyms: a language names itself in its own language, so these
+        // read the same whatever the UI language is. Every new language adds one.
+        "English US", "Deutsch",
 
         // Developer-facing exception, never surfaced in the UI.
         "localized text is one-way",
@@ -102,6 +103,57 @@ public class TranslationCoverageTests
 
     /// <summary>Lines whose strings are log or developer output, not UI.</summary>
     private static readonly string[] NonUiCalls = ["DiagnosticLog.", "Debug.WriteLine", "Console.Write", "nameof("];
+
+    /// <summary>
+    /// Every shipped language must answer for every key. A missing entry is not a
+    /// runtime error — ResourceManager silently serves the neutral string — so
+    /// nothing but a test catches a translation that has fallen behind.
+    /// </summary>
+    [Theory]
+    [InlineData("de")]
+    public void TranslationCoversEveryKey(string culture)
+    {
+        var neutral = ResourceKeys("Strings.resx");
+        var translated = ResourceKeys($"Strings.{culture}.resx");
+
+        var missing = neutral.Except(translated).Order().ToList();
+        var orphaned = translated.Except(neutral).Order().ToList();
+
+        Assert.True(missing.Count == 0,
+            $"Strings.{culture}.resx is missing {missing.Count} key(s):\n  " + string.Join("\n  ", missing));
+        Assert.True(orphaned.Count == 0,
+            $"Strings.{culture}.resx defines {orphaned.Count} key(s) the neutral table no longer has:\n  "
+            + string.Join("\n  ", orphaned));
+    }
+
+    /// <summary>
+    /// A translation that drops or renumbers a placeholder throws
+    /// <see cref="FormatException"/> at the point of use — in a status line or a
+    /// dialog, where nobody is looking. Compare the placeholder sets instead.
+    /// </summary>
+    [Theory]
+    [InlineData("de")]
+    public void PlaceholdersSurviveTranslation(string culture)
+    {
+        var neutral = ResourceValues("Strings.resx");
+        var translated = ResourceValues($"Strings.{culture}.resx");
+        var holes = new Regex(@"\{(\d+)\}", RegexOptions.Compiled);
+        var wrong = new List<string>();
+
+        foreach (var (key, english) in neutral)
+        {
+            if (!translated.TryGetValue(key, out var other)) continue;
+            var expected = holes.Matches(english).Select(m => m.Value).ToHashSet();
+            var actual = holes.Matches(other).Select(m => m.Value).ToHashSet();
+            if (!expected.SetEquals(actual))
+                wrong.Add($"{key}: expected {Show(expected)}, translation has {Show(actual)}");
+        }
+
+        Assert.True(wrong.Count == 0,
+            $"{wrong.Count} translated string(s) changed their placeholders:\n  " + string.Join("\n  ", wrong));
+
+        static string Show(HashSet<string> set) => set.Count == 0 ? "none" : string.Join(" ", set.Order());
+    }
 
     [Fact]
     public void NoUntranslatedTextInXaml()
@@ -188,6 +240,14 @@ public class TranslationCoverageTests
         }
         return line;
     }
+
+    private static Dictionary<string, string> ResourceValues(string fileName) =>
+        System.Xml.Linq.XDocument
+            .Load(Path.Combine(LocalizationTests.SrcRoot(), "OpenLogi.Core", "Localization", fileName))
+            .Root!.Elements("data")
+            .ToDictionary(d => d.Attribute("name")!.Value, d => d.Element("value")?.Value ?? "");
+
+    private static HashSet<string> ResourceKeys(string fileName) => [.. ResourceValues(fileName).Keys];
 
     private static IEnumerable<(string Path, string Relative)> ScannedFiles(string pattern)
     {

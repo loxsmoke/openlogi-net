@@ -1,0 +1,1043 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    German translation. Keys and their order mirror Strings.resx; each comment
+    carries the English source so a reviewer can see what was translated.
+    Placeholders ({0}, {1}) must survive translation - a test checks that.
+  -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <data name="Settings_Title" xml:space="preserve">
+    <value>Einstellungen</value>
+    <comment>EN: Settings</comment>
+  </data>
+  <data name="Settings_Language" xml:space="preserve">
+    <value>Sprache</value>
+    <comment>EN: Language</comment>
+  </data>
+  <data name="Settings_Language_System" xml:space="preserve">
+    <value>System ({0})</value>
+    <comment>EN: System ({0})</comment>
+  </data>
+  <data name="Settings_Language_Fallback" xml:space="preserve">
+    <value>Alles, was nicht übersetzt ist, erscheint auf English US.</value>
+    <comment>EN: Anything not translated falls back to English US.</comment>
+  </data>
+  <data name="Settings_LaunchAtLogin" xml:space="preserve">
+    <value>Beim Anmelden starten</value>
+    <comment>EN: Launch at login</comment>
+  </data>
+  <data name="Settings_CheckForUpdates" xml:space="preserve">
+    <value>Beim Start nach Updates suchen</value>
+    <comment>EN: Check for updates on launch</comment>
+  </data>
+  <data name="Settings_AutoDownloadAssets" xml:space="preserve">
+    <value>Geräteabbildungen automatisch herunterladen</value>
+    <comment>EN: Automatically download device images</comment>
+  </data>
+  <data name="Settings_MinimizeToTray" xml:space="preserve">
+    <value>In den Infobereich minimieren (aus der Taskleiste ausblenden)</value>
+    <comment>EN: Minimize to the system tray (hide from the taskbar)</comment>
+  </data>
+  <data name="Settings_SuppressLogging" xml:space="preserve">
+    <value>Diagnoseprotokolle unterdrücken</value>
+    <comment>EN: Suppress diagnostic logs</comment>
+  </data>
+  <data name="Settings_Footer" xml:space="preserve">
+    <value>Einstellungen werden in config.toml gespeichert. Die Updateprüfung ist standardmäßig aktiviert.</value>
+    <comment>EN: Settings are saved to config.toml. Update checks are enabled by default.</comment>
+  </data>
+  <data name="QuickColor_OffTurnsKeyOff" xml:space="preserve">
+    <value>Aus (schaltet die Taste ab)</value>
+    <comment>EN: Off (turns the key off)</comment>
+  </data>
+  <data name="About_AboutOpenlogiNet" xml:space="preserve">
+    <value>Über OpenLogi.net</value>
+    <comment>EN: About OpenLogi.net</comment>
+  </data>
+  <data name="About_OpenlogiNet" xml:space="preserve">
+    <value>OpenLogi.net</value>
+    <comment>EN: OpenLogi.net</comment>
+  </data>
+  <data name="About_LocalFirstAlternativeLogitechOptions" xml:space="preserve">
+    <value>Eine lokale Alternative zu Logitech Options+ für HID++-Geräte. Kein Konto, keine Telemetrie.</value>
+    <comment>EN: A local-first alternative to Logitech Options+ for HID++ devices. No account, no telemetry.</comment>
+  </data>
+  <data name="About_Github" xml:space="preserve">
+    <value>GitHub</value>
+    <comment>EN: GitHub</comment>
+  </data>
+  <data name="About_Releases" xml:space="preserve">
+    <value>Releases</value>
+    <comment>EN: Releases</comment>
+  </data>
+  <data name="About_LicensedUnderMIT" xml:space="preserve">
+    <value>Lizenziert unter MIT</value>
+    <comment>EN: Licensed under MIT</comment>
+  </data>
+  <data name="About_CopyInfo" xml:space="preserve">
+    <value>Infos kopieren</value>
+    <comment>EN: Copy info</comment>
+  </data>
+  <data name="About_OpenLogs" xml:space="preserve">
+    <value>Protokolle öffnen</value>
+    <comment>EN: Open logs</comment>
+  </data>
+  <data name="About_Close" xml:space="preserve">
+    <value>Schließen</value>
+    <comment>EN: Close</comment>
+  </data>
+  <data name="Confirm_Confirm" xml:space="preserve">
+    <value>Bestätigen</value>
+    <comment>EN: Confirm</comment>
+  </data>
+  <data name="Confirm_Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+    <comment>EN: Cancel</comment>
+  </data>
+  <data name="ExitConfirm_ExitOpenlogiNet" xml:space="preserve">
+    <value>OpenLogi.net beenden?</value>
+    <comment>EN: Exit OpenLogi.net?</comment>
+  </data>
+  <data name="ExitConfirm_WhileAppIsnTRunning" xml:space="preserve">
+    <value>Solange die App nicht läuft, funktionieren Tastenbelegungen, Mausgesten, App-Profile und sanftes Scrollen nicht — Ihre Geräte verhalten sich dann wie ab Werk. Sie können die App stattdessen in den Infobereich minimieren, damit alles aktiv bleibt.</value>
+    <comment>EN: While the app isn't running, button remaps, mouse gestures, per-app profiles, and smooth scrolling stop working — your devices fall back to their default behavior. You can minimize to the system tray instead to keep everything active.</comment>
+  </data>
+  <data name="ExitConfirm_MinimizeTray" xml:space="preserve">
+    <value>In den Infobereich</value>
+    <comment>EN: Minimize to tray</comment>
+  </data>
+  <data name="ExitConfirm_Exit" xml:space="preserve">
+    <value>Beenden</value>
+    <comment>EN: Exit</comment>
+  </data>
+  <data name="ExitConfirm_Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+    <comment>EN: Cancel</comment>
+  </data>
+  <data name="KeyPicker_PickKey" xml:space="preserve">
+    <value>Taste auswählen</value>
+    <comment>EN: Pick a key</comment>
+  </data>
+  <data name="KeyPicker_ClickModifiersShiftCtrlAlt" xml:space="preserve">
+    <value>Klicken Sie auf Modifikatoren (Umschalt / Strg / Alt), um sie umzuschalten, und dann auf eine Taste. Ausgegraute Tasten sind nicht möglich.</value>
+    <comment>EN: Click modifiers (Shift / Ctrl / Alt) to toggle them, then click a key. Greyed keys can't be targets.</comment>
+  </data>
+  <data name="KeyPicker_Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+    <comment>EN: Cancel</comment>
+  </data>
+  <data name="KeyPicker_OK" xml:space="preserve">
+    <value>OK</value>
+    <comment>EN: OK</comment>
+  </data>
+  <data name="Main_OpenlogiNet" xml:space="preserve">
+    <value>OpenLogi.net</value>
+    <comment>EN: OpenLogi.net</comment>
+  </data>
+  <data name="Main_Install" xml:space="preserve">
+    <value>Installieren</value>
+    <comment>EN: Install</comment>
+  </data>
+  <data name="Main_Download" xml:space="preserve">
+    <value>Herunterladen</value>
+    <comment>EN: Download</comment>
+  </data>
+  <data name="Main_ViewGithub" xml:space="preserve">
+    <value>Auf GitHub ansehen</value>
+    <comment>EN: View on GitHub</comment>
+  </data>
+  <data name="Main_Devices" xml:space="preserve">
+    <value>Geräte</value>
+    <comment>EN: Devices</comment>
+  </data>
+  <data name="Main_Refresh" xml:space="preserve">
+    <value>Aktualisieren</value>
+    <comment>EN: Refresh</comment>
+  </data>
+  <data name="Main_Settings" xml:space="preserve">
+    <value>Einstellungen</value>
+    <comment>EN: Settings</comment>
+  </data>
+  <data name="Main_About" xml:space="preserve">
+    <value>Über</value>
+    <comment>EN: About</comment>
+  </data>
+  <data name="Main_Devices2" xml:space="preserve">
+    <value>←  Geräte</value>
+    <comment>EN: ←  Devices</comment>
+  </data>
+  <data name="Main_Asleep" xml:space="preserve">
+    <value>☾ Schläft</value>
+    <comment>EN: ☾ Asleep</comment>
+  </data>
+  <data name="Main_ScanningDevices" xml:space="preserve">
+    <value>Suche nach Geräten…</value>
+    <comment>EN: Scanning for devices…</comment>
+  </data>
+  <data name="Main_NoDevicesDetected" xml:space="preserve">
+    <value>Keine Geräte gefunden</value>
+    <comment>EN: No devices detected</comment>
+  </data>
+  <data name="Main_ConnectLogitechMouseKeyboardRefresh" xml:space="preserve">
+    <value>Schließen Sie eine Logitech-Maus oder -Tastatur an und aktualisieren Sie.</value>
+    <comment>EN: Connect a Logitech mouse or keyboard, then refresh.</comment>
+  </data>
+  <data name="Main_Buttons" xml:space="preserve">
+    <value>Tasten</value>
+    <comment>EN: Buttons</comment>
+  </data>
+  <data name="Main_GesturesEnabled" xml:space="preserve">
+    <value>Gesten aktiviert</value>
+    <comment>EN: Gestures Enabled</comment>
+  </data>
+  <data name="Main_GesturesTurnMouseButtonInto" xml:space="preserve">
+    <value>Gesten machen aus einer Maustaste fünf Steuerelemente: Halten Sie sie gedrückt und wischen Sie nach oben / unten / links / rechts für vier Aktionen (Desktops wechseln, Medien, Fenster andocken…); ein einfacher Klick löst die fünfte aus. Die gewählte Taste gibt ihre normale Funktion ab.</value>
+    <comment>EN: Gestures turn a mouse button into five controls: hold it and swipe up / down / left / right for four actions (switch desktops, media, snap windows…), while a plain tap fires a fifth. The chosen button gives up its normal function.</comment>
+  </data>
+  <data name="Main_Button" xml:space="preserve">
+    <value>Taste</value>
+    <comment>EN: Button</comment>
+  </data>
+  <data name="Main_Gestures" xml:space="preserve">
+    <value>Gesten</value>
+    <comment>EN: Gestures</comment>
+  </data>
+  <data name="Main_Pointer" xml:space="preserve">
+    <value>Zeiger</value>
+    <comment>EN: Pointer</comment>
+  </data>
+  <data name="Main_ScrollDirection" xml:space="preserve">
+    <value>Scrollrichtung</value>
+    <comment>EN: Scroll direction</comment>
+  </data>
+  <data name="Main_InvertScrollDirection" xml:space="preserve">
+    <value>Scrollrichtung umkehren</value>
+    <comment>EN: Invert scroll direction</comment>
+  </data>
+  <data name="Main_ReversesWheelFirmwareNaturalScrolling" xml:space="preserve">
+    <value>Kehrt das Rad in der Firmware um (natürliches Scrollen). Wird bei erneuter Verbindung der Maus automatisch wieder angewendet.</value>
+    <comment>EN: Reverses the wheel in firmware (natural scrolling). Reapplied automatically when the mouse reconnects.</comment>
+  </data>
+  <data name="Main_SmoothScrolling" xml:space="preserve">
+    <value>Sanftes Scrollen</value>
+    <comment>EN: Smooth scrolling</comment>
+  </data>
+  <data name="Main_HighResolutionSmoothScrolling" xml:space="preserve">
+    <value>Hochauflösendes sanftes Scrollen</value>
+    <comment>EN: High-resolution smooth scrolling</comment>
+  </data>
+  <data name="Main_ScrollsFineSubLineSteps" xml:space="preserve">
+    <value>Scrollt in feinen Teilschritten statt in ganzen Zeilen. Die App übersetzt das Rad, solange sie läuft; nach dem Beenden gilt wieder das Standardscrollen.</value>
+    <comment>EN: Scrolls in fine sub-line steps instead of whole lines. The app translates the wheel while it runs; standard scrolling returns when it quits.</comment>
+  </data>
+  <data name="Main_FindPointer" xml:space="preserve">
+    <value>Zeiger finden</value>
+    <comment>EN: Find the pointer</comment>
+  </data>
+  <data name="Main_EnlargePointerWhenMouseShaken" xml:space="preserve">
+    <value>Zeiger vergrößern, wenn die Maus geschüttelt wird</value>
+    <comment>EN: Enlarge the pointer when the mouse is shaken</comment>
+  </data>
+  <data name="Main_WiggleMouseBackForthPointer" xml:space="preserve">
+    <value>Bewegen Sie die Maus schnell hin und her, und der Zeiger wächst — bis zum 3-fachen — und schrumpft danach sanft zurück. Ändert währenddessen die Windows-Zeigergröße.</value>
+    <comment>EN: Wiggle the mouse back and forth and the pointer grows — up to 3× — then shrinks smoothly back once you stop. Changes the Windows pointer size while active.</comment>
+  </data>
+  <data name="Main_PointerTuning" xml:space="preserve">
+    <value>Zeigereinstellungen</value>
+    <comment>EN: Pointer tuning</comment>
+  </data>
+  <data name="Main_DPI" xml:space="preserve">
+    <value>DPI</value>
+    <comment>EN: DPI</comment>
+  </data>
+  <data name="Main_Presets" xml:space="preserve">
+    <value>VOREINSTELLUNGEN</value>
+    <comment>EN: PRESETS</comment>
+  </data>
+  <data name="Main_Add" xml:space="preserve">
+    <value>+ Hinzufügen</value>
+    <comment>EN: + Add</comment>
+  </data>
+  <data name="Main_SmartshiftSmartScrolling" xml:space="preserve">
+    <value>SmartShift / Smart Scrolling</value>
+    <comment>EN: SmartShift / Smart Scrolling</comment>
+  </data>
+  <data name="Main_WheelMode" xml:space="preserve">
+    <value>Radmodus</value>
+    <comment>EN: Wheel mode</comment>
+  </data>
+  <data name="Main_FreeSpin" xml:space="preserve">
+    <value>Freilauf</value>
+    <comment>EN: Free spin</comment>
+  </data>
+  <data name="Main_SmoothFrictionlessScrolling" xml:space="preserve">
+    <value>Sanftes, widerstandsfreies Scrollen.</value>
+    <comment>EN: Smooth, frictionless scrolling.</comment>
+  </data>
+  <data name="Main_Smartshift" xml:space="preserve">
+    <value>SmartShift</value>
+    <comment>EN: SmartShift</comment>
+  </data>
+  <data name="Main_RatchetFreeSpinsFastFlick" xml:space="preserve">
+    <value>Rasterung, die bei einem schnellen Schwung in den Freilauf wechselt.</value>
+    <comment>EN: Ratchet that free-spins on a fast flick.</comment>
+  </data>
+  <data name="Main_Ratchet" xml:space="preserve">
+    <value>Rasterung</value>
+    <comment>EN: Ratchet</comment>
+  </data>
+  <data name="Main_AlwaysClicksLineByLine" xml:space="preserve">
+    <value>Rastet immer zeilenweise.</value>
+    <comment>EN: Always clicks line-by-line.</comment>
+  </data>
+  <data name="Main_Sensitivity" xml:space="preserve">
+    <value>Empfindlichkeit</value>
+    <comment>EN: Sensitivity</comment>
+  </data>
+  <data name="Main_HigherKeepsRatchetEngagedLonger" xml:space="preserve">
+    <value>Höhere Werte halten die Rasterung länger, bevor der Freilauf einsetzt.</value>
+    <comment>EN: Higher keeps the ratchet engaged longer before free-spin.</comment>
+  </data>
+  <data name="Main_Lighting" xml:space="preserve">
+    <value>Beleuchtung</value>
+    <comment>EN: Lighting</comment>
+  </data>
+  <data name="Main_BacklightBrightness" xml:space="preserve">
+    <value>Helligkeit der Hintergrundbeleuchtung</value>
+    <comment>EN: Backlight brightness</comment>
+  </data>
+  <data name="Main_KeyboardProfile" xml:space="preserve">
+    <value>Tastaturprofil</value>
+    <comment>EN: Keyboard profile</comment>
+  </data>
+  <data name="Main_ProfileRunsKeyboardSBuilt" xml:space="preserve">
+    <value>Ein Profil lässt die integrierte Beleuchtung auf dem Gerät laufen (flüssig, bleibt nach dem Schließen dieser App erhalten). „Kein Profil“ verwendet die unten eingestellte Farbe.</value>
+    <comment>EN: A profile runs the keyboard's built-in lighting on the device (smooth, stays after this app closes). 'No profile' uses the custom color configured below.</comment>
+  </data>
+  <data name="Main_Lighting2" xml:space="preserve">
+    <value>Beleuchtung ein</value>
+    <comment>EN: Lighting on</comment>
+  </data>
+  <data name="Main_Effect" xml:space="preserve">
+    <value>Effekt</value>
+    <comment>EN: Effect</comment>
+  </data>
+  <data name="Main_BreathingSpeed" xml:space="preserve">
+    <value>Atemgeschwindigkeit</value>
+    <comment>EN: Breathing speed</comment>
+  </data>
+  <data name="Main_Color" xml:space="preserve">
+    <value>Farbe</value>
+    <comment>EN: Color</comment>
+  </data>
+  <data name="Main_ColorIntensity" xml:space="preserve">
+    <value>Farbintensität</value>
+    <comment>EN: Color intensity</comment>
+  </data>
+  <data name="Main_RestoreKeyboardDefault" xml:space="preserve">
+    <value>Tastaturstandard wiederherstellen</value>
+    <comment>EN: Restore keyboard default</comment>
+  </data>
+  <data name="Main_SaveLightingProfile" xml:space="preserve">
+    <value>Beleuchtung in diesem Profil speichern</value>
+    <comment>EN: Save lighting to this profile</comment>
+  </data>
+  <data name="Main_PerKeyColors" xml:space="preserve">
+    <value>Farben je Taste…</value>
+    <comment>EN: Per-key colors…</comment>
+  </data>
+  <data name="Main_NoProfileColorAppliesLive" xml:space="preserve">
+    <value>Bei „Kein Profil“ wirkt die Farbe sofort; „Tastaturstandard wiederherstellen“ gibt die Beleuchtung an das Onboard-Profil zurück.</value>
+    <comment>EN: With 'No profile', the color applies live; 'Restore keyboard default' hands lighting back to the onboard profile.</comment>
+  </data>
+  <data name="Main_ChooseEffectColorSpeedSave" xml:space="preserve">
+    <value>Wählen Sie Effekt, Farbe und Geschwindigkeit und dann „Beleuchtung in diesem Profil speichern“ — das schreibt in das Onboard-Profil der Tastatur (dauerhaft, geräteseitig, flüssig). „Farben durchlaufen“ nutzt die Standardgeschwindigkeit des Geräts.</value>
+    <comment>EN: Choose an effect, color and speed, then 'Save lighting to this profile' — it writes into the keyboard's onboard profile (persistent, device-side, smooth). Cycle colors uses the device's default speed.</comment>
+  </data>
+  <data name="Main_GKeys" xml:space="preserve">
+    <value>G-Tasten</value>
+    <comment>EN: G-Keys</comment>
+  </data>
+  <data name="Main_Change" xml:space="preserve">
+    <value>⌨ Ändern</value>
+    <comment>EN: ⌨ Change</comment>
+  </data>
+  <data name="Main_ReassignG1G5MacroKeys" xml:space="preserve">
+    <value>Belegen Sie die Makrotasten G1–G5 für das aktive Profil neu. Änderungen werden in das Onboard-Profil der Tastatur geschrieben und bleiben nach dem Schließen der App erhalten.</value>
+    <comment>EN: Reassign the G1–G5 macro keys for the active profile. Changes write to the keyboard's onboard profile and persist after the app closes.</comment>
+  </data>
+  <data name="Main_Device" xml:space="preserve">
+    <value>Gerät</value>
+    <comment>EN: Device</comment>
+  </data>
+  <data name="Main_Name" xml:space="preserve">
+    <value>Name</value>
+    <comment>EN: Name</comment>
+  </data>
+  <data name="Main_Type" xml:space="preserve">
+    <value>Typ</value>
+    <comment>EN: Type</comment>
+  </data>
+  <data name="Main_Status" xml:space="preserve">
+    <value>Status</value>
+    <comment>EN: Status</comment>
+  </data>
+  <data name="Main_Battery" xml:space="preserve">
+    <value>Akku</value>
+    <comment>EN: Battery</comment>
+  </data>
+  <data name="Main_Connection" xml:space="preserve">
+    <value>Verbindung</value>
+    <comment>EN: Connection</comment>
+  </data>
+  <data name="Main_HostsEasyswitch" xml:space="preserve">
+    <value>Hosts (EasySwitch)</value>
+    <comment>EN: Hosts (EasySwitch)</comment>
+  </data>
+  <data name="Main_Switch" xml:space="preserve">
+    <value>Wechseln</value>
+    <comment>EN: Switch</comment>
+  </data>
+  <data name="Main_Forget" xml:space="preserve">
+    <value>Entfernen</value>
+    <comment>EN: Forget</comment>
+  </data>
+  <data name="Main_SwitchingMovesDeviceAnotherPaired" xml:space="preserve">
+    <value>Beim Wechseln geht das Gerät an einen anderen gekoppelten Computer und trennt sich hier.</value>
+    <comment>EN: Switching moves the device to another paired computer and disconnects it here.</comment>
+  </data>
+  <data name="Main_ForgettingHostClearsItsPairing" xml:space="preserve">
+    <value>Das Entfernen eines Hosts löscht dessen Kopplung — dieser Computer muss sich neu koppeln, um sich wieder zu verbinden.</value>
+    <comment>EN: Forgetting a host clears its pairing — that computer must pair again to reconnect.</comment>
+  </data>
+  <data name="Main_DeviceDoesnTSupportClearing" xml:space="preserve">
+    <value>Dieses Gerät unterstützt das Löschen von Host-Plätzen per Software nicht.</value>
+    <comment>EN: This device doesn't support clearing host slots from software.</comment>
+  </data>
+  <data name="PerKeyColor_ColorKeys" xml:space="preserve">
+    <value>Tasten einfärben</value>
+    <comment>EN: Color keys</comment>
+  </data>
+  <data name="PerKeyColor_PressPhysicalKeyKeyboardPaint" xml:space="preserve">
+    <value>Drücken Sie eine Taste auf der Tastatur, um sie mit der Farbe unten einzufärben. Drücken Sie dieselbe Taste erneut, um sie auf die Grundfarbe zurückzusetzen.</value>
+    <comment>EN: Press a physical key on the keyboard to paint it with the color below. Press the same key again to reset it to the base color.</comment>
+  </data>
+  <data name="PerKeyColor_PaintColor" xml:space="preserve">
+    <value>Malfarbe</value>
+    <comment>EN: Paint color</comment>
+  </data>
+  <data name="PerKeyColor_BaseColor" xml:space="preserve">
+    <value>Grundfarbe</value>
+    <comment>EN: Base color</comment>
+  </data>
+  <data name="PerKeyColor_ResetAllKeysBaseAlt" xml:space="preserve">
+    <value>Alle Tasten auf Grundfarbe zurücksetzen (Alt+R)</value>
+    <comment>EN: Reset all keys to base (Alt+R)</comment>
+  </data>
+  <data name="PerKeyColor_SpecialKeysOSSwallowsThese" xml:space="preserve">
+    <value>Sondertasten (das Betriebssystem fängt diese ab — zum Einfärben anklicken)</value>
+    <comment>EN: Special keys (OS swallows these — click to paint)</comment>
+  </data>
+  <data name="Action_BrowserBack" xml:space="preserve">
+    <value>Browser zurück</value>
+    <comment>EN: Browser Back</comment>
+  </data>
+  <data name="Action_BrowserForward" xml:space="preserve">
+    <value>Browser vorwärts</value>
+    <comment>EN: Browser Forward</comment>
+  </data>
+  <data name="Action_CaptureRegion" xml:space="preserve">
+    <value>Bereich aufnehmen</value>
+    <comment>EN: Capture Region</comment>
+  </data>
+  <data name="Action_CloseTab" xml:space="preserve">
+    <value>Tab schließen</value>
+    <comment>EN: Close Tab</comment>
+  </data>
+  <data name="Action_Copy" xml:space="preserve">
+    <value>Kopieren</value>
+    <comment>EN: Copy</comment>
+  </data>
+  <data name="Action_Cut" xml:space="preserve">
+    <value>Ausschneiden</value>
+    <comment>EN: Cut</comment>
+  </data>
+  <data name="Action_CycleDpiPresets" xml:space="preserve">
+    <value>DPI-Voreinstellungen durchlaufen</value>
+    <comment>EN: Cycle DPI Presets</comment>
+  </data>
+  <data name="Action_Find" xml:space="preserve">
+    <value>Suchen</value>
+    <comment>EN: Find</comment>
+  </data>
+  <data name="Action_HorizontalScrollLeft" xml:space="preserve">
+    <value>Nach links scrollen</value>
+    <comment>EN: Scroll Left</comment>
+  </data>
+  <data name="Action_HorizontalScrollRight" xml:space="preserve">
+    <value>Nach rechts scrollen</value>
+    <comment>EN: Scroll Right</comment>
+  </data>
+  <data name="Action_LeftClick" xml:space="preserve">
+    <value>Linksklick</value>
+    <comment>EN: Left Click</comment>
+  </data>
+  <data name="Action_LockScreen" xml:space="preserve">
+    <value>Bildschirm sperren</value>
+    <comment>EN: Lock Screen</comment>
+  </data>
+  <data name="Action_MaximizeWindow" xml:space="preserve">
+    <value>Fenster maximieren</value>
+    <comment>EN: Maximize Window</comment>
+  </data>
+  <data name="Action_MiddleClick" xml:space="preserve">
+    <value>Mittelklick</value>
+    <comment>EN: Middle Click</comment>
+  </data>
+  <data name="Action_MinimizeWindow" xml:space="preserve">
+    <value>Fenster minimieren</value>
+    <comment>EN: Minimize Window</comment>
+  </data>
+  <data name="Action_MouseBack" xml:space="preserve">
+    <value>Zurück (Taste 4)</value>
+    <comment>EN: Back (Button 4)</comment>
+  </data>
+  <data name="Action_MouseForward" xml:space="preserve">
+    <value>Vorwärts (Taste 5)</value>
+    <comment>EN: Forward (Button 5)</comment>
+  </data>
+  <data name="Action_MuteVolume" xml:space="preserve">
+    <value>Stummschalten</value>
+    <comment>EN: Mute</comment>
+  </data>
+  <data name="Action_NewTab" xml:space="preserve">
+    <value>Neuer Tab</value>
+    <comment>EN: New Tab</comment>
+  </data>
+  <data name="Action_NextDesktop" xml:space="preserve">
+    <value>Nächster Desktop</value>
+    <comment>EN: Next Desktop</comment>
+  </data>
+  <data name="Action_NextTab" xml:space="preserve">
+    <value>Nächster Tab</value>
+    <comment>EN: Next Tab</comment>
+  </data>
+  <data name="Action_NextTrack" xml:space="preserve">
+    <value>Nächster Titel</value>
+    <comment>EN: Next Track</comment>
+  </data>
+  <data name="Action_None" xml:space="preserve">
+    <value>Nichts tun</value>
+    <comment>EN: Do Nothing</comment>
+  </data>
+  <data name="Action_Paste" xml:space="preserve">
+    <value>Einfügen</value>
+    <comment>EN: Paste</comment>
+  </data>
+  <data name="Action_PlayPause" xml:space="preserve">
+    <value>Wiedergabe / Pause</value>
+    <comment>EN: Play / Pause</comment>
+  </data>
+  <data name="Action_PrevTab" xml:space="preserve">
+    <value>Vorheriger Tab</value>
+    <comment>EN: Previous Tab</comment>
+  </data>
+  <data name="Action_PrevTrack" xml:space="preserve">
+    <value>Vorheriger Titel</value>
+    <comment>EN: Previous Track</comment>
+  </data>
+  <data name="Action_PreviousDesktop" xml:space="preserve">
+    <value>Vorheriger Desktop</value>
+    <comment>EN: Previous Desktop</comment>
+  </data>
+  <data name="Action_Redo" xml:space="preserve">
+    <value>Wiederholen</value>
+    <comment>EN: Redo</comment>
+  </data>
+  <data name="Action_ReloadPage" xml:space="preserve">
+    <value>Seite neu laden</value>
+    <comment>EN: Reload Page</comment>
+  </data>
+  <data name="Action_ReopenTab" xml:space="preserve">
+    <value>Tab wieder öffnen</value>
+    <comment>EN: Reopen Tab</comment>
+  </data>
+  <data name="Action_RightClick" xml:space="preserve">
+    <value>Rechtsklick</value>
+    <comment>EN: Right Click</comment>
+  </data>
+  <data name="Action_Save" xml:space="preserve">
+    <value>Speichern</value>
+    <comment>EN: Save</comment>
+  </data>
+  <data name="Action_Screenshot" xml:space="preserve">
+    <value>Screenshot</value>
+    <comment>EN: Screenshot</comment>
+  </data>
+  <data name="Action_ScrollDown" xml:space="preserve">
+    <value>Nach unten scrollen</value>
+    <comment>EN: Scroll Down</comment>
+  </data>
+  <data name="Action_ScrollUp" xml:space="preserve">
+    <value>Nach oben scrollen</value>
+    <comment>EN: Scroll Up</comment>
+  </data>
+  <data name="Action_SelectAll" xml:space="preserve">
+    <value>Alles auswählen</value>
+    <comment>EN: Select All</comment>
+  </data>
+  <data name="Action_SetDpiPreset" xml:space="preserve">
+    <value>DPI-Voreinstellung {0}</value>
+    <comment>EN: DPI Preset {0}</comment>
+  </data>
+  <data name="Action_ShowDesktop" xml:space="preserve">
+    <value>Desktop anzeigen</value>
+    <comment>EN: Show Desktop</comment>
+  </data>
+  <data name="Action_SnapWindowLeft" xml:space="preserve">
+    <value>Fenster links andocken</value>
+    <comment>EN: Snap Window Left</comment>
+  </data>
+  <data name="Action_SnapWindowRight" xml:space="preserve">
+    <value>Fenster rechts andocken</value>
+    <comment>EN: Snap Window Right</comment>
+  </data>
+  <data name="Action_StartMenu" xml:space="preserve">
+    <value>Startmenü</value>
+    <comment>EN: Start Menu</comment>
+  </data>
+  <data name="Action_TaskView" xml:space="preserve">
+    <value>Taskansicht</value>
+    <comment>EN: Task View</comment>
+  </data>
+  <data name="Action_ToggleSmartShift" xml:space="preserve">
+    <value>SmartShift umschalten</value>
+    <comment>EN: Toggle SmartShift</comment>
+  </data>
+  <data name="Action_Undo" xml:space="preserve">
+    <value>Rückgängig</value>
+    <comment>EN: Undo</comment>
+  </data>
+  <data name="Action_VolumeDown" xml:space="preserve">
+    <value>Leiser</value>
+    <comment>EN: Volume Down</comment>
+  </data>
+  <data name="Action_VolumeUp" xml:space="preserve">
+    <value>Lauter</value>
+    <comment>EN: Volume Up</comment>
+  </data>
+  <data name="Button_Back" xml:space="preserve">
+    <value>Zurück</value>
+    <comment>EN: Back</comment>
+  </data>
+  <data name="Button_DpiToggle" xml:space="preserve">
+    <value>DPI-Umschalter</value>
+    <comment>EN: DPI Toggle</comment>
+  </data>
+  <data name="Button_Forward" xml:space="preserve">
+    <value>Vorwärts</value>
+    <comment>EN: Forward</comment>
+  </data>
+  <data name="Button_GestureButton" xml:space="preserve">
+    <value>Gestentaste</value>
+    <comment>EN: Gesture Button</comment>
+  </data>
+  <data name="Button_LeftClick" xml:space="preserve">
+    <value>Linksklick</value>
+    <comment>EN: Left Click</comment>
+  </data>
+  <data name="Button_MiddleClick" xml:space="preserve">
+    <value>Mittelklick</value>
+    <comment>EN: Middle Click</comment>
+  </data>
+  <data name="Button_RightClick" xml:space="preserve">
+    <value>Rechtsklick</value>
+    <comment>EN: Right Click</comment>
+  </data>
+  <data name="Button_Thumbwheel" xml:space="preserve">
+    <value>Daumenrad</value>
+    <comment>EN: Thumb Wheel</comment>
+  </data>
+  <data name="Button_ThumbwheelScrollDown" xml:space="preserve">
+    <value>Daumenrad abwärts</value>
+    <comment>EN: Thumb Wheel Down</comment>
+  </data>
+  <data name="Button_ThumbwheelScrollUp" xml:space="preserve">
+    <value>Daumenrad aufwärts</value>
+    <comment>EN: Thumb Wheel Up</comment>
+  </data>
+  <data name="Gesture_Click" xml:space="preserve">
+    <value>Klick</value>
+    <comment>EN: Click</comment>
+  </data>
+  <data name="Gesture_Down" xml:space="preserve">
+    <value>Unten</value>
+    <comment>EN: Down</comment>
+  </data>
+  <data name="Gesture_Left" xml:space="preserve">
+    <value>Links</value>
+    <comment>EN: Left</comment>
+  </data>
+  <data name="Gesture_Right" xml:space="preserve">
+    <value>Rechts</value>
+    <comment>EN: Right</comment>
+  </data>
+  <data name="Gesture_Up" xml:space="preserve">
+    <value>Oben</value>
+    <comment>EN: Up</comment>
+  </data>
+  <data name="Category_Browser" xml:space="preserve">
+    <value>Browser &amp; Tabs</value>
+    <comment>EN: Browser &amp; Tabs</comment>
+  </data>
+  <data name="Category_Dpi" xml:space="preserve">
+    <value>DPI &amp; Rad</value>
+    <comment>EN: DPI &amp; Wheel</comment>
+  </data>
+  <data name="Category_Editing" xml:space="preserve">
+    <value>Bearbeiten</value>
+    <comment>EN: Editing</comment>
+  </data>
+  <data name="Category_Media" xml:space="preserve">
+    <value>Medien &amp; Lautstärke</value>
+    <comment>EN: Media &amp; Volume</comment>
+  </data>
+  <data name="Category_Mouse" xml:space="preserve">
+    <value>Maustasten</value>
+    <comment>EN: Mouse Buttons</comment>
+  </data>
+  <data name="Category_Navigation" xml:space="preserve">
+    <value>Fenster &amp; Desktops</value>
+    <comment>EN: Windows &amp; Desktops</comment>
+  </data>
+  <data name="Category_Scroll" xml:space="preserve">
+    <value>Scrollen</value>
+    <comment>EN: Scrolling</comment>
+  </data>
+  <data name="Category_System" xml:space="preserve">
+    <value>System</value>
+    <comment>EN: System</comment>
+  </data>
+  <data name="Effect_Cycle" xml:space="preserve">
+    <value>Farben durchlaufen</value>
+    <comment>EN: Cycle colors</comment>
+  </data>
+  <data name="Device_Online" xml:space="preserve">
+    <value>Online</value>
+    <comment>EN: Online</comment>
+  </data>
+  <data name="Device_Asleep" xml:space="preserve">
+    <value>Schläft</value>
+    <comment>EN: Asleep</comment>
+  </data>
+  <data name="Connection_Bluetooth" xml:space="preserve">
+    <value>Bluetooth</value>
+    <comment>EN: Bluetooth</comment>
+  </data>
+  <data name="Connection_Lightspeed" xml:space="preserve">
+    <value>LIGHTSPEED-Dongle</value>
+    <comment>EN: LIGHTSPEED dongle</comment>
+  </data>
+  <data name="Connection_Unifying" xml:space="preserve">
+    <value>Unifying-Dongle</value>
+    <comment>EN: Unifying dongle</comment>
+  </data>
+  <data name="Connection_Bolt" xml:space="preserve">
+    <value>Bolt-Dongle</value>
+    <comment>EN: Bolt dongle</comment>
+  </data>
+  <data name="Connection_Usb" xml:space="preserve">
+    <value>USB</value>
+    <comment>EN: USB</comment>
+  </data>
+  <data name="Capability_Buttons" xml:space="preserve">
+    <value>Tasten</value>
+    <comment>EN: Buttons</comment>
+  </data>
+  <data name="Capability_Dpi" xml:space="preserve">
+    <value>DPI</value>
+    <comment>EN: DPI</comment>
+  </data>
+  <data name="Capability_Lighting" xml:space="preserve">
+    <value>Beleuchtung</value>
+    <comment>EN: Lighting</comment>
+  </data>
+  <data name="Host_Unnamed" xml:space="preserve">
+    <value>Host {0}</value>
+    <comment>EN: Host {0}</comment>
+  </data>
+  <data name="Host_Current" xml:space="preserve">
+    <value>aktuell</value>
+    <comment>EN: current</comment>
+  </data>
+  <data name="Host_Paired" xml:space="preserve">
+    <value>gekoppelt</value>
+    <comment>EN: paired</comment>
+  </data>
+  <data name="Host_Empty" xml:space="preserve">
+    <value>leer</value>
+    <comment>EN: empty</comment>
+  </data>
+  <data name="Binding_Gestures" xml:space="preserve">
+    <value>Gesten</value>
+    <comment>EN: Gestures</comment>
+  </data>
+  <data name="GestureOwner_GestureButton" xml:space="preserve">
+    <value>Gestentaste</value>
+    <comment>EN: Gesture button</comment>
+  </data>
+  <data name="GestureOwner_DpiToggle" xml:space="preserve">
+    <value>Rad-/DPI-Taste</value>
+    <comment>EN: Wheel / DPI button</comment>
+  </data>
+  <data name="Gestures_Summary" xml:space="preserve">
+    <value>Gesten: {0}</value>
+    <comment>EN: Gestures: {0}</comment>
+  </data>
+  <data name="Status_SwitchingHost" xml:space="preserve">
+    <value>Wechsle zu Host {0}…</value>
+    <comment>EN: Switching to host {0}…</comment>
+  </data>
+  <data name="Status_ForgettingHost" xml:space="preserve">
+    <value>Entferne Host {0}…</value>
+    <comment>EN: Forgetting host {0}…</comment>
+  </data>
+  <data name="Status_ForgetHostFailed" xml:space="preserve">
+    <value>Host {0} konnte nicht entfernt werden.</value>
+    <comment>EN: Could not forget host {0}.</comment>
+  </data>
+  <data name="Status_HostForgotten" xml:space="preserve">
+    <value>Host {0} entfernt — Gerät getrennt.</value>
+    <comment>EN: Host {0} forgotten — device disconnected.</comment>
+  </data>
+  <data name="Status_RemappingGKey" xml:space="preserve">
+    <value>Belege G{0} neu…</value>
+    <comment>EN: Remapping G{0}…</comment>
+  </data>
+  <data name="Status_GKeyRemapped" xml:space="preserve">
+    <value>G{0} neu belegt (Profil {1}).</value>
+    <comment>EN: G{0} remapped (profile {1}).</comment>
+  </data>
+  <data name="Status_GKeyRemapFailed" xml:space="preserve">
+    <value>Neubelegung der G-Taste fehlgeschlagen.</value>
+    <comment>EN: G-key remap failed.</comment>
+  </data>
+  <data name="Status_SavingLighting" xml:space="preserve">
+    <value>Speichere Beleuchtung in Profil {0}…</value>
+    <comment>EN: Saving lighting to profile {0}…</comment>
+  </data>
+  <data name="Status_LightingSaved" xml:space="preserve">
+    <value>In Profil {0} gespeichert.</value>
+    <comment>EN: Saved to profile {0}.</comment>
+  </data>
+  <data name="Status_LightingSaveFailed" xml:space="preserve">
+    <value>Speichern des Profils fehlgeschlagen.</value>
+    <comment>EN: Profile save failed.</comment>
+  </data>
+  <data name="Update_Available" xml:space="preserve">
+    <value>Update verfügbar: v{0}</value>
+    <comment>EN: Update available: v{0}</comment>
+  </data>
+  <data name="Update_Installing" xml:space="preserve">
+    <value>Installiere v{0} — {1} wird neu gestartet…</value>
+    <comment>EN: Installing v{0} — {1} will restart…</comment>
+  </data>
+  <data name="Update_InstallerFailed" xml:space="preserve">
+    <value>Installationsprogramm konnte nicht gestartet werden — versuchen Sie stattdessen „Herunterladen“.</value>
+    <comment>EN: Couldn't start the installer — try Download instead.</comment>
+  </data>
+  <data name="Update_SavedToDownloads" xml:space="preserve">
+    <value>v{0} in „Downloads“ gespeichert</value>
+    <comment>EN: v{0} saved to Downloads</comment>
+  </data>
+  <data name="Update_Downloading" xml:space="preserve">
+    <value>Lade v{0} herunter…</value>
+    <comment>EN: Downloading v{0}…</comment>
+  </data>
+  <data name="Update_DownloadFailed" xml:space="preserve">
+    <value>Download von v{0} fehlgeschlagen — versuchen Sie „Auf GitHub ansehen“.</value>
+    <comment>EN: Download of v{0} failed — try View on GitHub.</comment>
+  </data>
+  <data name="LogiWarning_One" xml:space="preserve">
+    <value>{0} läuft — Logitech-Software kann den Empfänger übernehmen; nur eine App zur selben Zeit kann Ihre Geräte zuverlässig steuern.</value>
+    <comment>EN: {0} is running — Logitech software can take over the receiver; only one app at a time can reliably control your devices.</comment>
+  </data>
+  <data name="LogiWarning_Many" xml:space="preserve">
+    <value>{0} laufen — Logitech-Software kann den Empfänger übernehmen; nur eine App zur selben Zeit kann Ihre Geräte zuverlässig steuern.</value>
+    <comment>EN: {0} are running — Logitech software can take over the receiver; only one app at a time can reliably control your devices.</comment>
+  </data>
+  <data name="Status_RescanFailed" xml:space="preserve">
+    <value>Erneutes Suchen fehlgeschlagen: {0}</value>
+    <comment>EN: Rescan failed: {0}</comment>
+  </data>
+  <data name="Preset_Custom" xml:space="preserve">
+    <value>Benutzerdefiniert</value>
+    <comment>EN: Custom</comment>
+  </data>
+  <data name="Preset_Disabled" xml:space="preserve">
+    <value>Deaktiviert</value>
+    <comment>EN: Disabled</comment>
+  </data>
+  <data name="Preset_WindowsDesktops" xml:space="preserve">
+    <value>Fenster &amp; Desktops</value>
+    <comment>EN: Windows &amp; Desktops</comment>
+  </data>
+  <data name="Preset_MediaVolume" xml:space="preserve">
+    <value>Medien &amp; Lautstärke</value>
+    <comment>EN: Media &amp; Volume</comment>
+  </data>
+  <data name="Preset_ArrangeWindows" xml:space="preserve">
+    <value>Fenster anordnen</value>
+    <comment>EN: Arrange Windows</comment>
+  </data>
+  <data name="Preset_BrowserTabs" xml:space="preserve">
+    <value>Browser-Tabs</value>
+    <comment>EN: Browser Tabs</comment>
+  </data>
+  <data name="Preset_Scrolling" xml:space="preserve">
+    <value>Scrollen</value>
+    <comment>EN: Scrolling</comment>
+  </data>
+  <data name="Status_LoadingDevices" xml:space="preserve">
+    <value>Lade Geräte…</value>
+    <comment>EN: Loading devices…</comment>
+  </data>
+  <data name="Status_Scanning" xml:space="preserve">
+    <value>Suche nach Logitech-Geräten…</value>
+    <comment>EN: Scanning for Logitech devices…</comment>
+  </data>
+  <data name="Status_NoDevicesFound" xml:space="preserve">
+    <value>Keine Logitech-HID++-Geräte gefunden.</value>
+    <comment>EN: No Logitech HID++ devices found.</comment>
+  </data>
+  <data name="Status_DeviceCount" xml:space="preserve">
+    <value>{0} Gerät(e).</value>
+    <comment>EN: {0} device(s).</comment>
+  </data>
+  <data name="Status_EnumerationFailed" xml:space="preserve">
+    <value>Erfassung fehlgeschlagen: {0}</value>
+    <comment>EN: Enumeration failed: {0}</comment>
+  </data>
+  <data name="PerKey_Hint" xml:space="preserve">
+    <value>Wählen Sie eine Farbe und drücken Sie dann eine Taste, um sie einzufärben. Erneut drücken setzt sie zurück.</value>
+    <comment>EN: Pick a color, then press a key to paint it. Press it again to reset.</comment>
+  </data>
+  <data name="PerKey_NotPaintable" xml:space="preserve">
+    <value>{0} ist keine einfärbbare Taste.</value>
+    <comment>EN: {0} isn't a paintable key.</comment>
+  </data>
+  <data name="PerKey_AllReset" xml:space="preserve">
+    <value>Alle Tasten auf die Grundfarbe zurückgesetzt.</value>
+    <comment>EN: All keys reset to base.</comment>
+  </data>
+  <data name="About_LogiWarning" xml:space="preserve">
+    <value>⚠ {0} — Logitech-Software kann den Empfänger übernehmen; nur eine App zur selben Zeit kann Ihre Geräte zuverlässig steuern.</value>
+    <comment>EN: ⚠ {0} — Logitech software can take over the receiver; only one app at a time can reliably control your devices.</comment>
+  </data>
+  <data name="About_Copied" xml:space="preserve">
+    <value>Kopiert ✓</value>
+    <comment>EN: Copied ✓</comment>
+  </data>
+  <data name="Tray_Open" xml:space="preserve">
+    <value>OpenLogi.net öffnen</value>
+    <comment>EN: Open OpenLogi.net</comment>
+  </data>
+  <data name="Tray_Quit" xml:space="preserve">
+    <value>Beenden</value>
+    <comment>EN: Quit</comment>
+  </data>
+  <data name="Notify_UpdateTitle" xml:space="preserve">
+    <value>OpenLogi.net-Update verfügbar</value>
+    <comment>EN: OpenLogi.net update available</comment>
+  </data>
+  <data name="Notify_UpdateBody" xml:space="preserve">
+    <value>Version {0} ist bereit. Klicken Sie, um OpenLogi.net zu öffnen.</value>
+    <comment>EN: Version {0} is ready. Click to open OpenLogi.net.</comment>
+  </data>
+  <data name="ForgetHost_CurrentTitle" xml:space="preserve">
+    <value>Host {0} entfernen — den gerade genutzten?</value>
+    <comment>EN: Forget host {0} — the one you're using?</comment>
+  </data>
+  <data name="ForgetHost_CurrentBody" xml:space="preserve">
+    <value>Dieses Gerät ist über Host {0} mit diesem Computer verbunden. Beim Entfernen wird das Gerät sofort getrennt, und Sie müssen es erneut koppeln, um es zu verwenden.</value>
+    <comment>EN: This device is connected to this computer through host {0}. Forgetting it disconnects the device now, and you'll have to pair it again to use it.</comment>
+  </data>
+  <data name="ForgetHost_Title" xml:space="preserve">
+    <value>Host {0} entfernen?</value>
+    <comment>EN: Forget host {0}?</comment>
+  </data>
+  <data name="ForgetHost_Body" xml:space="preserve">
+    <value>Der in diesem Platz gekoppelte Computer muss sich erneut koppeln, um sich zu verbinden.</value>
+    <comment>EN: The computer paired in this slot will have to pair again to reconnect.</comment>
+  </data>
+  <data name="ForgetHost_Confirm" xml:space="preserve">
+    <value>Host entfernen</value>
+    <comment>EN: Forget host</comment>
+  </data>
+  <data name="Profile_None" xml:space="preserve">
+    <value>Kein Profil</value>
+    <comment>EN: No profile</comment>
+  </data>
+  <data name="Profile_Numbered" xml:space="preserve">
+    <value>Profil {0}</value>
+    <comment>EN: Profile {0}</comment>
+  </data>
+</root>
