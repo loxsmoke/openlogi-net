@@ -67,11 +67,27 @@ public class LocalizationTests
     }
 
     [Fact]
-    public void SystemRowIsTranslatedAndLanguageRowsAreNot()
+    public void SystemRowNamesTheLanguageItResolvesTo()
     {
+        // English is all we ship, so System lands there whatever the OS is set to.
         Assert.Null(LanguageCatalog.System.Code);
-        Assert.Equal("System", LanguageCatalog.System.Display);
-        Assert.Equal("English (US)", LanguageCatalog.All.Single(o => o.Code == "en-US").Display);
+        Assert.Equal("English US", LanguageCatalog.SystemLanguageName);
+        Assert.Equal("System (English US)", LanguageCatalog.System.Display);
+    }
+
+    [Fact]
+    public void LanguageRowsAreNotTranslated() =>
+        Assert.Equal("English US", LanguageCatalog.All.Single(o => o.Code == "en-US").Display);
+
+    [Fact]
+    public void SystemRowSurvivesAMissingFormatString()
+    {
+        // Get() returns the key when a translation drops the entry; string.Format
+        // must not be handed a placeholder-free template it then chokes on.
+        var format = Loc.Current["Settings_Language_System"];
+        Assert.Contains("{0}", format);
+        Assert.Equal("Settings_Language_System",
+            string.Format(CultureInfo.InvariantCulture, "Settings_Language_System", "English US"));
     }
 
     [Fact]

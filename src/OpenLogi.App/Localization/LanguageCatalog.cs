@@ -20,7 +20,7 @@ public sealed class LanguageOption : INotifyPropertyChanged
         _endonym = endonym;
 
         // Only the System row is translated; language names stay in their own
-        // language ("English (US)", "Deutsch"), which is what a user hunting for
+        // language ("English US", "Deutsch"), which is what a user hunting for
         // their language in a list they cannot currently read needs to see.
         if (code is null)
             Loc.Current.PropertyChanged += (_, _) =>
@@ -30,8 +30,14 @@ public sealed class LanguageOption : INotifyPropertyChanged
     /// <summary>Culture name to force, or <c>null</c> to follow the OS UI language.</summary>
     public string? Code { get; }
 
-    /// <summary>Row text in the dropdown.</summary>
-    public string Display => Code is null ? Loc.Current["Settings_Language_System"] : _endonym!;
+    /// <summary>
+    /// Row text in the dropdown. The System row names the language it currently
+    /// resolves to, so the choice is legible without selecting it first.
+    /// </summary>
+    public string Display => Code is null
+        ? string.Format(CultureInfo.CurrentCulture,
+            Loc.Current["Settings_Language_System"], LanguageCatalog.SystemLanguageName)
+        : _endonym!;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -43,6 +49,8 @@ public sealed class LanguageOption : INotifyPropertyChanged
 ///
 /// English is the neutral resource set, so it is always available; adding a
 /// language means adding a <c>Strings.&lt;culture&gt;.resx</c> and one row here.
+/// Keep endonyms free of parentheses — they are nested inside the System row's
+/// own parentheses ("System (English US)"), and a second pair reads as noise.
 /// </summary>
 public static class LanguageCatalog
 {
@@ -59,7 +67,7 @@ public static class LanguageCatalog
     public static readonly IReadOnlyList<LanguageOption> All =
     [
         System,
-        new("en-US", "English (US)"),
+        new("en-US", "English US"),
     ];
 
     /// <summary>
@@ -73,6 +81,22 @@ public static class LanguageCatalog
     /// </summary>
     public static CultureInfo Resolve(string? setting) =>
         Match(setting) ?? Match(Loc.SystemUiCulture.Name) ?? Fallback;
+
+    /// <summary>
+    /// The language the System row currently resolves to, named as its own row is.
+    /// Falls back to the culture's name if a shipped culture somehow has no row.
+    /// </summary>
+    public static string SystemLanguageName
+    {
+        get
+        {
+            var resolved = Resolve(null);
+            foreach (var option in All)
+                if (string.Equals(option.Code, resolved.Name, StringComparison.OrdinalIgnoreCase))
+                    return option.Display;
+            return resolved.Name;
+        }
+    }
 
     /// <summary>The dropdown row for a persisted setting; unknown values show as System.</summary>
     public static LanguageOption OptionFor(string? setting)

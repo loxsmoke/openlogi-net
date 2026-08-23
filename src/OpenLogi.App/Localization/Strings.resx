@@ -74,8 +74,8 @@
     <comment>Label beside the language dropdown.</comment>
   </data>
   <data name="Settings_Language_System" xml:space="preserve">
-    <value>System</value>
-    <comment>Language dropdown row meaning "follow the operating system's language". The other rows are language names, which are never translated.</comment>
+    <value>System ({0})</value>
+    <comment>Language dropdown row meaning "follow the operating system's language". {0} is the language that currently resolves to, e.g. "System (English US)". The other rows are language names, which are never translated.</comment>
   </data>
   <data name="Settings_LaunchAtLogin" xml:space="preserve">
     <value>Launch at login</value>
