@@ -83,13 +83,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private (ButtonId Owner, Core.Actions.MouseAction[] Actions)? _lastGestureState;
 
     /// <summary>The Custom sentinel: selected when the swipes match no preset; applies nothing.</summary>
-    private static readonly GesturePreset CustomGesturePreset = new(Loc.Current["Preset_Custom"], null, null, null, null);
+    private static readonly GesturePreset CustomGesturePreset = new("Preset_Custom", null, null, null, null);
 
     /// <summary>
     /// "Disabled": all four swipes Do Nothing — the default for an unconfigured
     /// button, and the way to turn one button's swipes off (its Click keeps working).
     /// </summary>
-    private static readonly GesturePreset DisabledGesturePreset = new(Loc.Current["Preset_Disabled"],
+    private static readonly GesturePreset DisabledGesturePreset = new("Preset_Disabled",
         Core.Actions.MouseAction.None, Core.Actions.MouseAction.None,
         Core.Actions.MouseAction.None, Core.Actions.MouseAction.None);
 
@@ -97,15 +97,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public IReadOnlyList<GesturePreset> GestureCategories { get; } =
     [
         DisabledGesturePreset,
-        new(Loc.Current["Preset_WindowsDesktops"], Core.Actions.MouseAction.TaskView, Core.Actions.MouseAction.ShowDesktop,
+        new("Preset_WindowsDesktops", Core.Actions.MouseAction.TaskView, Core.Actions.MouseAction.ShowDesktop,
             Core.Actions.MouseAction.PreviousDesktop, Core.Actions.MouseAction.NextDesktop),
-        new(Loc.Current["Preset_MediaVolume"], Core.Actions.MouseAction.VolumeUp, Core.Actions.MouseAction.VolumeDown,
+        new("Preset_MediaVolume", Core.Actions.MouseAction.VolumeUp, Core.Actions.MouseAction.VolumeDown,
             Core.Actions.MouseAction.PrevTrack, Core.Actions.MouseAction.NextTrack),
-        new(Loc.Current["Preset_ArrangeWindows"], Core.Actions.MouseAction.MaximizeWindow, Core.Actions.MouseAction.MinimizeWindow,
+        new("Preset_ArrangeWindows", Core.Actions.MouseAction.MaximizeWindow, Core.Actions.MouseAction.MinimizeWindow,
             Core.Actions.MouseAction.SnapWindowLeft, Core.Actions.MouseAction.SnapWindowRight),
-        new(Loc.Current["Preset_BrowserTabs"], Core.Actions.MouseAction.NewTab, Core.Actions.MouseAction.CloseTab,
+        new("Preset_BrowserTabs", Core.Actions.MouseAction.NewTab, Core.Actions.MouseAction.CloseTab,
             Core.Actions.MouseAction.PrevTab, Core.Actions.MouseAction.NextTab),
-        new(Loc.Current["Preset_Scrolling"], Core.Actions.MouseAction.ScrollUp, Core.Actions.MouseAction.ScrollDown,
+        new("Preset_Scrolling", Core.Actions.MouseAction.ScrollUp, Core.Actions.MouseAction.ScrollDown,
             Core.Actions.MouseAction.HorizontalScrollLeft, Core.Actions.MouseAction.HorizontalScrollRight),
         CustomGesturePreset,
     ];
@@ -309,6 +309,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     public MainWindowViewModel()
     {
+        Loc.Current.PropertyChanged += OnCultureChanged;
         _agent = new AgentRuntime(_config);
         // The setting is app-wide, so it is read once here rather than per device load.
         ShakeToLocate = _config.AppSettings.ShakeToLocate;
@@ -597,6 +598,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>Tear down the remap hook and any open device session on app exit.</summary>
     public void Dispose()
     {
+        Loc.Current.PropertyChanged -= OnCultureChanged;
         try { Microsoft.Win32.SystemEvents.PowerModeChanged -= OnPowerModeChanged; } catch { /* never subscribed */ }
         _agent.Dispose();
         if (_deviceWatcher is not null)
@@ -620,6 +622,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         if (_session is not null && !IsPersistentSession(_session))
             _ = _session.DisposeAsync();
+    }
+
+    private void OnCultureChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is not (nameof(Loc.Culture) or "Item[]")) return;
+        foreach (var binding in _bindings.Values)
+            binding.RefreshLocalizedText();
+        if (SelectedDevice?.ConfigKey is { } configKey)
+            RefreshGestureSummaries(configKey);
     }
 
     private async Task ResolveCardImageAsync(DeviceViewModel vm)

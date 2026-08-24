@@ -833,6 +833,10 @@
     <value>USB</value>
     <comment>Tooltip on the tile's connection icon: USB.</comment>
   </data>
+  <data name="Connection_DirectDevice" xml:space="preserve">
+    <value>Direct device</value>
+    <comment>Device tab connection value for a mouse or keyboard connected directly over USB or Bluetooth, not through a receiver.</comment>
+  </data>
   <data name="Capability_Buttons" xml:space="preserve">
     <value>Buttons</value>
     <comment>Capability listed on a device tile: Buttons.</comment>
@@ -844,6 +848,30 @@
   <data name="Capability_Lighting" xml:space="preserve">
     <value>Lighting</value>
     <comment>Capability listed on a device tile: Lighting.</comment>
+  </data>
+  <data name="BatteryStatus_Discharging" xml:space="preserve">
+    <value>Discharging</value>
+    <comment>Battery status shown beside the battery percentage: the device is running on battery power.</comment>
+  </data>
+  <data name="BatteryStatus_Charging" xml:space="preserve">
+    <value>Charging</value>
+    <comment>Battery status shown beside the battery percentage: the device is charging normally.</comment>
+  </data>
+  <data name="BatteryStatus_ChargingSlow" xml:space="preserve">
+    <value>Charging slowly</value>
+    <comment>Battery status shown beside the battery percentage: the device is charging slowly.</comment>
+  </data>
+  <data name="BatteryStatus_Full" xml:space="preserve">
+    <value>Full</value>
+    <comment>Battery status shown beside the battery percentage: the battery is fully charged.</comment>
+  </data>
+  <data name="BatteryStatus_Error" xml:space="preserve">
+    <value>Battery error</value>
+    <comment>Battery status shown beside the battery percentage: the device reported a battery error.</comment>
+  </data>
+  <data name="BatteryStatus_Unknown" xml:space="preserve">
+    <value>Unknown</value>
+    <comment>Battery status shown beside the battery percentage: the device did not report a known charging state.</comment>
   </data>
   <data name="Host_Unnamed" xml:space="preserve">
     <value>Host {0}</value>

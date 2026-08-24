@@ -23,17 +23,30 @@ public partial class MainWindow : Window
     private bool _startHiddenApplied;
     private string? _lastTrayUpdateVersion;
     private MainWindowViewModel? _subscribedViewModel;
+    private readonly string? _appVersion;
 
     public bool StartHiddenToTray { get; init; }
 
     public MainWindow()
     {
         InitializeComponent();
-        var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3);
-        Title = version is null ? "OpenLogi.net" : $"OpenLogi.net {version}";
+        _appVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3);
+        UpdateTitle();
+        Loc.Current.PropertyChanged += OnCultureChanged;
         InitTray();
         DataContextChanged += OnDataContextChanged;
         Opened += OnOpened;
+    }
+
+    public static string AppTitle(string appName, string? version) =>
+        string.IsNullOrWhiteSpace(version) ? appName : $"{appName} {version}";
+
+    private void UpdateTitle() => Title = AppTitle(Loc.Current["Main_OpenlogiNet"], _appVersion);
+
+    private void OnCultureChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(Loc.Culture) or "Item[]")
+            UpdateTitle();
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -191,6 +204,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        Loc.Current.PropertyChanged -= OnCultureChanged;
         if (_subscribedViewModel is not null)
             _subscribedViewModel.UpdateOfferShown -= OnUpdateOfferShown;
         _tray?.Dispose();

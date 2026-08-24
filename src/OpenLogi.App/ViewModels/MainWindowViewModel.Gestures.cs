@@ -83,14 +83,6 @@ public partial class MainWindowViewModel
         }
     }
 
-    /// <summary>Friendly label for a button offered as a gesture trigger.</summary>
-    private static string GestureOwnerLabel(ButtonId button) => button switch
-    {
-        ButtonId.GestureButton => Loc.Current["GestureOwner_GestureButton"],
-        ButtonId.DpiToggle => Loc.Current["GestureOwner_DpiToggle"],
-        _ => button.Label(),
-    };
-
     /// <summary>
     /// Populate the Gestures section for the selected mouse: the owner dropdown (Off +
     /// the device's HID++-capturable gesture buttons) and the five-direction editor.
@@ -110,7 +102,7 @@ public partial class MainWindowViewModel
         _suppressGesturePanel = true;
         GestureOwnerChoices.Clear();
         foreach (var b in eligible)
-            GestureOwnerChoices.Add(new GestureOwnerChoice(b, GestureOwnerLabel(b)));
+            GestureOwnerChoices.Add(new GestureOwnerChoice(b));
 
         GesturesEnabled = _config.GesturesEnabled(ck);
         var owner = _config.GestureOwner(ck);

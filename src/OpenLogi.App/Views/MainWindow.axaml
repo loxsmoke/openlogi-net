@@ -10,8 +10,7 @@
         x:Name="Root"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/icon.png"
-        Width="900" Height="600" MinWidth="720" MinHeight="480"
-        Title="{loc:Tr Main_OpenlogiNet}">
+        Width="900" Height="600" MinWidth="720" MinHeight="480">
 
     <Design.DataContext>
         <vm:MainWindowViewModel/>

@@ -3,7 +3,13 @@ using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Avalonia.Data;
 using OpenLogi.App.Localization;
+using OpenLogi.App.ViewModels;
+using OpenLogi.App.Views;
+using OpenLogi.Core.Config;
+using OpenLogi.Core.DeviceInfo;
+using OpenLogi.Core.Gestures;
 using OpenLogi.Core.Localization;
+using MouseAction = OpenLogi.Core.Actions.MouseAction;
 
 namespace OpenLogi.Tests.App;
 
@@ -31,6 +37,87 @@ public class LocalizationTests
         // The satellite serves every de-* region, and Format works through it too.
         Assert.Equal("Profil 2", Loc.Current.Format("Profile_Numbered", 2));
     });
+
+    [Fact]
+    public void GesturePresetNameFollowsCurrentCulture()
+    {
+        var preset = new GesturePreset("Preset_Disabled",
+            MouseAction.None, MouseAction.None, MouseAction.None, MouseAction.None);
+
+        InCulture("en-US", () => Assert.Equal("Disabled", preset.Name));
+        InCulture("de", () => Assert.Equal("Deaktiviert", preset.Name));
+    }
+
+    [Fact]
+    public void BatteryStatusUsesLocalizedLabel() => InCulture("de", () =>
+    {
+        var device = new PairedDevice
+        {
+            Slot = 1,
+            Kind = DeviceKind.Mouse,
+            Online = true,
+            Battery = new BatteryInfo
+            {
+                Percentage = 72,
+                Level = BatteryLevel.Good,
+                Status = BatteryStatus.Discharging,
+            },
+        };
+
+        var vm = new DeviceViewModel("Receiver", device, route: null);
+
+        Assert.Equal("72% · Entlädt", vm.Battery);
+    });
+
+    [Fact]
+    public void DeviceStatusAndDirectConnectionUseLocalizedLabels() => InCulture("de", () =>
+    {
+        var device = new PairedDevice
+        {
+            Slot = 1,
+            Kind = DeviceKind.Mouse,
+            Online = true,
+        };
+
+        var vm = new DeviceViewModel("Direct device", device, route: null);
+
+        Assert.Equal("Verbunden", vm.Status);
+        Assert.Equal("Direktes Gerät", vm.ReceiverName);
+    });
+
+    [Fact]
+    public void ExistingPickerAndHostRowsFollowCultureSwitches()
+    {
+        var action = new ActionChoice(MouseAction.Copy);
+        var button = new ButtonBindingViewModel(ButtonId.Back, MouseAction.Copy,
+            ButtonBindingViewModel.Catalog, (_, _) => { });
+        var direction = new GestureDirectionBindingViewModel(GestureDirection.Left, MouseAction.Copy,
+            ButtonBindingViewModel.Catalog, (_, _) => { });
+        var host = new HostSlotViewModel(0, isCurrent: true, paired: true, busType: "ble", name: null, supportsDelete: true);
+
+        InCulture("de", () =>
+        {
+            Assert.Equal("Kopieren", action.Label);
+            Assert.Equal("Zurück", button.Label);
+            Assert.Equal("Links", direction.Label);
+            Assert.Equal("aktuell · ble", host.Status);
+        });
+
+        InCulture("en-US", () =>
+        {
+            Assert.Equal("Copy", action.Label);
+            Assert.Equal("Back", button.Label);
+            Assert.Equal("Left", direction.Label);
+            Assert.Equal("current · ble", host.Status);
+        });
+    }
+
+    [Fact]
+    public void MainWindowTitleKeepsVersionWhenLocalized()
+    {
+        Assert.Equal("OpenLogi.net 0.16.1", MainWindow.AppTitle("OpenLogi.net", "0.16.1"));
+        Assert.Equal("OpenLogi.net", MainWindow.AppTitle("OpenLogi.net", null));
+    }
 
     [Fact]
     public void RegionalVariantUsesTheSatelliteForItsLanguage() => InCulture("de-AT", () =>

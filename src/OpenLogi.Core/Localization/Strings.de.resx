@@ -781,7 +781,7 @@
     <comment>EN: Cycle colors</comment>
   </data>
   <data name="Device_Online" xml:space="preserve">
-    <value>Online</value>
+    <value>Verbunden</value>
     <comment>EN: Online</comment>
   </data>
   <data name="Device_Asleep" xml:space="preserve">
@@ -808,6 +808,10 @@
     <value>USB</value>
     <comment>EN: USB</comment>
   </data>
+  <data name="Connection_DirectDevice" xml:space="preserve">
+    <value>Direktes Gerät</value>
+    <comment>EN: Direct device</comment>
+  </data>
   <data name="Capability_Buttons" xml:space="preserve">
     <value>Tasten</value>
     <comment>EN: Buttons</comment>
@@ -819,6 +823,30 @@
   <data name="Capability_Lighting" xml:space="preserve">
     <value>Beleuchtung</value>
     <comment>EN: Lighting</comment>
+  </data>
+  <data name="BatteryStatus_Discharging" xml:space="preserve">
+    <value>Entlädt</value>
+    <comment>EN: Discharging</comment>
+  </data>
+  <data name="BatteryStatus_Charging" xml:space="preserve">
+    <value>Lädt</value>
+    <comment>EN: Charging</comment>
+  </data>
+  <data name="BatteryStatus_ChargingSlow" xml:space="preserve">
+    <value>Lädt langsam</value>
+    <comment>EN: Charging slowly</comment>
+  </data>
+  <data name="BatteryStatus_Full" xml:space="preserve">
+    <value>Voll</value>
+    <comment>EN: Full</comment>
+  </data>
+  <data name="BatteryStatus_Error" xml:space="preserve">
+    <value>Akkufehler</value>
+    <comment>EN: Battery error</comment>
+  </data>
+  <data name="BatteryStatus_Unknown" xml:space="preserve">
+    <value>Unbekannt</value>
+    <comment>EN: Unknown</comment>
   </data>
   <data name="Host_Unnamed" xml:space="preserve">
     <value>Host {0}</value>

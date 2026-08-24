@@ -1,3 +1,4 @@
+using CommunityToolkit.Mvvm.ComponentModel;
 using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.ViewModels;
@@ -6,12 +7,23 @@ namespace OpenLogi.App.ViewModels;
 /// One onboard profile slot, or the synthetic "No profile" entry (<see cref="Number"/> 0)
 /// that drops the keyboard out of onboard mode and applies the configured custom colour.
 /// </summary>
-public sealed class ProfileSlotViewModel(int number, bool isCurrent)
+public sealed partial class ProfileSlotViewModel : ObservableObject
 {
-    /// <summary>One-based profile index sent to the device; 0 = "No profile" (custom colour).</summary>
-    public int Number { get; } = number;
+    public ProfileSlotViewModel(int number, bool isCurrent)
+    {
+        Number = number;
+        IsCurrent = isCurrent;
+        Loc.Current.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(Loc.Culture) or "Item[]")
+                OnPropertyChanged(nameof(Label));
+        };
+    }
 
-    public bool IsCurrent { get; } = isCurrent;
+    /// <summary>One-based profile index sent to the device; 0 = "No profile" (custom colour).</summary>
+    public int Number { get; }
+
+    public bool IsCurrent { get; }
     public bool CanSwitch => !IsCurrent;
 
     public string Label => Number == 0

@@ -71,6 +71,10 @@ public class TranslationCoverageTests
         // not displayed.
         "Undefined",
 
+        // Sentinel inventory name for a directly-attached HID++ node; DeviceViewModel
+        // maps it to Connection_DirectDevice before display.
+        "Direct device",
+
         // Physical key legends on the per-key colour editor's special-key rows —
         // same reasoning as KeyboardLayout.cs above.
         "Logo", "Pause", "Menu", "Prev", "Next", "Mute",
