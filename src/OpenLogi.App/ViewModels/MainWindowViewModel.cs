@@ -112,6 +112,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty] private DeviceViewModel? _selectedDevice;
     [ObservableProperty] private string _statusText = Loc.Current["Status_LoadingDevices"];
+    private string _statusKey = "Status_LoadingDevices";
+    private object?[] _statusArgs = [];
 
     // Home-gallery states: scanning (loading) and "no devices found".
     [ObservableProperty] private bool _isScanning;
@@ -126,6 +128,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     // whole button row disables while either is running.
     [ObservableProperty] private bool _updateAvailable;
     [ObservableProperty] private string _updateBannerText = "";
+    private string? _updateBannerKey;
+    private object?[] _updateBannerArgs = [];
     [ObservableProperty] private bool _canInstallUpdate;
     [ObservableProperty] private bool _updateBusy;
     [ObservableProperty] private double _updateProgress;
@@ -137,6 +141,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     // scan; the signature of the running set drives dismissal, mirroring updates.
     [ObservableProperty] private bool _logiWarningVisible;
     [ObservableProperty] private string _logiWarningText = "";
+    private IReadOnlyList<string> _logiWarningRunning = [];
     private string _logiWarningSignature = "";
     private string? _dismissedLogiWarning;
 
@@ -213,7 +218,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private int _lightingBrightness = 100;
     [ObservableProperty][NotifyPropertyChangedFor(nameof(ShowColor), nameof(ShowSpeed))] private LightingEffect _selectedEffect = LightingEffect.Solid;
     [ObservableProperty] private int _lightingSpeed = 3000; // breathing period (ms)
-    public System.Array LightingEffects { get; } = System.Enum.GetValues<LightingEffect>();
+    public IReadOnlyList<LightingEffectOption> LightingEffects { get; } =
+        [.. System.Enum.GetValues<LightingEffect>().Select(e => new LightingEffectOption(e))];
+    public LightingEffectOption? SelectedLightingEffect
+    {
+        get => LightingEffects.FirstOrDefault(e => e.Effect == SelectedEffect);
+        set
+        {
+            if (value is not null)
+                SelectedEffect = value.Effect;
+            OnPropertyChanged();
+        }
+    }
     private System.Threading.CancellationTokenSource? _effectCts;
 
     // Lighting control visibility:
@@ -234,6 +250,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     // G-keys (0x8010) — remappable per active onboard profile.
     [ObservableProperty] private int _gKeyProfile;
+    public string GKeyProfileLabel => Loc.Current.Format("Main_MacroKeysProfile", GKeyProfile);
     private ushort _gkeyProfileSector;
 
     // Per-key color editor (PerKeyLighting 0x8081) — shown when the device supports it.
@@ -465,7 +482,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private async Task LoadAsync(bool reactivateMice = true)
     {
         _rescanPending = false; // this scan reflects the current device set
-        StatusText = Loc.Current["Status_Scanning"];
+        SetStatus("Status_Scanning");
         IsScanning = true;
         NoDevices = false;
         Devices.Clear();
@@ -482,9 +499,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             // Stay on the home gallery; opening a card navigates to its detail.
             SelectedDevice = null;
             ShowingDevice = false;
-            StatusText = Devices.Count == 0
-                ? Loc.Current["Status_NoDevicesFound"]
-                : Loc.Current.Format("Status_DeviceCount", Devices.Count);
+            if (Devices.Count == 0)
+                SetStatus("Status_NoDevicesFound");
+            else
+                SetStatus("Status_DeviceCount", Devices.Count);
 
             // Activate every connected mouse's overrides as soon as the app is running,
             // without opening any page: the OS hook for Middle/Back/Forward (global) and
@@ -512,7 +530,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         catch (System.Exception e)
         {
-            StatusText = Loc.Current.Format("Status_EnumerationFailed", e.Message);
+            SetStatus("Status_EnumerationFailed", e.Message);
         }
         finally
         {
@@ -631,6 +649,40 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             binding.RefreshLocalizedText();
         if (SelectedDevice?.ConfigKey is { } configKey)
             RefreshGestureSummaries(configKey);
+        RefreshLocalizedMessages();
+    }
+
+    private void SetStatus(string key, params object?[] args)
+    {
+        _statusKey = key;
+        _statusArgs = args;
+        StatusText = args.Length == 0 ? Loc.Current[key] : Loc.Current.Format(key, args);
+    }
+
+    private void SetUpdateBanner(string key, params object?[] args)
+    {
+        _updateBannerKey = key;
+        _updateBannerArgs = args;
+        UpdateBannerText = args.Length == 0 ? Loc.Current[key] : Loc.Current.Format(key, args);
+    }
+
+    private void ClearUpdateBannerState()
+    {
+        _updateBannerKey = null;
+        _updateBannerArgs = [];
+        UpdateBannerText = "";
+    }
+
+    private void RefreshLocalizedMessages()
+    {
+        StatusText = _statusArgs.Length == 0 ? Loc.Current[_statusKey] : Loc.Current.Format(_statusKey, _statusArgs);
+        if (_updateBannerKey is not null)
+            UpdateBannerText = _updateBannerArgs.Length == 0
+                ? Loc.Current[_updateBannerKey]
+                : Loc.Current.Format(_updateBannerKey, _updateBannerArgs);
+        if (_logiWarningRunning.Count > 0)
+            LogiWarningText = BuildLogiWarningText(_logiWarningRunning);
+        OnPropertyChanged(nameof(GKeyProfileLabel));
     }
 
     private async Task ResolveCardImageAsync(DeviceViewModel vm)

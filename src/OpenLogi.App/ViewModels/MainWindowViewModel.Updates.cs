@@ -49,7 +49,7 @@ public partial class MainWindowViewModel
             case UpdateCheck.BannerState.Shown:
                 var notify = _latestRelease?.Version != release!.Version || !UpdateAvailable;
                 _latestRelease = release;
-                UpdateBannerText = Loc.Current.Format("Update_Available", release!.Version);
+                SetUpdateBanner("Update_Available", release!.Version);
                 // Install only makes sense when there's an installer to run and we're
                 // running from an install it can upgrade in place.
                 CanInstallUpdate = release.SetupUrl is not null && UpdateInstaller.IsInstalledBySetup();
@@ -77,27 +77,31 @@ public partial class MainWindowViewModel
     private async Task InstallUpdateAsync()
     {
         if (_latestRelease is not { } release || UpdateBusy) return;
-        var previousText = UpdateBannerText;
+        var previousBannerKey = _updateBannerKey;
+        var previousBannerArgs = _updateBannerArgs;
 
         var path = await DownloadInstallerAsync(release, UpdateInstaller.UpdateStagingDir());
         if (path is null) return;
 
         try
         {
-            UpdateBannerText = Loc.Current.Format("Update_Installing", release.Version, Brand.AppName);
+            SetUpdateBanner("Update_Installing", release.Version, Brand.AppName);
             UpdateInstaller.Launch(path);
         }
         catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
         {
             // User declined the UAC prompt. Put the banner back and stay running.
-            UpdateBannerText = previousText;
+            if (previousBannerKey is not null)
+                SetUpdateBanner(previousBannerKey, previousBannerArgs);
+            else
+                ClearUpdateBannerState();
             UpdateBusy = false;
             return;
         }
         catch (Exception ex)
         {
             DiagnosticLog.Warn("update", $"launching installer failed: {ex.Message}");
-            UpdateBannerText = Loc.Current["Update_InstallerFailed"];
+            SetUpdateBanner("Update_InstallerFailed");
             CanInstallUpdate = false;
             UpdateBusy = false;
             return;
@@ -119,7 +123,7 @@ public partial class MainWindowViewModel
         if (path is null) return;
 
         UpdateInstaller.Reveal(path);
-        UpdateBannerText = Loc.Current.Format("Update_SavedToDownloads", release.Version);
+        SetUpdateBanner("Update_SavedToDownloads", release.Version);
     }
 
     /// <summary>Open the release notes for the offered version (not just "latest").</summary>
@@ -140,14 +144,14 @@ public partial class MainWindowViewModel
     {
         UpdateBusy = true;
         UpdateProgress = 0;
-        UpdateBannerText = Loc.Current.Format("Update_Downloading", release.Version);
+        SetUpdateBanner("Update_Downloading", release.Version);
 
         var progress = new Progress<double>(p => UpdateProgress = p);
         var path = await UpdateInstaller.DownloadAsync(release, destDir, progress);
 
         if (path is null)
         {
-            UpdateBannerText = Loc.Current.Format("Update_DownloadFailed", release.Version);
+            SetUpdateBanner("Update_DownloadFailed", release.Version);
             CanInstallUpdate = false;
             UpdateBusy = false;
             return null;
@@ -192,9 +196,11 @@ public partial class MainWindowViewModel
         _logiWarningSignature = string.Join("|", running.OrderBy(n => n, StringComparer.Ordinal));
         if (running.Count == 0)
         {
+            _logiWarningRunning = [];
             LogiWarningVisible = false;
             return;
         }
+        _logiWarningRunning = [.. running];
         LogiWarningText = BuildLogiWarningText(running);
         LogiWarningVisible = _logiWarningSignature != _dismissedLogiWarning;
     }

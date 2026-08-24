@@ -632,11 +632,11 @@
                                 <!-- Profile: pick the effect to save. -->
                                 <StackPanel Spacing="4" IsVisible="{Binding ShowEffect}">
                                     <TextBlock Text="{loc:Tr Main_Effect}" FontWeight="SemiBold"/>
-                                    <ComboBox ItemsSource="{Binding LightingEffects}" SelectedItem="{Binding SelectedEffect}"
+                                    <ComboBox ItemsSource="{Binding LightingEffects}" SelectedItem="{Binding SelectedLightingEffect}"
                                               Width="180" HorizontalAlignment="Left">
                                         <ComboBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding Converter={x:Static vm:Converters.EffectLabel}}"/>
+                                            <DataTemplate x:DataType="vm:LightingEffectOption">
+                                                <TextBlock Text="{Binding Label}"/>
                                             </DataTemplate>
                                         </ComboBox.ItemTemplate>
                                     </ComboBox>
@@ -680,7 +680,7 @@
                 <TabItem Header="{loc:Tr Main_GKeys}" IsVisible="{Binding HasGKeysTab}">
                     <ScrollViewer>
                         <StackPanel Margin="16" Spacing="10" MaxWidth="380">
-                            <TextBlock Text="{Binding GKeyProfile, StringFormat='Macro keys — profile {0}'}" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding GKeyProfileLabel}" FontWeight="SemiBold"/>
                             <ItemsControl ItemsSource="{Binding GKeys}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:GKeyViewModel">

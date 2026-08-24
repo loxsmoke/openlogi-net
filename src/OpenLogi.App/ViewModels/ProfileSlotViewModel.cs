@@ -13,11 +13,11 @@ public sealed partial class ProfileSlotViewModel : ObservableObject
     {
         Number = number;
         IsCurrent = isCurrent;
-        Loc.Current.PropertyChanged += (_, e) =>
+        Loc.Current.WeakSubscribe(this, static (self, e) =>
         {
             if (e.PropertyName is nameof(Loc.Culture) or "Item[]")
-                OnPropertyChanged(nameof(Label));
-        };
+                self.OnPropertyChanged(nameof(Label));
+        });
     }
 
     /// <summary>One-based profile index sent to the device; 0 = "No profile" (custom colour).</summary>

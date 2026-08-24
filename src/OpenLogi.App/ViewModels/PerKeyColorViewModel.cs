@@ -122,13 +122,13 @@ public sealed partial class PerKeyColorViewModel : ObservableObject
         {
             _painted.Remove(zone);
             await SetZoneAsync(zone, BaseColor);
-            Status = $"{label} reset.";
+            Status = Loc.Current.Format("PerKey_KeyReset", label);
         }
         else
         {
             _painted[zone] = SelectedColor;
             await SetZoneAsync(zone, SelectedColor);
-            Status = $"{label} → #{SelectedColor.R:x2}{SelectedColor.G:x2}{SelectedColor.B:x2}";
+            Status = Loc.Current.Format("PerKey_KeyPainted", label, $"{SelectedColor.R:x2}{SelectedColor.G:x2}{SelectedColor.B:x2}");
         }
         Persist();
     }

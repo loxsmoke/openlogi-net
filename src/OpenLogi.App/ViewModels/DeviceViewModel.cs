@@ -18,7 +18,7 @@ public sealed partial class DeviceViewModel : ObservableObject
         Device = device;
         Route = route;
         Connection = ConnectionKinds.For(route, device);
-        Loc.Current.PropertyChanged += OnCultureChanged;
+        Loc.Current.WeakSubscribe(this, static (self, e) => self.OnCultureChanged(null, e));
     }
 
     public string ReceiverName => _receiverName == DirectDeviceReceiverName

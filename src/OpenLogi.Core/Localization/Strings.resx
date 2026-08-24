@@ -429,6 +429,10 @@
     <value>G-Keys</value>
     <comment>MainWindow: TabItem header.</comment>
   </data>
+  <data name="Main_MacroKeysProfile" xml:space="preserve">
+    <value>Macro keys — profile {0}</value>
+    <comment>MainWindow: G-Keys heading. {0} is the active onboard profile number.</comment>
+  </data>
   <data name="Main_Change" xml:space="preserve">
     <value>⌨ Change</value>
     <comment>MainWindow: Button content.</comment>
@@ -801,8 +805,20 @@
   </data>
 
   <!-- View models, dialogs, tray and notifications -->
+  <data name="Effect_Solid" xml:space="preserve">
+    <value>Solid</value>
+    <comment>Lighting effect name in the effect dropdown.</comment>
+  </data>
+  <data name="Effect_Breathing" xml:space="preserve">
+    <value>Breathing</value>
+    <comment>Lighting effect name in the effect dropdown.</comment>
+  </data>
   <data name="Effect_Cycle" xml:space="preserve">
     <value>Cycle colors</value>
+    <comment>Lighting effect name in the effect dropdown.</comment>
+  </data>
+  <data name="Effect_Off" xml:space="preserve">
+    <value>Off</value>
     <comment>Lighting effect name in the effect dropdown.</comment>
   </data>
   <data name="Device_Online" xml:space="preserve">
@@ -920,6 +936,10 @@
   <data name="Status_HostForgotten" xml:space="preserve">
     <value>Host {0} forgotten — device disconnected.</value>
     <comment>Status line after clearing the host slot in use. {0} is the slot number.</comment>
+  </data>
+  <data name="Status_HostForgottenKeptConnected" xml:space="preserve">
+    <value>Host {0} forgotten.</value>
+    <comment>Status line after clearing a host slot that is not currently in use. {0} is the slot number.</comment>
   </data>
   <data name="Status_RemappingGKey" xml:space="preserve">
     <value>Remapping G{0}…</value>
@@ -1040,6 +1060,14 @@
   <data name="PerKey_AllReset" xml:space="preserve">
     <value>All keys reset to base.</value>
     <comment>Shown after resetting every key to the base colour.</comment>
+  </data>
+  <data name="PerKey_KeyReset" xml:space="preserve">
+    <value>{0} reset.</value>
+    <comment>Shown after resetting one key to the base colour. {0} is the physical key label.</comment>
+  </data>
+  <data name="PerKey_KeyPainted" xml:space="preserve">
+    <value>{0} → #{1}</value>
+    <comment>Shown after painting one key. {0} is the physical key label; {1} is the RGB hex colour without #.</comment>
   </data>
   <data name="About_LogiWarning" xml:space="preserve">
     <value>⚠ {0} — Logitech software can take over the receiver; only one app at a time can reliably control your devices.</value>

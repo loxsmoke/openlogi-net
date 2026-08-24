@@ -81,9 +81,7 @@ public static class LanguageCatalog
     ///
     /// A named language is honoured when we ship it. Otherwise — the System entry,
     /// a blank value, or a language we shipped once and no longer do — the OS UI
-    /// language decides, and English is the last resort. Since English is the only
-    /// shipped language today, every path currently lands on English; the fallback
-    /// chain is what is being built here, not the outcome.
+    /// language decides, and English is the last resort.
     /// </summary>
     public static CultureInfo Resolve(string? setting) =>
         Match(setting) ?? Match(Loc.SystemUiCulture.Name) ?? Fallback;
@@ -104,12 +102,13 @@ public static class LanguageCatalog
         }
     }
 
-    /// <summary>The dropdown row for a persisted setting; unknown values show as System.</summary>
+    /// <summary>The dropdown row for a persisted setting; regional variants select their shipped language.</summary>
     public static LanguageOption OptionFor(string? setting)
     {
-        if (!string.IsNullOrWhiteSpace(setting))
+        var matched = Match(setting);
+        if (matched is not null)
             foreach (var option in All)
-                if (string.Equals(option.Code, setting, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(option.Code, matched.Name, StringComparison.OrdinalIgnoreCase))
                     return option;
         return System;
     }

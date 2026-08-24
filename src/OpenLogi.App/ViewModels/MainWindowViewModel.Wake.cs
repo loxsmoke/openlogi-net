@@ -114,12 +114,12 @@ public partial class MainWindowViewModel
                 nodeFilter: n => n.VendorId == vid && n.ProductId == pid);
             foreach (var inv in inventories)
                 MergeInventoryIntoGallery(inv);
-            StatusText = $"{Devices.Count} device(s).";
+            SetStatus("Status_DeviceCount", Devices.Count);
             PokeLightingKeepalive();
         }
         catch (System.Exception e)
         {
-            StatusText = Loc.Current.Format("Status_RescanFailed", e.Message);
+            SetStatus("Status_RescanFailed", e.Message);
         }
         finally
         {

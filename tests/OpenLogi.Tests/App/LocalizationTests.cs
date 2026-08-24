@@ -177,6 +177,13 @@ public class LocalizationTests
     }
 
     [Fact]
+    public void OptionForMapsRegionalSettingsToTheShippedLanguage()
+    {
+        Assert.Equal("en-US", LanguageCatalog.OptionFor("en-GB").Code);
+        Assert.Equal("de", LanguageCatalog.OptionFor("de-DE").Code);
+    }
+
+    [Fact]
     public void SystemRowNamesTheLanguageItResolvesTo()
     {
         // Named against what System actually resolves to on this machine, so the

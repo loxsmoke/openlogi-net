@@ -46,7 +46,10 @@ public partial class MainWindow : Window
     private void OnCultureChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(Loc.Culture) or "Item[]")
+        {
             UpdateTitle();
+            UpdateTrayText();
+        }
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -102,6 +105,13 @@ public partial class MainWindow : Window
                 Dispatcher.UIThread.Post(RestoreFromTray);
         };
         _tray.BalloonTipClicked += (_, _) => Dispatcher.UIThread.Post(RestoreFromTray);
+    }
+
+    private void UpdateTrayText()
+    {
+        if (_tray?.ContextMenuStrip is not { } menu || menu.Items.Count < 2) return;
+        menu.Items[0].Text = Loc.Current["Tray_Open"];
+        menu.Items[1].Text = Loc.Current["Tray_Quit"];
     }
 
     private bool MinimizeToTrayEnabled() =>

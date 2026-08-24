@@ -318,7 +318,7 @@ public partial class MainWindowViewModel
             }
             detail = candidate;
         }
-        return $"Gestures: {detail}";
+        return Loc.Current.Format("Gestures_Summary", detail);
     }
 
     /// <summary>Recompute every button's "Gestures: …" label line (owner or map changed).</summary>

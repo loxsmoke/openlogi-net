@@ -416,6 +416,10 @@
     <value>G-Tasten</value>
     <comment>EN: G-Keys</comment>
   </data>
+  <data name="Main_MacroKeysProfile" xml:space="preserve">
+    <value>Makrotasten — Profil {0}</value>
+    <comment>EN: Macro keys — profile {0}</comment>
+  </data>
   <data name="Main_Change" xml:space="preserve">
     <value>⌨ Ändern</value>
     <comment>EN: ⌨ Change</comment>
@@ -776,9 +780,21 @@
     <value>System</value>
     <comment>EN: System</comment>
   </data>
+  <data name="Effect_Solid" xml:space="preserve">
+    <value>Statisch</value>
+    <comment>EN: Solid</comment>
+  </data>
+  <data name="Effect_Breathing" xml:space="preserve">
+    <value>Atmen</value>
+    <comment>EN: Breathing</comment>
+  </data>
   <data name="Effect_Cycle" xml:space="preserve">
     <value>Farben durchlaufen</value>
     <comment>EN: Cycle colors</comment>
+  </data>
+  <data name="Effect_Off" xml:space="preserve">
+    <value>Aus</value>
+    <comment>EN: Off</comment>
   </data>
   <data name="Device_Online" xml:space="preserve">
     <value>Verbunden</value>
@@ -895,6 +911,10 @@
   <data name="Status_HostForgotten" xml:space="preserve">
     <value>Host {0} entfernt — Gerät getrennt.</value>
     <comment>EN: Host {0} forgotten — device disconnected.</comment>
+  </data>
+  <data name="Status_HostForgottenKeptConnected" xml:space="preserve">
+    <value>Host {0} entfernt.</value>
+    <comment>EN: Host {0} forgotten.</comment>
   </data>
   <data name="Status_RemappingGKey" xml:space="preserve">
     <value>Belege G{0} neu…</value>
@@ -1015,6 +1035,14 @@
   <data name="PerKey_AllReset" xml:space="preserve">
     <value>Alle Tasten auf die Grundfarbe zurückgesetzt.</value>
     <comment>EN: All keys reset to base.</comment>
+  </data>
+  <data name="PerKey_KeyReset" xml:space="preserve">
+    <value>{0} zurückgesetzt.</value>
+    <comment>EN: {0} reset.</comment>
+  </data>
+  <data name="PerKey_KeyPainted" xml:space="preserve">
+    <value>{0} → #{1}</value>
+    <comment>EN: {0} → #{1}</comment>
   </data>
   <data name="About_LogiWarning" xml:space="preserve">
     <value>⚠ {0} — Logitech-Software kann den Empfänger übernehmen; nur eine App zur selben Zeit kann Ihre Geräte zuverlässig steuern.</value>

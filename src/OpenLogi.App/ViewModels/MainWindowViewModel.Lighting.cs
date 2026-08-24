@@ -131,16 +131,17 @@ public partial class MainWindowViewModel
     private void OnGKeyChanged(int index, byte usage, byte modifier)
     {
         if (_session is null || _gkeyProfileSector < 1) return;
-        StatusText = Loc.Current.Format("Status_RemappingGKey", index + 1);
+        SetStatus("Status_RemappingGKey", index + 1);
         _ = WriteGKeyAsync(index, usage, modifier);
     }
 
     private async Task WriteGKeyAsync(int index, byte usage, byte modifier)
     {
         var ok = _session is not null && await _session.SetGKeyUsageAsync(_gkeyProfileSector, index, usage, modifier);
-        StatusText = ok
-            ? Loc.Current.Format("Status_GKeyRemapped", index + 1, _gkeyProfileSector)
-            : Loc.Current["Status_GKeyRemapFailed"];
+        if (ok)
+            SetStatus("Status_GKeyRemapped", index + 1, _gkeyProfileSector);
+        else
+            SetStatus("Status_GKeyRemapFailed");
     }
 
     /// <summary>Persist the selected effect + colour + speed/brightness into the profile's flash (device-side).</summary>
@@ -156,12 +157,13 @@ public partial class MainWindowViewModel
             LightingEffect.Cycle => DeviceSession.EffectCycle,
             _ => DeviceSession.EffectFixed,
         };
-        StatusText = Loc.Current.Format("Status_SavingLighting", SelectedProfileForEdit);
+        SetStatus("Status_SavingLighting", SelectedProfileForEdit);
         var ok = await _session.SetProfileEffectAsync((ushort)SelectedProfileForEdit, effect,
             c.R, c.G, c.B, (ushort)LightingSpeed, (byte)LightingBrightness);
-        StatusText = ok
-            ? Loc.Current.Format("Status_LightingSaved", SelectedProfileForEdit)
-            : Loc.Current["Status_LightingSaveFailed"];
+        if (ok)
+            SetStatus("Status_LightingSaved", SelectedProfileForEdit);
+        else
+            SetStatus("Status_LightingSaveFailed");
     }
 
     /// <summary>Mark "No profile" active (a custom colour/effect is driving the keyboard).</summary>
@@ -211,7 +213,13 @@ public partial class MainWindowViewModel
     partial void OnLightingEnabledChanged(bool value) { if (!_loadingControls && !ProfileSelected) RestartLighting(); }
     partial void OnLightingColorChanged(Avalonia.Media.Color value) { if (!_loadingControls && !ProfileSelected) RestartLighting(); }
     partial void OnLightingBrightnessChanged(int value) { if (!_loadingControls && !ProfileSelected) RestartLighting(); }
-    partial void OnSelectedEffectChanged(LightingEffect value) { if (!_loadingControls && !ProfileSelected) RestartLighting(); }
+    partial void OnSelectedEffectChanged(LightingEffect value)
+    {
+        OnPropertyChanged(nameof(SelectedLightingEffect));
+        if (!_loadingControls && !ProfileSelected) RestartLighting();
+    }
+
+    partial void OnGKeyProfileChanged(int value) => OnPropertyChanged(nameof(GKeyProfileLabel));
 
     /// <summary>Persist + apply the live "No profile" lighting (always a solid colour; app-driven animations are disabled).</summary>
     private void RestartLighting()

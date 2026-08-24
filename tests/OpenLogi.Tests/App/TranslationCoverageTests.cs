@@ -52,7 +52,7 @@ public class TranslationCoverageTests
 
     /// <summary>
     /// Individual literals that stay English inside otherwise-translated files.
-    /// Interpolation holes are collapsed to <c>{}</c> before matching (see
+    /// Interpolation holes are replaced before matching (see
     /// <see cref="CodeLiterals"/>), so entries here are written that way too.
     /// </summary>
     private static readonly HashSet<string> ExemptText =
@@ -82,11 +82,22 @@ public class TranslationCoverageTests
 
         // The About window's copy-to-clipboard diagnostics blob. It goes into bug
         // reports, so it stays English for the same reason the log does.
-        "Logitech software: {}",
+        "Logitech software: value",
+
+        // Numeric hardware labels and units. These are measurements or legends,
+        // not prose: "G1", "800 DPI", "800-3200 - step 50", and "3000 ms".
+        "Gvalue", "value DPI", "value–value · step value", "value ms",
+
+        // Product title plus version ("OpenLogi.net 0.16.1").
+        "value value",
     ];
 
     private static readonly Regex XamlAttribute = new(
         @"(?<![A-Za-z])(Text|Content|Header|Title|Watermark|PlaceholderText|ToolTip\.Tip)=""([^""{][^""]*)""",
+        RegexOptions.Compiled);
+
+    private static readonly Regex XamlStringFormat = new(
+        @"StringFormat=(['""])(?:\{\})?([^'""]*)\1",
         RegexOptions.Compiled);
 
     private static readonly Regex XamlComment = new("<!--.*?-->", RegexOptions.Compiled | RegexOptions.Singleline);
@@ -174,6 +185,13 @@ public class TranslationCoverageTests
                 if (!TwoLetters.IsMatch(value) || ExemptText.Contains(value)) continue;
                 found.Add($"{relative}:{LineOf(src, m.Index)}  {m.Groups[1].Value}=\"{value}\"");
             }
+            foreach (Match m in XamlStringFormat.Matches(src))
+            {
+                if (comments.Any(c => c.Index <= m.Index && m.Index < c.End)) continue;
+                var value = InterpolationHole.Replace(m.Groups[2].Value, "value");
+                if (!LooksUserFacing(value) || ExemptText.Contains(value)) continue;
+                found.Add($"{relative}:{LineOf(src, m.Index)}  StringFormat=\"{m.Groups[2].Value}\"");
+            }
         }
         Assert.True(found.Count == 0, Report(found, "use {loc:Tr Key}"));
     }
@@ -192,8 +210,8 @@ public class TranslationCoverageTests
     /// <summary>
     /// Prose string literals in one C# file. Log and developer-output calls are
     /// skipped whole (including the continuation lines of a multi-line call), and
-    /// interpolation holes are blanked to <c>{}</c> first so that quotes belonging
-    /// to code inside a hole are not mistaken for text.
+    /// interpolation holes are replaced first so that prose on both sides of a hole
+    /// still reads like prose while quotes inside the hole are not mistaken for text.
     /// </summary>
     private static IEnumerable<(int Line, string Text)> CodeLiterals(string path)
     {
@@ -216,15 +234,20 @@ public class TranslationCoverageTests
                 continue;
             }
 
-            var code = InterpolationHole.Replace(StripTrailingComment(raw), "{}");
+            var code = InterpolationHole.Replace(StripTrailingComment(raw), "value");
             foreach (Match m in Literal.Matches(code))
             {
                 var text = m.Groups[1].Value;
-                if (text.Length < 3 || Technical.IsMatch(text)) continue;
-                if (Prose.IsMatch(text) || SingleWord.IsMatch(text))
+                if (LooksUserFacing(text))
                     yield return (lineNumber, text);
             }
         }
+    }
+
+    private static bool LooksUserFacing(string text)
+    {
+        if (text.Length < 3 || Technical.IsMatch(text)) return false;
+        return Prose.IsMatch(text) || SingleWord.IsMatch(text);
     }
 
     /// <summary>

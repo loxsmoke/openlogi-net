@@ -13,9 +13,9 @@ namespace OpenLogi.Core.Localization;
 /// culture change re-evaluates every localized binding in place, with no window
 /// recreation.
 ///
-/// Only the neutral (English) resource set ships today; other cultures resolve
-/// through <see cref="ResourceManager"/>'s own fallback chain
-/// (<c>de-AT</c> → <c>de</c> → neutral) once satellite assemblies exist.
+/// English is the neutral resource set, and German currently ships as a
+/// satellite resource. Other cultures resolve through <see cref="ResourceManager"/>'s
+/// own fallback chain (<c>de-AT</c> → <c>de</c> → neutral).
 /// </summary>
 public sealed class Loc : INotifyPropertyChanged
 {
@@ -95,5 +95,39 @@ public sealed class Loc : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("Item[]"));
     }
 
+    /// <summary>
+    /// Subscribe to culture changes without letting this process-wide singleton root
+    /// transient UI rows after their collections are rebuilt.
+    /// </summary>
+    public IDisposable WeakSubscribe<TTarget>(TTarget target, Action<TTarget, PropertyChangedEventArgs> onChanged)
+        where TTarget : class
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(onChanged);
+
+        var weak = new WeakReference<TTarget>(target);
+        PropertyChangedEventHandler? handler = null;
+        handler = (_, e) =>
+        {
+            if (weak.TryGetTarget(out var alive))
+            {
+                onChanged(alive, e);
+                return;
+            }
+
+            if (handler is not null)
+                PropertyChanged -= handler;
+        };
+        PropertyChanged += handler;
+        return new Subscription(() => PropertyChanged -= handler);
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    private sealed class Subscription(Action unsubscribe) : IDisposable
+    {
+        private Action? _unsubscribe = unsubscribe;
+
+        public void Dispose() => System.Threading.Interlocked.Exchange(ref _unsubscribe, null)?.Invoke();
+    }
 }

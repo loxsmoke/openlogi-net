@@ -26,11 +26,11 @@ public sealed partial class ActionChoice : ObservableObject, IActionPickerItem
     public ActionChoice(CoreAction action)
     {
         Action = action;
-        Loc.Current.PropertyChanged += (_, e) =>
+        Loc.Current.WeakSubscribe(this, static (self, e) =>
         {
             if (e.PropertyName is nameof(Loc.Culture) or "Item[]")
-                OnPropertyChanged(nameof(Label));
-        };
+                self.OnPropertyChanged(nameof(Label));
+        });
     }
 }
 
@@ -44,11 +44,11 @@ public sealed partial class ActionGroupHeader : ObservableObject, IActionPickerI
     public ActionGroupHeader(Category category)
     {
         Category = category;
-        Loc.Current.PropertyChanged += (_, e) =>
+        Loc.Current.WeakSubscribe(this, static (self, e) =>
         {
             if (e.PropertyName is nameof(Loc.Culture) or "Item[]")
-                OnPropertyChanged(nameof(Name));
-        };
+                self.OnPropertyChanged(nameof(Name));
+        });
     }
 }
 
@@ -71,11 +71,11 @@ public sealed partial class GestureOwnerChoice : ObservableObject
     public GestureOwnerChoice(ButtonId? button)
     {
         Button = button;
-        Loc.Current.PropertyChanged += (_, e) =>
+        Loc.Current.WeakSubscribe(this, static (self, e) =>
         {
             if (e.PropertyName is nameof(Loc.Culture) or "Item[]")
-                OnPropertyChanged(nameof(Label));
-        };
+                self.OnPropertyChanged(nameof(Label));
+        });
     }
 }
 
@@ -100,11 +100,11 @@ public sealed partial class GesturePreset : ObservableObject
         Down = down;
         Left = left;
         Right = right;
-        Loc.Current.PropertyChanged += (_, e) =>
+        Loc.Current.WeakSubscribe(this, static (self, e) =>
         {
             if (e.PropertyName is nameof(Loc.Culture) or "Item[]")
-                OnPropertyChanged(nameof(Name));
-        };
+                self.OnPropertyChanged(nameof(Name));
+        });
     }
 
     public bool IsCustom => Up is null;
@@ -163,11 +163,11 @@ public sealed partial class GestureDirectionBindingViewModel : ObservableObject
         _suppress = true;
         _selected = choices.FirstOrDefault(c => c.Action.Equals(current)) ?? choices[0];
         _suppress = false;
-        Loc.Current.PropertyChanged += (_, e) =>
+        Loc.Current.WeakSubscribe(this, static (self, e) =>
         {
             if (e.PropertyName is nameof(Loc.Culture) or "Item[]")
-                OnPropertyChanged(nameof(Label));
-        };
+                self.OnPropertyChanged(nameof(Label));
+        });
     }
 
     partial void OnSelectedChanged(ActionChoice value)
@@ -248,7 +248,7 @@ public sealed partial class ButtonBindingViewModel : ObservableObject
         _suppress = true;
         _selected = choices.FirstOrDefault(c => c.Action.Equals(current)) ?? choices[0];
         _suppress = false;
-        Loc.Current.PropertyChanged += OnCultureChanged;
+        Loc.Current.WeakSubscribe(this, static (self, e) => self.OnCultureChanged(null, e));
     }
 
     /// <summary>Construct the gesture-button binding: a five-direction editor, no single action.</summary>
@@ -262,7 +262,7 @@ public sealed partial class ButtonBindingViewModel : ObservableObject
         _suppress = true;
         _selected = choices[0]; // unused for gestures; keeps the property non-null
         _suppress = false;
-        Loc.Current.PropertyChanged += OnCultureChanged;
+        Loc.Current.WeakSubscribe(this, static (self, e) => self.OnCultureChanged(null, e));
     }
 
     partial void OnSelectedChanged(ActionChoice value)

@@ -19,14 +19,14 @@ public sealed partial class HostSlotViewModel : ObservableObject
         _busType = busType;
         _name = name;
         _supportsDelete = supportsDelete;
-        Loc.Current.PropertyChanged += (_, e) =>
+        Loc.Current.WeakSubscribe(this, static (self, e) =>
         {
             if (e.PropertyName is nameof(Loc.Culture) or "Item[]")
             {
-                OnPropertyChanged(nameof(Title));
-                OnPropertyChanged(nameof(Status));
+                self.OnPropertyChanged(nameof(Title));
+                self.OnPropertyChanged(nameof(Status));
             }
-        };
+        });
     }
 
     /// <summary>Zero-based host index sent to the device.</summary>
