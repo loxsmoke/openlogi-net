@@ -8,6 +8,7 @@ using Avalonia.Interactivity;
 using Avalonia.Threading;
 using OpenLogi.App.ViewModels;
 using WinForms = System.Windows.Forms;
+using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.Views;
 
@@ -22,17 +23,33 @@ public partial class MainWindow : Window
     private bool _startHiddenApplied;
     private string? _lastTrayUpdateVersion;
     private MainWindowViewModel? _subscribedViewModel;
+    private readonly string? _appVersion;
 
     public bool StartHiddenToTray { get; init; }
 
     public MainWindow()
     {
         InitializeComponent();
-        var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3);
-        Title = version is null ? "OpenLogi.net" : $"OpenLogi.net {version}";
+        _appVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3);
+        UpdateTitle();
+        Loc.Current.PropertyChanged += OnCultureChanged;
         InitTray();
         DataContextChanged += OnDataContextChanged;
         Opened += OnOpened;
+    }
+
+    public static string AppTitle(string appName, string? version) =>
+        string.IsNullOrWhiteSpace(version) ? appName : $"{appName} {version}";
+
+    private void UpdateTitle() => Title = AppTitle(Loc.Current["Main_OpenlogiNet"], _appVersion);
+
+    private void OnCultureChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(Loc.Culture) or "Item[]")
+        {
+            UpdateTitle();
+            UpdateTrayText();
+        }
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -66,8 +83,8 @@ public partial class MainWindow : Window
     private void InitTray()
     {
         var menu = new WinForms.ContextMenuStrip();
-        menu.Items.Add("Open OpenLogi.net", null, (_, _) => Dispatcher.UIThread.Post(RestoreFromTray));
-        menu.Items.Add("Quit", null, (_, _) => Dispatcher.UIThread.Post(() =>
+        menu.Items.Add(Loc.Current["Tray_Open"], null, (_, _) => Dispatcher.UIThread.Post(RestoreFromTray));
+        menu.Items.Add(Loc.Current["Tray_Quit"], null, (_, _) => Dispatcher.UIThread.Post(() =>
         {
             // Quit from the tray menu is already an explicit choice (and the window
             // may be hidden, so there's nothing to own a dialog) — skip the prompt.
@@ -88,6 +105,13 @@ public partial class MainWindow : Window
                 Dispatcher.UIThread.Post(RestoreFromTray);
         };
         _tray.BalloonTipClicked += (_, _) => Dispatcher.UIThread.Post(RestoreFromTray);
+    }
+
+    private void UpdateTrayText()
+    {
+        if (_tray?.ContextMenuStrip is not { } menu || menu.Items.Count < 2) return;
+        menu.Items[0].Text = Loc.Current["Tray_Open"];
+        menu.Items[1].Text = Loc.Current["Tray_Quit"];
     }
 
     private bool MinimizeToTrayEnabled() =>
@@ -178,8 +202,8 @@ public partial class MainWindow : Window
         _tray.Visible = true;
         _tray.ShowBalloonTip(
             10000,
-            "OpenLogi.net update available",
-            $"Version {version} is ready. Click to open OpenLogi.net.",
+            Loc.Current["Notify_UpdateTitle"],
+            Loc.Current.Format("Notify_UpdateBody", version),
             WinForms.ToolTipIcon.Info);
     }
 
@@ -190,6 +214,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        Loc.Current.PropertyChanged -= OnCultureChanged;
         if (_subscribedViewModel is not null)
             _subscribedViewModel.UpdateOfferShown -= OnUpdateOfferShown;
         _tray?.Dispose();
@@ -224,13 +249,12 @@ public partial class MainWindow : Window
         if (DataContext is not MainWindowViewModel vm) return;
 
         var (title, message) = slot.IsCurrent
-            ? ($"Forget host {slot.Number} — the one you're using?",
-               $"This device is connected to this computer through host {slot.Number}. " +
-               "Forgetting it disconnects the device now, and you'll have to pair it again to use it.")
-            : ($"Forget host {slot.Number}?",
-               "The computer paired in this slot will have to pair again to reconnect.");
+            ? (Loc.Current.Format("ForgetHost_CurrentTitle", slot.Number),
+               Loc.Current.Format("ForgetHost_CurrentBody", slot.Number))
+            : (Loc.Current.Format("ForgetHost_Title", slot.Number),
+               Loc.Current["ForgetHost_Body"]);
 
-        var confirmed = await new ConfirmWindow(title, message, "Forget host").ShowDialog<bool>(this);
+        var confirmed = await new ConfirmWindow(title, message, Loc.Current["ForgetHost_Confirm"]).ShowDialog<bool>(this);
         if (confirmed) await vm.ForgetHostAsync(slot);
     }
 

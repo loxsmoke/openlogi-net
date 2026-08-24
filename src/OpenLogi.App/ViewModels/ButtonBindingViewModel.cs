@@ -3,6 +3,7 @@ using OpenLogi.Core.Actions;
 using OpenLogi.Core.Config;
 using OpenLogi.Core.Gestures;
 using CoreAction = OpenLogi.Core.Actions.MouseAction;
+using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.ViewModels;
 
@@ -16,31 +17,96 @@ public interface IActionPickerItem
 }
 
 /// <summary>A selectable action in the picker dropdown (wraps an action with a label).</summary>
-public sealed record ActionChoice(CoreAction Action) : IActionPickerItem
+public sealed partial class ActionChoice : ObservableObject, IActionPickerItem
 {
+    public CoreAction Action { get; }
     public string Label => Action.Label();
     public bool Selectable => true;
+
+    public ActionChoice(CoreAction action)
+    {
+        Action = action;
+        Loc.Current.WeakSubscribe(this, static (self, e) =>
+        {
+            if (e.PropertyName is nameof(Loc.Culture) or "Item[]")
+                self.OnPropertyChanged(nameof(Label));
+        });
+    }
 }
 
 /// <summary>A non-selectable group-header row (category name + horizontal rule).</summary>
-public sealed record ActionGroupHeader(string Name) : IActionPickerItem
+public sealed partial class ActionGroupHeader : ObservableObject, IActionPickerItem
 {
+    public Category Category { get; }
+    public string Name => Category.Label();
     public bool Selectable => false;
+
+    public ActionGroupHeader(Category category)
+    {
+        Category = category;
+        Loc.Current.WeakSubscribe(this, static (self, e) =>
+        {
+            if (e.PropertyName is nameof(Loc.Culture) or "Item[]")
+                self.OnPropertyChanged(nameof(Name));
+        });
+    }
 }
 
 /// <summary>
 /// A choice in the gesture-owner dropdown: which button drives gestures on the
 /// device, or <c>null</c> for "All off". <see cref="Label"/> is the display text.
 /// </summary>
-public sealed record GestureOwnerChoice(ButtonId? Button, string Label);
+public sealed partial class GestureOwnerChoice : ObservableObject
+{
+    public ButtonId? Button { get; }
+
+    public string Label => Button switch
+    {
+        ButtonId.GestureButton => Loc.Current["GestureOwner_GestureButton"],
+        ButtonId.DpiToggle => Loc.Current["GestureOwner_DpiToggle"],
+        { } button => button.Label(),
+        _ => "",
+    };
+
+    public GestureOwnerChoice(ButtonId? button)
+    {
+        Button = button;
+        Loc.Current.WeakSubscribe(this, static (self, e) =>
+        {
+            if (e.PropertyName is nameof(Loc.Culture) or "Item[]")
+                self.OnPropertyChanged(nameof(Label));
+        });
+    }
+}
 
 /// <summary>
 /// A named per-direction gesture set for the Category dropdown (mirrors the
 /// Options+ gesture sets). The <c>Custom</c> sentinel (null actions) is selected
 /// whenever the four swipes don't match any preset, and applies nothing.
 /// </summary>
-public sealed record GesturePreset(string Name, CoreAction? Up, CoreAction? Down, CoreAction? Left, CoreAction? Right)
+public sealed partial class GesturePreset : ObservableObject
 {
+    public string Name => Loc.Current[Key];
+    public string Key { get; }
+    public CoreAction? Up { get; }
+    public CoreAction? Down { get; }
+    public CoreAction? Left { get; }
+    public CoreAction? Right { get; }
+
+    public GesturePreset(string key, CoreAction? up, CoreAction? down, CoreAction? left, CoreAction? right)
+    {
+        Key = key;
+        Up = up;
+        Down = down;
+        Left = left;
+        Right = right;
+        Loc.Current.WeakSubscribe(this, static (self, e) =>
+        {
+            if (e.PropertyName is nameof(Loc.Culture) or "Item[]")
+                self.OnPropertyChanged(nameof(Name));
+        });
+    }
+
     public bool IsCustom => Up is null;
 
     /// <summary>The preset's action for <paramref name="direction"/> (swipes only).</summary>
@@ -65,7 +131,7 @@ public sealed partial class GestureDirectionBindingViewModel : ObservableObject
     private bool _suppress;
 
     public GestureDirection Direction { get; }
-    public string Label { get; }
+    public string Label => Direction.Label();
     public string Glyph { get; }
     public IReadOnlyList<ActionChoice> Choices { get; }
 
@@ -91,13 +157,17 @@ public sealed partial class GestureDirectionBindingViewModel : ObservableObject
         System.Action<GestureDirection, CoreAction> persist)
     {
         Direction = direction;
-        Label = direction.Label();
         Glyph = direction.Glyph();
         Choices = choices;
         _persist = persist;
         _suppress = true;
         _selected = choices.FirstOrDefault(c => c.Action.Equals(current)) ?? choices[0];
         _suppress = false;
+        Loc.Current.WeakSubscribe(this, static (self, e) =>
+        {
+            if (e.PropertyName is nameof(Loc.Culture) or "Item[]")
+                self.OnPropertyChanged(nameof(Label));
+        });
     }
 
     partial void OnSelectedChanged(ActionChoice value)
@@ -140,7 +210,7 @@ public sealed partial class ButtonBindingViewModel : ObservableObject
     public bool IsGesture => Directions is not null;
 
     /// <summary>The one-line summary shown on the diagram label: the bound action, or "Gestures".</summary>
-    public string SummaryLabel => IsGesture ? "Gestures" : Selected.Label;
+    public string SummaryLabel => IsGesture ? Loc.Current["Binding_Gestures"] : Selected.Label;
 
     [ObservableProperty]
     private ActionChoice _selected;
@@ -178,6 +248,7 @@ public sealed partial class ButtonBindingViewModel : ObservableObject
         _suppress = true;
         _selected = choices.FirstOrDefault(c => c.Action.Equals(current)) ?? choices[0];
         _suppress = false;
+        Loc.Current.WeakSubscribe(this, static (self, e) => self.OnCultureChanged(null, e));
     }
 
     /// <summary>Construct the gesture-button binding: a five-direction editor, no single action.</summary>
@@ -191,6 +262,7 @@ public sealed partial class ButtonBindingViewModel : ObservableObject
         _suppress = true;
         _selected = choices[0]; // unused for gestures; keeps the property non-null
         _suppress = false;
+        Loc.Current.WeakSubscribe(this, static (self, e) => self.OnCultureChanged(null, e));
     }
 
     partial void OnSelectedChanged(ActionChoice value)
@@ -260,10 +332,23 @@ public sealed partial class ButtonBindingViewModel : ObservableObject
             // last row, so the unbind option is always in the same place.
             var group = Catalog.Where(c => c.Action.Category() == category && c.Action.Kind != ActionKind.None).ToList();
             if (group.Count == 0) continue;
-            items.Add(new ActionGroupHeader(category.Label()));
+            items.Add(new ActionGroupHeader(category));
             items.AddRange(group);
         }
         items.AddRange(Catalog.Where(c => c.Action.Kind == ActionKind.None));
         return items;
+    }
+
+    public void RefreshLocalizedText()
+    {
+        OnPropertyChanged(nameof(Label));
+        OnPropertyChanged(nameof(SummaryLabel));
+        OnPropertyChanged(nameof(GestureSummary));
+    }
+
+    private void OnCultureChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(Loc.Culture) or "Item[]")
+            RefreshLocalizedText();
     }
 }

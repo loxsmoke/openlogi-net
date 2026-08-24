@@ -1,3 +1,5 @@
+using OpenLogi.Core.Localization;
+
 namespace OpenLogi.Core.Config;
 
 public static class ButtonIdExtensions
@@ -20,16 +22,16 @@ public static class ButtonIdExtensions
     /// <summary>Human-readable label for popovers and tooltips.</summary>
     public static string Label(this ButtonId id) => id switch
     {
-        ButtonId.LeftClick => "Left Click",
-        ButtonId.RightClick => "Right Click",
-        ButtonId.MiddleClick => "Middle Click",
-        ButtonId.Back => "Back",
-        ButtonId.Forward => "Forward",
-        ButtonId.DpiToggle => "DPI Toggle",
-        ButtonId.Thumbwheel => "Thumb Wheel",
-        ButtonId.ThumbwheelScrollUp => "Thumb Wheel Up",
-        ButtonId.ThumbwheelScrollDown => "Thumb Wheel Down",
-        ButtonId.GestureButton => "Gesture Button",
+        ButtonId.LeftClick => Loc.Current["Button_LeftClick"],
+        ButtonId.RightClick => Loc.Current["Button_RightClick"],
+        ButtonId.MiddleClick => Loc.Current["Button_MiddleClick"],
+        ButtonId.Back => Loc.Current["Button_Back"],
+        ButtonId.Forward => Loc.Current["Button_Forward"],
+        ButtonId.DpiToggle => Loc.Current["Button_DpiToggle"],
+        ButtonId.Thumbwheel => Loc.Current["Button_Thumbwheel"],
+        ButtonId.ThumbwheelScrollUp => Loc.Current["Button_ThumbwheelScrollUp"],
+        ButtonId.ThumbwheelScrollDown => Loc.Current["Button_ThumbwheelScrollDown"],
+        ButtonId.GestureButton => Loc.Current["Button_GestureButton"],
         _ => id.ToString(),
     };
 }

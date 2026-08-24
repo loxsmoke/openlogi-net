@@ -2,21 +2,37 @@ using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using OpenLogi.Core.DeviceInfo;
 using OpenLogi.Hid;
+using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.ViewModels;
 
 /// <summary>Display wrapper for a paired device shown in the carousel / list.</summary>
-public sealed partial class DeviceViewModel(string receiverName, PairedDevice device, DeviceRoute? route) : ObservableObject
+public sealed partial class DeviceViewModel : ObservableObject
 {
-    public string ReceiverName { get; } = receiverName;
-    public PairedDevice Device { get; } = device;
+    private const string DirectDeviceReceiverName = "Direct device";
+    private readonly string _receiverName;
+
+    public DeviceViewModel(string receiverName, PairedDevice device, DeviceRoute? route)
+    {
+        _receiverName = receiverName;
+        Device = device;
+        Route = route;
+        Connection = ConnectionKinds.For(route, device);
+        Loc.Current.WeakSubscribe(this, static (self, e) => self.OnCultureChanged(null, e));
+    }
+
+    public string ReceiverName => _receiverName == DirectDeviceReceiverName
+        ? Loc.Current["Connection_DirectDevice"]
+        : _receiverName;
+
+    public PairedDevice Device { get; }
 
     /// <summary>How to reach this device for live DPI/SmartShift control; <c>null</c> if unroutable.</summary>
-    public DeviceRoute? Route { get; } = route;
+    public DeviceRoute? Route { get; }
 
     public string Name => Device.Codename ?? Device.Kind.ToString();
     public string Kind => Device.Kind.ToString();
-    public string Status => Device.Online ? "Online" : "Asleep";
+    public string Status => Device.Online ? Loc.Current["Device_Online"] : Loc.Current["Device_Asleep"];
 
     /// <summary>
     /// True when the device is paired but not currently on its wireless link — a
@@ -30,18 +46,18 @@ public sealed partial class DeviceViewModel(string receiverName, PairedDevice de
     public double TileImageOpacity => IsAsleep ? 0.4 : 1.0;
 
     /// <summary>How the device is connected (dongle vs Bluetooth vs cable) — the tile's corner icon.</summary>
-    public ConnectionKind Connection { get; } = ConnectionKinds.For(route, device);
+    public ConnectionKind Connection { get; }
 
     public bool HasConnectionIcon => Connection != ConnectionKind.Unknown;
 
     /// <summary>Tooltip for the connection icon.</summary>
     public string ConnectionLabel => Connection switch
     {
-        ConnectionKind.Bluetooth => "Bluetooth",
-        ConnectionKind.LightspeedDongle => "LIGHTSPEED dongle",
-        ConnectionKind.UnifyingDongle => "Unifying dongle",
-        ConnectionKind.BoltDongle => "Bolt dongle",
-        ConnectionKind.UsbCable => "USB",
+        ConnectionKind.Bluetooth => Loc.Current["Connection_Bluetooth"],
+        ConnectionKind.LightspeedDongle => Loc.Current["Connection_Lightspeed"],
+        ConnectionKind.UnifyingDongle => Loc.Current["Connection_Unifying"],
+        ConnectionKind.BoltDongle => Loc.Current["Connection_Bolt"],
+        ConnectionKind.UsbCable => Loc.Current["Connection_Usb"],
         _ => "",
     };
 
@@ -70,7 +86,7 @@ public sealed partial class DeviceViewModel(string receiverName, PairedDevice de
 
     private BatteryInfo? CurrentBattery => LiveBattery ?? Device.Battery;
 
-    public string Battery => CurrentBattery is { } b ? $"{b.Percentage}% · {b.Status}" : "—";
+    public string Battery => CurrentBattery is { } b ? $"{b.Percentage}% · {b.Status.Label()}" : "—";
 
     /// <summary>Whether a battery reading is available (drives the battery icon's visibility).</summary>
     public bool HasBattery => CurrentBattery is not null;
@@ -101,10 +117,20 @@ public sealed partial class DeviceViewModel(string receiverName, PairedDevice de
         get
         {
             var caps = new List<string>();
-            if (HasButtons) caps.Add("Buttons");
-            if (HasPointer) caps.Add("DPI");
-            if (HasLighting) caps.Add("Lighting");
+            if (HasButtons) caps.Add(Loc.Current["Capability_Buttons"]);
+            if (HasPointer) caps.Add(Loc.Current["Capability_Dpi"]);
+            if (HasLighting) caps.Add(Loc.Current["Capability_Lighting"]);
             return caps.Count > 0 ? string.Join(", ", caps) : "—";
         }
+    }
+
+    private void OnCultureChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is not (nameof(Loc.Culture) or "Item[]")) return;
+        OnPropertyChanged(nameof(ReceiverName));
+        OnPropertyChanged(nameof(Status));
+        OnPropertyChanged(nameof(ConnectionLabel));
+        OnPropertyChanged(nameof(Battery));
+        OnPropertyChanged(nameof(Capabilities));
     }
 }

@@ -9,6 +9,7 @@ using OpenLogi.Core;
 using OpenLogi.Core.Config;
 using OpenLogi.Core.DeviceInfo;
 using OpenLogi.Hid;
+using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.ViewModels;
 
@@ -82,13 +83,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private (ButtonId Owner, Core.Actions.MouseAction[] Actions)? _lastGestureState;
 
     /// <summary>The Custom sentinel: selected when the swipes match no preset; applies nothing.</summary>
-    private static readonly GesturePreset CustomGesturePreset = new("Custom", null, null, null, null);
+    private static readonly GesturePreset CustomGesturePreset = new("Preset_Custom", null, null, null, null);
 
     /// <summary>
     /// "Disabled": all four swipes Do Nothing — the default for an unconfigured
     /// button, and the way to turn one button's swipes off (its Click keeps working).
     /// </summary>
-    private static readonly GesturePreset DisabledGesturePreset = new("Disabled",
+    private static readonly GesturePreset DisabledGesturePreset = new("Preset_Disabled",
         Core.Actions.MouseAction.None, Core.Actions.MouseAction.None,
         Core.Actions.MouseAction.None, Core.Actions.MouseAction.None);
 
@@ -96,21 +97,23 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public IReadOnlyList<GesturePreset> GestureCategories { get; } =
     [
         DisabledGesturePreset,
-        new("Windows & Desktops", Core.Actions.MouseAction.TaskView, Core.Actions.MouseAction.ShowDesktop,
+        new("Preset_WindowsDesktops", Core.Actions.MouseAction.TaskView, Core.Actions.MouseAction.ShowDesktop,
             Core.Actions.MouseAction.PreviousDesktop, Core.Actions.MouseAction.NextDesktop),
-        new("Media & Volume", Core.Actions.MouseAction.VolumeUp, Core.Actions.MouseAction.VolumeDown,
+        new("Preset_MediaVolume", Core.Actions.MouseAction.VolumeUp, Core.Actions.MouseAction.VolumeDown,
             Core.Actions.MouseAction.PrevTrack, Core.Actions.MouseAction.NextTrack),
-        new("Arrange Windows", Core.Actions.MouseAction.MaximizeWindow, Core.Actions.MouseAction.MinimizeWindow,
+        new("Preset_ArrangeWindows", Core.Actions.MouseAction.MaximizeWindow, Core.Actions.MouseAction.MinimizeWindow,
             Core.Actions.MouseAction.SnapWindowLeft, Core.Actions.MouseAction.SnapWindowRight),
-        new("Browser Tabs", Core.Actions.MouseAction.NewTab, Core.Actions.MouseAction.CloseTab,
+        new("Preset_BrowserTabs", Core.Actions.MouseAction.NewTab, Core.Actions.MouseAction.CloseTab,
             Core.Actions.MouseAction.PrevTab, Core.Actions.MouseAction.NextTab),
-        new("Scrolling", Core.Actions.MouseAction.ScrollUp, Core.Actions.MouseAction.ScrollDown,
+        new("Preset_Scrolling", Core.Actions.MouseAction.ScrollUp, Core.Actions.MouseAction.ScrollDown,
             Core.Actions.MouseAction.HorizontalScrollLeft, Core.Actions.MouseAction.HorizontalScrollRight),
         CustomGesturePreset,
     ];
 
     [ObservableProperty] private DeviceViewModel? _selectedDevice;
-    [ObservableProperty] private string _statusText = "Loading devices…";
+    [ObservableProperty] private string _statusText = Loc.Current["Status_LoadingDevices"];
+    private string _statusKey = "Status_LoadingDevices";
+    private object?[] _statusArgs = [];
 
     // Home-gallery states: scanning (loading) and "no devices found".
     [ObservableProperty] private bool _isScanning;
@@ -125,6 +128,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     // whole button row disables while either is running.
     [ObservableProperty] private bool _updateAvailable;
     [ObservableProperty] private string _updateBannerText = "";
+    private string? _updateBannerKey;
+    private object?[] _updateBannerArgs = [];
     [ObservableProperty] private bool _canInstallUpdate;
     [ObservableProperty] private bool _updateBusy;
     [ObservableProperty] private double _updateProgress;
@@ -136,6 +141,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     // scan; the signature of the running set drives dismissal, mirroring updates.
     [ObservableProperty] private bool _logiWarningVisible;
     [ObservableProperty] private string _logiWarningText = "";
+    private IReadOnlyList<string> _logiWarningRunning = [];
     private string _logiWarningSignature = "";
     private string? _dismissedLogiWarning;
 
@@ -212,7 +218,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private int _lightingBrightness = 100;
     [ObservableProperty][NotifyPropertyChangedFor(nameof(ShowColor), nameof(ShowSpeed))] private LightingEffect _selectedEffect = LightingEffect.Solid;
     [ObservableProperty] private int _lightingSpeed = 3000; // breathing period (ms)
-    public System.Array LightingEffects { get; } = System.Enum.GetValues<LightingEffect>();
+    public IReadOnlyList<LightingEffectOption> LightingEffects { get; } =
+        [.. System.Enum.GetValues<LightingEffect>().Select(e => new LightingEffectOption(e))];
+    public LightingEffectOption? SelectedLightingEffect
+    {
+        get => LightingEffects.FirstOrDefault(e => e.Effect == SelectedEffect);
+        set
+        {
+            if (value is not null)
+                SelectedEffect = value.Effect;
+            OnPropertyChanged();
+        }
+    }
     private System.Threading.CancellationTokenSource? _effectCts;
 
     // Lighting control visibility:
@@ -233,6 +250,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     // G-keys (0x8010) — remappable per active onboard profile.
     [ObservableProperty] private int _gKeyProfile;
+    public string GKeyProfileLabel => Loc.Current.Format("Main_MacroKeysProfile", GKeyProfile);
     private ushort _gkeyProfileSector;
 
     // Per-key color editor (PerKeyLighting 0x8081) — shown when the device supports it.
@@ -308,6 +326,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     public MainWindowViewModel()
     {
+        Loc.Current.PropertyChanged += OnCultureChanged;
         _agent = new AgentRuntime(_config);
         // The setting is app-wide, so it is read once here rather than per device load.
         ShakeToLocate = _config.AppSettings.ShakeToLocate;
@@ -463,7 +482,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private async Task LoadAsync(bool reactivateMice = true)
     {
         _rescanPending = false; // this scan reflects the current device set
-        StatusText = "Scanning for Logitech devices…";
+        SetStatus("Status_Scanning");
         IsScanning = true;
         NoDevices = false;
         Devices.Clear();
@@ -480,7 +499,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             // Stay on the home gallery; opening a card navigates to its detail.
             SelectedDevice = null;
             ShowingDevice = false;
-            StatusText = Devices.Count == 0 ? "No Logitech HID++ devices found." : $"{Devices.Count} device(s).";
+            if (Devices.Count == 0)
+                SetStatus("Status_NoDevicesFound");
+            else
+                SetStatus("Status_DeviceCount", Devices.Count);
 
             // Activate every connected mouse's overrides as soon as the app is running,
             // without opening any page: the OS hook for Middle/Back/Forward (global) and
@@ -508,7 +530,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         catch (System.Exception e)
         {
-            StatusText = $"Enumeration failed: {e.Message}";
+            SetStatus("Status_EnumerationFailed", e.Message);
         }
         finally
         {
@@ -594,6 +616,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     /// <summary>Tear down the remap hook and any open device session on app exit.</summary>
     public void Dispose()
     {
+        Loc.Current.PropertyChanged -= OnCultureChanged;
         try { Microsoft.Win32.SystemEvents.PowerModeChanged -= OnPowerModeChanged; } catch { /* never subscribed */ }
         _agent.Dispose();
         if (_deviceWatcher is not null)
@@ -617,6 +640,49 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         if (_session is not null && !IsPersistentSession(_session))
             _ = _session.DisposeAsync();
+    }
+
+    private void OnCultureChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is not (nameof(Loc.Culture) or "Item[]")) return;
+        foreach (var binding in _bindings.Values)
+            binding.RefreshLocalizedText();
+        if (SelectedDevice?.ConfigKey is { } configKey)
+            RefreshGestureSummaries(configKey);
+        RefreshLocalizedMessages();
+    }
+
+    private void SetStatus(string key, params object?[] args)
+    {
+        _statusKey = key;
+        _statusArgs = args;
+        StatusText = args.Length == 0 ? Loc.Current[key] : Loc.Current.Format(key, args);
+    }
+
+    private void SetUpdateBanner(string key, params object?[] args)
+    {
+        _updateBannerKey = key;
+        _updateBannerArgs = args;
+        UpdateBannerText = args.Length == 0 ? Loc.Current[key] : Loc.Current.Format(key, args);
+    }
+
+    private void ClearUpdateBannerState()
+    {
+        _updateBannerKey = null;
+        _updateBannerArgs = [];
+        UpdateBannerText = "";
+    }
+
+    private void RefreshLocalizedMessages()
+    {
+        StatusText = _statusArgs.Length == 0 ? Loc.Current[_statusKey] : Loc.Current.Format(_statusKey, _statusArgs);
+        if (_updateBannerKey is not null)
+            UpdateBannerText = _updateBannerArgs.Length == 0
+                ? Loc.Current[_updateBannerKey]
+                : Loc.Current.Format(_updateBannerKey, _updateBannerArgs);
+        if (_logiWarningRunning.Count > 0)
+            LogiWarningText = BuildLogiWarningText(_logiWarningRunning);
+        OnPropertyChanged(nameof(GKeyProfileLabel));
     }
 
     private async Task ResolveCardImageAsync(DeviceViewModel vm)

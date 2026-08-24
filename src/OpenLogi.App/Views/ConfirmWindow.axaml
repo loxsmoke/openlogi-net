@@ -1,10 +1,11 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:OpenLogi.App.Localization"
         x:Class="OpenLogi.App.Views.ConfirmWindow"
         Width="440" SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         CanResize="False" ShowInTaskbar="False"
-        Title="Confirm">
+        Title="{loc:Tr Confirm_Confirm}">
     <StackPanel Margin="24" Spacing="20">
         <StackPanel Orientation="Horizontal" Spacing="18">
             <TextBlock Text="⚠" FontSize="48" Foreground="#E3B341" VerticalAlignment="Top"/>
@@ -14,8 +15,8 @@
             </StackPanel>
         </StackPanel>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-            <Button Content="Cancel" Click="OnCancel" MinWidth="84"/>
-            <Button x:Name="ConfirmButton" Content="Confirm" Click="OnConfirm" MinWidth="84"
+            <Button Content="{loc:Tr Confirm_Cancel}" Click="OnCancel" MinWidth="84"/>
+            <Button x:Name="ConfirmButton" Content="{loc:Tr Confirm_Confirm}" Click="OnConfirm" MinWidth="84"
                     Background="#DA3633" Foreground="White"/>
         </StackPanel>
     </StackPanel>

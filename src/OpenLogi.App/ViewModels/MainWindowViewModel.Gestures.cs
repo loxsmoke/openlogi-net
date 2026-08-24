@@ -4,6 +4,7 @@ using OpenLogi.Core.Actions;
 using OpenLogi.Core.Config;
 using OpenLogi.Core.Gestures;
 using OpenLogi.Hid;
+using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.ViewModels;
 
@@ -82,14 +83,6 @@ public partial class MainWindowViewModel
         }
     }
 
-    /// <summary>Friendly label for a button offered as a gesture trigger.</summary>
-    private static string GestureOwnerLabel(ButtonId button) => button switch
-    {
-        ButtonId.GestureButton => "Gesture button",
-        ButtonId.DpiToggle => "Wheel / DPI button",
-        _ => button.Label(),
-    };
-
     /// <summary>
     /// Populate the Gestures section for the selected mouse: the owner dropdown (Off +
     /// the device's HID++-capturable gesture buttons) and the five-direction editor.
@@ -109,7 +102,7 @@ public partial class MainWindowViewModel
         _suppressGesturePanel = true;
         GestureOwnerChoices.Clear();
         foreach (var b in eligible)
-            GestureOwnerChoices.Add(new GestureOwnerChoice(b, GestureOwnerLabel(b)));
+            GestureOwnerChoices.Add(new GestureOwnerChoice(b));
 
         GesturesEnabled = _config.GesturesEnabled(ck);
         var owner = _config.GestureOwner(ck);
@@ -312,7 +305,7 @@ public partial class MainWindowViewModel
 
         var categories = actions.Select(a => a.Category()).Distinct().ToList();
         if (categories.Count == 1)
-            return $"Gestures: {categories[0].Label()}";
+            return Loc.Current.Format("Gestures_Summary", categories[0].Label());
 
         var detail = "";
         foreach (var label in actions.Select(a => a.Label()).Distinct())
@@ -325,7 +318,7 @@ public partial class MainWindowViewModel
             }
             detail = candidate;
         }
-        return $"Gestures: {detail}";
+        return Loc.Current.Format("Gestures_Summary", detail);
     }
 
     /// <summary>Recompute every button's "Gestures: …" label line (owner or map changed).</summary>

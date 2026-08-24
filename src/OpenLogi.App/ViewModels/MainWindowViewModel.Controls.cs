@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.Input;
 using OpenLogi.Core.Config;
 using OpenLogi.Hid;
+using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.ViewModels;
 
@@ -13,7 +14,7 @@ public partial class MainWindowViewModel
     private async Task SwitchHost(HostSlotViewModel? slot)
     {
         if (slot is null || slot.IsCurrent || _session is null) return;
-        StatusText = $"Switching to host {slot.Number}…";
+        SetStatus("Status_SwitchingHost", slot.Number);
         await _session.SwitchHostAsync((byte)slot.Index);
     }
 
@@ -26,23 +27,23 @@ public partial class MainWindowViewModel
     {
         if (_session is null || SelectedDevice is not { } device) return;
         var wasCurrent = slot.IsCurrent;
-        StatusText = $"Forgetting host {slot.Number}…";
+        SetStatus("Status_ForgettingHost", slot.Number);
         if (!await _session.ClearHostAsync((byte)slot.Index))
         {
-            StatusText = $"Could not forget host {slot.Number}.";
+            SetStatus("Status_ForgetHostFailed", slot.Number);
             return;
         }
         if (wasCurrent)
         {
             // The device just dropped off this computer — return to the gallery and rescan.
-            StatusText = $"Host {slot.Number} forgotten — device disconnected.";
+            SetStatus("Status_HostForgotten", slot.Number);
             await RefreshAsync();
             return;
         }
         // Refresh so the freed slot shows as empty.
         if (await _session.ReadHostsAsync() is { } hosts && ReferenceEquals(SelectedDevice, device))
             RebuildHosts(hosts);
-        StatusText = $"Host {slot.Number} forgotten.";
+        SetStatus("Status_HostForgottenKeptConnected", slot.Number);
     }
 
     private void RebuildHosts(HostSnapshot hosts)

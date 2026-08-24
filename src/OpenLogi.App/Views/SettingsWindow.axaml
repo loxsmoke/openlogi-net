@@ -1,27 +1,49 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:OpenLogi.App.ViewModels"
+        xmlns:loc="using:OpenLogi.App.Localization"
         x:Class="OpenLogi.App.Views.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
         Width="440" SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         Icon="/Assets/icon.png"
-        Title="Settings">
+        Title="{loc:Tr Settings_Title}">
     <Design.DataContext>
         <vm:SettingsViewModel/>
     </Design.DataContext>
 
     <StackPanel Margin="24" Spacing="16">
-        <TextBlock Text="Settings" FontSize="18" FontWeight="Bold"/>
+        <TextBlock Text="{loc:Tr Settings_Title}" FontSize="18" FontWeight="Bold"/>
 
-        <CheckBox Content="Launch at login" IsChecked="{Binding LaunchAtLogin}"/>
-        <CheckBox Content="Check for updates on launch" IsChecked="{Binding CheckForUpdates}"/>
-        <CheckBox Content="Automatically download device images" IsChecked="{Binding AutoDownloadAssets}"/>
-        <CheckBox Content="Minimize to the system tray (hide from the taskbar)" IsChecked="{Binding MinimizeToTray}"/>
-        <CheckBox Content="Suppress diagnostic logs" IsChecked="{Binding SuppressLogging}"/>
+        <!-- Language rows are their own endonyms and never translated; only the
+             "System" row follows the current language. The tighter inner spacing
+             keeps the fallback hint attached to the dropdown rather than reading
+             as another settings row. -->
+        <StackPanel Spacing="6">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock Text="{loc:Tr Settings_Language}" VerticalAlignment="Center"/>
+                <ComboBox ItemsSource="{Binding Languages}"
+                          SelectedItem="{Binding SelectedLanguage}"
+                          MinWidth="200">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="loc:LanguageOption">
+                            <TextBlock Text="{Binding Display}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+            <TextBlock Text="{loc:Tr Settings_Language_Fallback}"
+                       TextWrapping="Wrap" Opacity="0.5" FontSize="12"/>
+        </StackPanel>
 
-        <TextBlock Text="Settings are saved to config.toml. Update checks are enabled by default."
+        <CheckBox Content="{loc:Tr Settings_LaunchAtLogin}" IsChecked="{Binding LaunchAtLogin}"/>
+        <CheckBox Content="{loc:Tr Settings_CheckForUpdates}" IsChecked="{Binding CheckForUpdates}"/>
+        <CheckBox Content="{loc:Tr Settings_AutoDownloadAssets}" IsChecked="{Binding AutoDownloadAssets}"/>
+        <CheckBox Content="{loc:Tr Settings_MinimizeToTray}" IsChecked="{Binding MinimizeToTray}"/>
+        <CheckBox Content="{loc:Tr Settings_SuppressLogging}" IsChecked="{Binding SuppressLogging}"/>
+
+        <TextBlock Text="{loc:Tr Settings_Footer}"
                    TextWrapping="Wrap" Opacity="0.5" FontSize="12"/>
     </StackPanel>
 </Window>

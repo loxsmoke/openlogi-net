@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using OpenLogi.App.Services;
 using OpenLogi.Core;
 using OpenLogi.Core.Logging;
+using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.ViewModels;
 
@@ -48,7 +49,7 @@ public partial class MainWindowViewModel
             case UpdateCheck.BannerState.Shown:
                 var notify = _latestRelease?.Version != release!.Version || !UpdateAvailable;
                 _latestRelease = release;
-                UpdateBannerText = $"Update available: v{release!.Version}";
+                SetUpdateBanner("Update_Available", release!.Version);
                 // Install only makes sense when there's an installer to run and we're
                 // running from an install it can upgrade in place.
                 CanInstallUpdate = release.SetupUrl is not null && UpdateInstaller.IsInstalledBySetup();
@@ -76,27 +77,31 @@ public partial class MainWindowViewModel
     private async Task InstallUpdateAsync()
     {
         if (_latestRelease is not { } release || UpdateBusy) return;
-        var previousText = UpdateBannerText;
+        var previousBannerKey = _updateBannerKey;
+        var previousBannerArgs = _updateBannerArgs;
 
         var path = await DownloadInstallerAsync(release, UpdateInstaller.UpdateStagingDir());
         if (path is null) return;
 
         try
         {
-            UpdateBannerText = $"Installing v{release.Version} — {Brand.AppName} will restart…";
+            SetUpdateBanner("Update_Installing", release.Version, Brand.AppName);
             UpdateInstaller.Launch(path);
         }
         catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
         {
             // User declined the UAC prompt. Put the banner back and stay running.
-            UpdateBannerText = previousText;
+            if (previousBannerKey is not null)
+                SetUpdateBanner(previousBannerKey, previousBannerArgs);
+            else
+                ClearUpdateBannerState();
             UpdateBusy = false;
             return;
         }
         catch (Exception ex)
         {
             DiagnosticLog.Warn("update", $"launching installer failed: {ex.Message}");
-            UpdateBannerText = "Couldn't start the installer — try Download instead.";
+            SetUpdateBanner("Update_InstallerFailed");
             CanInstallUpdate = false;
             UpdateBusy = false;
             return;
@@ -118,7 +123,7 @@ public partial class MainWindowViewModel
         if (path is null) return;
 
         UpdateInstaller.Reveal(path);
-        UpdateBannerText = $"v{release.Version} saved to Downloads";
+        SetUpdateBanner("Update_SavedToDownloads", release.Version);
     }
 
     /// <summary>Open the release notes for the offered version (not just "latest").</summary>
@@ -139,14 +144,14 @@ public partial class MainWindowViewModel
     {
         UpdateBusy = true;
         UpdateProgress = 0;
-        UpdateBannerText = $"Downloading v{release.Version}…";
+        SetUpdateBanner("Update_Downloading", release.Version);
 
         var progress = new Progress<double>(p => UpdateProgress = p);
         var path = await UpdateInstaller.DownloadAsync(release, destDir, progress);
 
         if (path is null)
         {
-            UpdateBannerText = $"Download of v{release.Version} failed — try View on GitHub.";
+            SetUpdateBanner("Update_DownloadFailed", release.Version);
             CanInstallUpdate = false;
             UpdateBusy = false;
             return null;
@@ -191,15 +196,17 @@ public partial class MainWindowViewModel
         _logiWarningSignature = string.Join("|", running.OrderBy(n => n, StringComparer.Ordinal));
         if (running.Count == 0)
         {
+            _logiWarningRunning = [];
             LogiWarningVisible = false;
             return;
         }
+        _logiWarningRunning = [.. running];
         LogiWarningText = BuildLogiWarningText(running);
         LogiWarningVisible = _logiWarningSignature != _dismissedLogiWarning;
     }
 
     /// <summary>The banner sentence: names of the running apps + the shared receiver-contention caution.</summary>
     private static string BuildLogiWarningText(IReadOnlyList<string> running) =>
-        $"{string.Join(", ", running)} {(running.Count == 1 ? "is" : "are")} running — Logitech software "
-        + "can take over the receiver; only one app at a time can reliably control your devices.";
+        Loc.Current.Format(running.Count == 1 ? "LogiWarning_One" : "LogiWarning_Many",
+            string.Join(", ", running));
 }

@@ -5,6 +5,7 @@ using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using OpenLogi.Core;
+using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.Views;
 
@@ -26,8 +27,7 @@ public partial class AboutWindow : Window
         if (logi.Count > 0)
         {
             var warning = this.FindControl<TextBlock>("LogiWarningText")!;
-            warning.Text = $"⚠ {string.Join(", ", logi)} — Logitech software can take over the "
-                + "receiver; only one app at a time can reliably control your devices.";
+            warning.Text = Loc.Current.Format("About_LogiWarning", string.Join(", ", logi));
             warning.IsVisible = true;
         }
 
@@ -66,9 +66,9 @@ public partial class AboutWindow : Window
             if (Clipboard is { } clipboard) await clipboard.SetTextAsync(_diagnostics);
             if (sender is Button button)
             {
-                button.Content = "Copied ✓";
+                button.Content = Loc.Current["About_Copied"];
                 await System.Threading.Tasks.Task.Delay(1500);
-                button.Content = "Copy info";
+                button.Content = Loc.Current["About_CopyInfo"];
             }
         }
         catch { /* clipboard unavailable — nothing to signal */ }

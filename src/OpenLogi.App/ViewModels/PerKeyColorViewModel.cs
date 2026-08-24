@@ -3,6 +3,7 @@ using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using OpenLogi.Hid;
+using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.ViewModels;
 
@@ -23,7 +24,7 @@ public sealed partial class PerKeyColorViewModel : ObservableObject
 
     [ObservableProperty] private Color _selectedColor = Colors.Red;
     [ObservableProperty] private Color _baseColor = Colors.White;
-    [ObservableProperty] private string _status = "Pick a color, then press a key to paint it. Press it again to reset.";
+    [ObservableProperty] private string _status = Loc.Current["PerKey_Hint"];
 
     public PerKeyColorViewModel(
         DeviceSession session,
@@ -94,7 +95,7 @@ public sealed partial class PerKeyColorViewModel : ObservableObject
     {
         if (PhysicalToZone(physical) is not { } zone)
         {
-            Status = $"{physical} isn't a paintable key.";
+            Status = Loc.Current.Format("PerKey_NotPaintable", physical);
             return;
         }
         await PaintZoneAsync(zone, physical.ToString());
@@ -121,13 +122,13 @@ public sealed partial class PerKeyColorViewModel : ObservableObject
         {
             _painted.Remove(zone);
             await SetZoneAsync(zone, BaseColor);
-            Status = $"{label} reset.";
+            Status = Loc.Current.Format("PerKey_KeyReset", label);
         }
         else
         {
             _painted[zone] = SelectedColor;
             await SetZoneAsync(zone, SelectedColor);
-            Status = $"{label} → #{SelectedColor.R:x2}{SelectedColor.G:x2}{SelectedColor.B:x2}";
+            Status = Loc.Current.Format("PerKey_KeyPainted", label, $"{SelectedColor.R:x2}{SelectedColor.G:x2}{SelectedColor.B:x2}");
         }
         Persist();
     }
@@ -139,7 +140,7 @@ public sealed partial class PerKeyColorViewModel : ObservableObject
         // base color at once, instead of walking key by key.
         _painted.Clear();
         await _session.ApplyPerKeyColorAsync(BaseColor.R, BaseColor.G, BaseColor.B);
-        Status = "All keys reset to base.";
+        Status = Loc.Current["PerKey_AllReset"];
         Persist();
     }
 
