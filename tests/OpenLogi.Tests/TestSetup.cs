@@ -1,4 +1,6 @@
 using System.Runtime.CompilerServices;
+using System.Globalization;
+using OpenLogi.Core.Localization;
 using OpenLogi.Core.Logging;
 
 // Loc is a process-wide singleton, so a test that pins the UI language changes it
@@ -21,5 +23,9 @@ internal static class TestSetup
     /// directly against temp directories.
     /// </summary>
     [ModuleInitializer]
-    internal static void SuppressDiagnosticLog() => DiagnosticLog.Suppressed = true;
+    internal static void Initialize()
+    {
+        DiagnosticLog.Suppressed = true;
+        Loc.Current.SetCulture(CultureInfo.GetCultureInfo("en-US"));
+    }
 }

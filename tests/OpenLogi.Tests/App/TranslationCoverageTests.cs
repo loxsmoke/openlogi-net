@@ -142,9 +142,10 @@ public class TranslationCoverageTests
     }
 
     /// <summary>
-    /// A translation that drops or renumbers a placeholder throws
+    /// A translation that drops, duplicates or renumbers a placeholder throws
     /// <see cref="FormatException"/> at the point of use — in a status line or a
-    /// dialog, where nobody is looking. Compare the placeholder sets instead.
+    /// dialog, where nobody is looking. Compare sorted placeholder sequences so
+    /// translations may reorder holes but cannot add or remove occurrences.
     /// </summary>
     [Theory]
     [InlineData("de")]
@@ -158,16 +159,17 @@ public class TranslationCoverageTests
         foreach (var (key, english) in neutral)
         {
             if (!translated.TryGetValue(key, out var other)) continue;
-            var expected = holes.Matches(english).Select(m => m.Value).ToHashSet();
-            var actual = holes.Matches(other).Select(m => m.Value).ToHashSet();
-            if (!expected.SetEquals(actual))
+            var expected = holes.Matches(english).Select(m => m.Value).Order().ToArray();
+            var actual = holes.Matches(other).Select(m => m.Value).Order().ToArray();
+            if (!expected.SequenceEqual(actual))
                 wrong.Add($"{key}: expected {Show(expected)}, translation has {Show(actual)}");
         }
 
         Assert.True(wrong.Count == 0,
             $"{wrong.Count} translated string(s) changed their placeholders:\n  " + string.Join("\n  ", wrong));
 
-        static string Show(HashSet<string> set) => set.Count == 0 ? "none" : string.Join(" ", set.Order());
+        static string Show(string[] placeholders) =>
+            placeholders.Length == 0 ? "none" : string.Join(" ", placeholders);
     }
 
     [Fact]

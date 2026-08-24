@@ -279,6 +279,32 @@ public class LocalizationTests
     }
 
     [Fact]
+    public void EveryKeyUsedInCodeExists()
+    {
+        var defined = ResourceKeys();
+        var patterns = new[]
+        {
+            @"Loc\.Current\[\s*""([A-Za-z0-9_]+)""\s*\]",
+            @"Loc\.Current\.Get\(\s*""([A-Za-z0-9_]+)""",
+            @"Loc\.Current\.Format\(\s*""([A-Za-z0-9_]+)""",
+            @"SetStatus\(\s*""([A-Za-z0-9_]+)""",
+            @"SetUpdateBanner\(\s*""([A-Za-z0-9_]+)""",
+        };
+
+        foreach (var file in Directory.EnumerateFiles(SrcRoot(), "*.cs", SearchOption.AllDirectories))
+        {
+            var source = File.ReadAllText(file);
+            foreach (var pattern in patterns)
+                foreach (Match match in Regex.Matches(source, pattern))
+                {
+                    var key = match.Groups[1].Value;
+                    Assert.True(defined.Contains(key),
+                        $"{Path.GetFileName(file)} uses localization key {key}, which is not in Strings.resx");
+                }
+        }
+    }
+
+    [Fact]
     public void NoOrphanedResourceKeys()
     {
         var source = string.Concat(Directory
@@ -287,7 +313,7 @@ public class LocalizationTests
             .Select(File.ReadAllText));
 
         foreach (var key in ResourceKeys())
-            Assert.True(source.Contains(key, StringComparison.Ordinal),
+            Assert.True(Regex.IsMatch(source, $@"(?<![A-Za-z0-9_]){Regex.Escape(key)}(?![A-Za-z0-9_])"),
                 $"Strings.resx defines {key}, which nothing references");
     }
 
