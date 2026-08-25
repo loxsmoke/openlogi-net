@@ -61,9 +61,11 @@ public static class LanguageCatalog
     /// <summary>
     /// Cultures with a shipped translation. German is the neutral <c>de</c>, not a
     /// regional variant, so one satellite serves de-DE, de-AT and de-CH alike.
+    /// Simplified Chinese uses <c>zh-Hans</c> so regional variants like
+    /// <c>zh-CN</c> resolve to the same satellite.
     /// </summary>
     public static readonly IReadOnlyList<CultureInfo> Shipped =
-        [Fallback, CultureInfo.GetCultureInfo("de")];
+        [Fallback, CultureInfo.GetCultureInfo("de"), CultureInfo.GetCultureInfo("zh-Hans")];
 
     /// <summary>Follow the OS UI language.</summary>
     public static readonly LanguageOption System = new(null, null);
@@ -74,6 +76,7 @@ public static class LanguageCatalog
         System,
         new("en-US", "English US"),
         new("de", "Deutsch"),
+        new("zh-Hans", "简体中文"),
     ];
 
     /// <summary>
