@@ -1,20 +1,21 @@
 using System;
-using System.Drawing;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using OpenLogi.App.ViewModels;
-using WinForms = System.Windows.Forms;
 using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.Views;
 
 public partial class MainWindow : Window
 {
-    private WinForms.NotifyIcon? _tray;
+    private TrayIcon? _tray;
+    private NativeMenuItem? _trayOpenItem;
+    private NativeMenuItem? _trayQuitItem;
     // Set once the user confirmed quitting (or quit from the tray menu), so the
     // resumed close isn't intercepted again.
     private bool _exitConfirmed;
@@ -82,36 +83,41 @@ public partial class MainWindow : Window
     // System-tray icon (hidden until the window is minimized to tray).
     private void InitTray()
     {
-        var menu = new WinForms.ContextMenuStrip();
-        menu.Items.Add(Loc.Current["Tray_Open"], null, (_, _) => Dispatcher.UIThread.Post(RestoreFromTray));
-        menu.Items.Add(Loc.Current["Tray_Quit"], null, (_, _) => Dispatcher.UIThread.Post(() =>
+        _trayOpenItem = new NativeMenuItem { Header = Loc.Current["Tray_Open"] };
+        _trayOpenItem.Click += (_, _) => Dispatcher.UIThread.Post(RestoreFromTray);
+
+        _trayQuitItem = new NativeMenuItem { Header = Loc.Current["Tray_Quit"] };
+        _trayQuitItem.Click += (_, _) => Dispatcher.UIThread.Post(() =>
         {
             // Quit from the tray menu is already an explicit choice (and the window
             // may be hidden, so there's nothing to own a dialog) — skip the prompt.
             _exitConfirmed = true;
             (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown();
-        }));
+        });
 
-        _tray = new WinForms.NotifyIcon
+        var menu = new NativeMenu
+        {
+            Items =
+            {
+                _trayOpenItem,
+                _trayQuitItem,
+            },
+        };
+
+        _tray = new TrayIcon
         {
             Icon = AppIcon(),
-            Text = "OpenLogi.net",
-            Visible = false,
-            ContextMenuStrip = menu,
+            ToolTipText = "OpenLogi.net",
+            IsVisible = false,
+            Menu = menu,
         };
-        _tray.MouseClick += (_, e) =>
-        {
-            if (e.Button == WinForms.MouseButtons.Left)
-                Dispatcher.UIThread.Post(RestoreFromTray);
-        };
-        _tray.BalloonTipClicked += (_, _) => Dispatcher.UIThread.Post(RestoreFromTray);
+        _tray.Clicked += (_, _) => Dispatcher.UIThread.Post(RestoreFromTray);
     }
 
     private void UpdateTrayText()
     {
-        if (_tray?.ContextMenuStrip is not { } menu || menu.Items.Count < 2) return;
-        menu.Items[0].Text = Loc.Current["Tray_Open"];
-        menu.Items[1].Text = Loc.Current["Tray_Quit"];
+        if (_trayOpenItem is not null) _trayOpenItem.Header = Loc.Current["Tray_Open"];
+        if (_trayQuitItem is not null) _trayQuitItem.Header = Loc.Current["Tray_Quit"];
     }
 
     private bool MinimizeToTrayEnabled() =>
@@ -141,7 +147,7 @@ public partial class MainWindow : Window
 
     private void HideToTray()
     {
-        if (_tray is not null) _tray.Visible = true;
+        if (_tray is not null) _tray.IsVisible = true;
         ShowInTaskbar = false; // hide from the taskbar; the tray icon restores it
         Hide();
     }
@@ -191,7 +197,11 @@ public partial class MainWindow : Window
         WindowState = WindowState.Normal;
         ShowInTaskbar = true;
         Activate();
-        if (_tray is not null) _tray.Visible = false;
+        if (_tray is not null)
+        {
+            _tray.ToolTipText = "OpenLogi.net";
+            _tray.IsVisible = false;
+        }
     }
 
     private void OnUpdateOfferShown(string version)
@@ -199,18 +209,12 @@ public partial class MainWindow : Window
         if (_tray is null || _lastTrayUpdateVersion == version || IsVisible) return;
 
         _lastTrayUpdateVersion = version;
-        _tray.Visible = true;
-        _tray.ShowBalloonTip(
-            10000,
-            Loc.Current["Notify_UpdateTitle"],
-            Loc.Current.Format("Notify_UpdateBody", version),
-            WinForms.ToolTipIcon.Info);
+        _tray.ToolTipText = $"{Loc.Current["Notify_UpdateTitle"]}{Environment.NewLine}{Loc.Current.Format("Notify_UpdateBody", version)}";
+        _tray.IsVisible = true;
     }
 
-    private static System.Drawing.Icon AppIcon() =>
-        Environment.ProcessPath is { } path
-            ? System.Drawing.Icon.ExtractAssociatedIcon(path) ?? SystemIcons.Application
-            : SystemIcons.Application;
+    private static WindowIcon AppIcon() =>
+        new(AssetLoader.Open(new Uri("avares://OpenLogi.App/Assets/icon.png")));
 
     protected override void OnClosed(EventArgs e)
     {
