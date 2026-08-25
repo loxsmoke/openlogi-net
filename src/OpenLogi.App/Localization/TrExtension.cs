@@ -11,8 +11,8 @@ namespace OpenLogi.App.Localization;
 /// The <c>{loc:Tr Key}</c> markup extension: replaces a compiled-in literal with a
 /// live binding, so the language can change without recreating windows.
 ///
-/// It returns a <see cref="Binding"/> built in C#, which matters twice over. The
-/// binding sets <see cref="Binding.Source"/> explicitly and never touches the
+/// It returns a <see cref="CompiledBinding"/> built in C#, which matters twice over. The
+/// binding sets <see cref="CompiledBinding.Source"/> explicitly and never touches the
 /// DataContext, so it coexists with the compiled bindings enabled project-wide
 /// (<c>AvaloniaUseCompiledBindingsByDefault</c>) without an
 /// <c>x:CompileBindings="False"</c> escape hatch that would cost type-checking
@@ -33,13 +33,12 @@ public sealed class TrExtension : MarkupExtension
     public string Key { get; set; } = string.Empty;
 
     public override object ProvideValue(IServiceProvider serviceProvider) =>
-        new Binding(nameof(Loc.Culture))
-        {
-            Source = Loc.Current,
-            Mode = BindingMode.OneWay,
-            Converter = LookupConverter.Instance,
-            ConverterParameter = Key,
-        };
+        CompiledBinding.Create<Loc, CultureInfo>(
+            loc => loc.Culture,
+            Loc.Current,
+            LookupConverter.Instance,
+            BindingMode.OneWay,
+            converterParameter: Key);
 
     /// <summary>Turns the culture-changed tick into the looked-up string for one key.</summary>
     private sealed class LookupConverter : IValueConverter

@@ -239,10 +239,10 @@ public class LocalizationTests
     [Fact]
     public void TrExtensionBindsToTheCultureAndLooksUpItsKey()
     {
-        var binding = Assert.IsType<Binding>(new TrExtension("Settings_Title").ProvideValue(null!));
+        var binding = Assert.IsType<CompiledBinding>(new TrExtension("Settings_Title").ProvideValue(null!));
 
         Assert.Same(Loc.Current, binding.Source);
-        Assert.Equal(nameof(Loc.Culture), binding.Path);
+        Assert.Equal(nameof(Loc.Culture), binding.Path?.ToString());
         Assert.Equal(BindingMode.OneWay, binding.Mode);
         Assert.Equal("Settings_Title",
             Assert.IsType<string>(binding.ConverterParameter));
