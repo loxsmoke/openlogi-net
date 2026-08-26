@@ -1,0 +1,1110 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Simplified Chinese translation. Keys and their order mirror Strings.resx; each comment
+    carries the English source so a reviewer can see what was translated.
+    Placeholders ({0}, {1}) must survive translation - a test checks that.
+  -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Settings_Title" xml:space="preserve">
+    <value>设置</value>
+    <comment>EN: Settings</comment>
+  </data>
+  <data name="Settings_Language" xml:space="preserve">
+    <value>语言</value>
+    <comment>EN: Language</comment>
+  </data>
+  <data name="Settings_Language_System" xml:space="preserve">
+    <value>系统 ({0})</value>
+    <comment>EN: System ({0})</comment>
+  </data>
+  <data name="Settings_Language_Fallback" xml:space="preserve">
+    <value>未翻译的内容将回退为 English US。</value>
+    <comment>EN: Anything not translated falls back to English US.</comment>
+  </data>
+  <data name="Settings_LaunchAtLogin" xml:space="preserve">
+    <value>登录时启动</value>
+    <comment>EN: Launch at login</comment>
+  </data>
+  <data name="Settings_CheckForUpdates" xml:space="preserve">
+    <value>启动时检查更新</value>
+    <comment>EN: Check for updates on launch</comment>
+  </data>
+  <data name="Settings_AutoDownloadAssets" xml:space="preserve">
+    <value>自动下载设备图片</value>
+    <comment>EN: Automatically download device images</comment>
+  </data>
+  <data name="Settings_MinimizeToTray" xml:space="preserve">
+    <value>最小化到系统托盘（从任务栏隐藏）</value>
+    <comment>EN: Minimize to the system tray (hide from the taskbar)</comment>
+  </data>
+  <data name="Settings_SuppressLogging" xml:space="preserve">
+    <value>禁用诊断日志</value>
+    <comment>EN: Suppress diagnostic logs</comment>
+  </data>
+  <data name="Settings_Footer" xml:space="preserve">
+    <value>设置会保存到 config.toml。默认启用更新检查。</value>
+    <comment>EN: Settings are saved to config.toml. Update checks are enabled by default.</comment>
+  </data>
+  <!-- QuickColorPicker -->
+  <data name="QuickColor_OffTurnsKeyOff" xml:space="preserve">
+    <value>关闭（关闭该按键）</value>
+    <comment>EN: Off (turns the key off)</comment>
+  </data>
+  <!-- AboutWindow -->
+  <data name="About_AboutOpenlogiNet" xml:space="preserve">
+    <value>关于 OpenLogi.net</value>
+    <comment>EN: About OpenLogi.net</comment>
+  </data>
+  <data name="About_OpenlogiNet" xml:space="preserve">
+    <value>OpenLogi.net</value>
+    <comment>EN: OpenLogi.net</comment>
+  </data>
+  <data name="About_LocalFirstAlternativeLogitechOptions" xml:space="preserve">
+    <value>面向 HID++ 设备的本地优先 Logitech Options+ 替代方案。无需账号，没有遥测。</value>
+    <comment>EN: A local-first alternative to Logitech Options+ for HID++ devices. No account, no telemetry.</comment>
+  </data>
+  <data name="About_Github" xml:space="preserve">
+    <value>GitHub</value>
+    <comment>EN: GitHub</comment>
+  </data>
+  <data name="About_Releases" xml:space="preserve">
+    <value>发布版本</value>
+    <comment>EN: Releases</comment>
+  </data>
+  <data name="About_LicensedUnderMIT" xml:space="preserve">
+    <value>基于 MIT 许可</value>
+    <comment>EN: Licensed under MIT</comment>
+  </data>
+  <data name="About_CopyInfo" xml:space="preserve">
+    <value>复制信息</value>
+    <comment>EN: Copy info</comment>
+  </data>
+  <data name="About_OpenLogs" xml:space="preserve">
+    <value>打开日志</value>
+    <comment>EN: Open logs</comment>
+  </data>
+  <data name="About_Close" xml:space="preserve">
+    <value>关闭</value>
+    <comment>EN: Close</comment>
+  </data>
+  <!-- ConfirmWindow -->
+  <data name="Confirm_Confirm" xml:space="preserve">
+    <value>确认</value>
+    <comment>EN: Confirm</comment>
+  </data>
+  <data name="Confirm_Cancel" xml:space="preserve">
+    <value>取消</value>
+    <comment>EN: Cancel</comment>
+  </data>
+  <!-- ExitConfirmWindow -->
+  <data name="ExitConfirm_ExitOpenlogiNet" xml:space="preserve">
+    <value>退出 OpenLogi.net？</value>
+    <comment>EN: Exit OpenLogi.net?</comment>
+  </data>
+  <data name="ExitConfirm_WhileAppIsnTRunning" xml:space="preserve">
+    <value>应用未运行时，按键重映射、鼠标手势、按应用配置文件和平滑滚动都会停止工作，设备会回到默认行为。你也可以改为最小化到系统托盘，让所有功能保持启用。</value>
+    <comment>EN: While the app isn't running, button remaps, mouse gestures, per-app profiles, and smooth scrolling stop working — your devices fall back to their default behavior. You can minimize to the system tray instead to keep everything active.</comment>
+  </data>
+  <data name="ExitConfirm_MinimizeTray" xml:space="preserve">
+    <value>最小化到托盘</value>
+    <comment>EN: Minimize to tray</comment>
+  </data>
+  <data name="ExitConfirm_Exit" xml:space="preserve">
+    <value>退出</value>
+    <comment>EN: Exit</comment>
+  </data>
+  <data name="ExitConfirm_Cancel" xml:space="preserve">
+    <value>取消</value>
+    <comment>EN: Cancel</comment>
+  </data>
+  <!-- KeyPickerWindow -->
+  <data name="KeyPicker_PickKey" xml:space="preserve">
+    <value>选择按键</value>
+    <comment>EN: Pick a key</comment>
+  </data>
+  <data name="KeyPicker_ClickModifiersShiftCtrlAlt" xml:space="preserve">
+    <value>点击修饰键（Shift / Ctrl / Alt）可切换它们，然后点击一个按键。灰色按键不能作为目标。</value>
+    <comment>EN: Click modifiers (Shift / Ctrl / Alt) to toggle them, then click a key. Greyed keys can't be targets.</comment>
+  </data>
+  <data name="KeyPicker_Cancel" xml:space="preserve">
+    <value>取消</value>
+    <comment>EN: Cancel</comment>
+  </data>
+  <data name="KeyPicker_OK" xml:space="preserve">
+    <value>确定</value>
+    <comment>EN: OK</comment>
+  </data>
+  <!-- MainWindow -->
+  <data name="Main_OpenlogiNet" xml:space="preserve">
+    <value>OpenLogi.net</value>
+    <comment>EN: OpenLogi.net</comment>
+  </data>
+  <data name="Main_Install" xml:space="preserve">
+    <value>安装</value>
+    <comment>EN: Install</comment>
+  </data>
+  <data name="Main_Download" xml:space="preserve">
+    <value>下载</value>
+    <comment>EN: Download</comment>
+  </data>
+  <data name="Main_ViewGithub" xml:space="preserve">
+    <value>在 GitHub 上查看</value>
+    <comment>EN: View on GitHub</comment>
+  </data>
+  <data name="Main_Devices" xml:space="preserve">
+    <value>设备</value>
+    <comment>EN: Devices</comment>
+  </data>
+  <data name="Main_Refresh" xml:space="preserve">
+    <value>刷新</value>
+    <comment>EN: Refresh</comment>
+  </data>
+  <data name="Main_Settings" xml:space="preserve">
+    <value>设置</value>
+    <comment>EN: Settings</comment>
+  </data>
+  <data name="Main_About" xml:space="preserve">
+    <value>关于</value>
+    <comment>EN: About</comment>
+  </data>
+  <data name="Main_Devices2" xml:space="preserve">
+    <value>←  设备</value>
+    <comment>EN: ←  Devices</comment>
+  </data>
+  <data name="Main_Asleep" xml:space="preserve">
+    <value>☾ 休眠</value>
+    <comment>EN: ☾ Asleep</comment>
+  </data>
+  <data name="Main_ScanningDevices" xml:space="preserve">
+    <value>正在扫描设备…</value>
+    <comment>EN: Scanning for devices…</comment>
+  </data>
+  <data name="Main_NoDevicesDetected" xml:space="preserve">
+    <value>未检测到设备</value>
+    <comment>EN: No devices detected</comment>
+  </data>
+  <data name="Main_ConnectLogitechMouseKeyboardRefresh" xml:space="preserve">
+    <value>连接 Logitech 鼠标或键盘，然后刷新。</value>
+    <comment>EN: Connect a Logitech mouse or keyboard, then refresh.</comment>
+  </data>
+  <data name="Main_Buttons" xml:space="preserve">
+    <value>按键</value>
+    <comment>EN: Buttons</comment>
+  </data>
+  <data name="Main_GesturesEnabled" xml:space="preserve">
+    <value>手势已启用</value>
+    <comment>EN: Gestures Enabled</comment>
+  </data>
+  <data name="Main_GesturesTurnMouseButtonInto" xml:space="preserve">
+    <value>手势会把一个鼠标按键变成五个控制项：按住并向上 / 下 / 左 / 右滑动可触发四个操作（切换桌面、媒体控制、贴靠窗口等），普通点击则触发第五个操作。所选按键会放弃它原本的功能。</value>
+    <comment>EN: Gestures turn a mouse button into five controls: hold it and swipe up / down / left / right for four actions (switch desktops, media, snap windows…), while a plain tap fires a fifth. The chosen button gives up its normal function.</comment>
+  </data>
+  <data name="Main_Button" xml:space="preserve">
+    <value>按键</value>
+    <comment>EN: Button</comment>
+  </data>
+  <data name="Main_Gestures" xml:space="preserve">
+    <value>手势</value>
+    <comment>EN: Gestures</comment>
+  </data>
+  <data name="Main_Pointer" xml:space="preserve">
+    <value>指针</value>
+    <comment>EN: Pointer</comment>
+  </data>
+  <data name="Main_ScrollDirection" xml:space="preserve">
+    <value>滚动方向</value>
+    <comment>EN: Scroll direction</comment>
+  </data>
+  <data name="Main_InvertScrollDirection" xml:space="preserve">
+    <value>反转滚动方向</value>
+    <comment>EN: Invert scroll direction</comment>
+  </data>
+  <data name="Main_ReversesWheelFirmwareNaturalScrolling" xml:space="preserve">
+    <value>在固件中反转滚轮方向（自然滚动）。鼠标重新连接时会自动重新应用。</value>
+    <comment>EN: Reverses the wheel in firmware (natural scrolling). Reapplied automatically when the mouse reconnects.</comment>
+  </data>
+  <data name="Main_SmoothScrolling" xml:space="preserve">
+    <value>平滑滚动</value>
+    <comment>EN: Smooth scrolling</comment>
+  </data>
+  <data name="Main_HighResolutionSmoothScrolling" xml:space="preserve">
+    <value>高分辨率平滑滚动</value>
+    <comment>EN: High-resolution smooth scrolling</comment>
+  </data>
+  <data name="Main_ScrollsFineSubLineSteps" xml:space="preserve">
+    <value>以精细的亚行步进滚动，而不是整行滚动。应用运行时会转换滚轮输入；退出后恢复标准滚动。</value>
+    <comment>EN: Scrolls in fine sub-line steps instead of whole lines. The app translates the wheel while it runs; standard scrolling returns when it quits.</comment>
+  </data>
+  <data name="Main_FindPointer" xml:space="preserve">
+    <value>查找指针</value>
+    <comment>EN: Find the pointer</comment>
+  </data>
+  <data name="Main_EnlargePointerWhenMouseShaken" xml:space="preserve">
+    <value>摇动鼠标时放大指针</value>
+    <comment>EN: Enlarge the pointer when the mouse is shaken</comment>
+  </data>
+  <data name="Main_WiggleMouseBackForthPointer" xml:space="preserve">
+    <value>来回快速移动鼠标，指针会放大，最高可达 3×，停止后会平滑缩回。启用时会更改 Windows 指针大小。</value>
+    <comment>EN: Wiggle the mouse back and forth and the pointer grows — up to 3× — then shrinks smoothly back once you stop. Changes the Windows pointer size while active.</comment>
+  </data>
+  <data name="Main_PointerTuning" xml:space="preserve">
+    <value>指针调节</value>
+    <comment>EN: Pointer tuning</comment>
+  </data>
+  <data name="Main_DPI" xml:space="preserve">
+    <value>DPI</value>
+    <comment>EN: DPI</comment>
+  </data>
+  <data name="Main_Presets" xml:space="preserve">
+    <value>预设</value>
+    <comment>EN: PRESETS</comment>
+  </data>
+  <data name="Main_Add" xml:space="preserve">
+    <value>+ 添加</value>
+    <comment>EN: + Add</comment>
+  </data>
+  <data name="Main_SmartshiftSmartScrolling" xml:space="preserve">
+    <value>SmartShift / 智能滚动</value>
+    <comment>EN: SmartShift / Smart Scrolling</comment>
+  </data>
+  <data name="Main_WheelMode" xml:space="preserve">
+    <value>滚轮模式</value>
+    <comment>EN: Wheel mode</comment>
+  </data>
+  <data name="Main_FreeSpin" xml:space="preserve">
+    <value>自由滚动</value>
+    <comment>EN: Free spin</comment>
+  </data>
+  <data name="Main_SmoothFrictionlessScrolling" xml:space="preserve">
+    <value>顺滑、无阻尼滚动。</value>
+    <comment>EN: Smooth, frictionless scrolling.</comment>
+  </data>
+  <data name="Main_Smartshift" xml:space="preserve">
+    <value>SmartShift</value>
+    <comment>EN: SmartShift</comment>
+  </data>
+  <data name="Main_RatchetFreeSpinsFastFlick" xml:space="preserve">
+    <value>棘轮模式，在快速拨动时切换为自由滚动。</value>
+    <comment>EN: Ratchet that free-spins on a fast flick.</comment>
+  </data>
+  <data name="Main_Ratchet" xml:space="preserve">
+    <value>棘轮</value>
+    <comment>EN: Ratchet</comment>
+  </data>
+  <data name="Main_AlwaysClicksLineByLine" xml:space="preserve">
+    <value>始终逐行滚动。</value>
+    <comment>EN: Always clicks line-by-line.</comment>
+  </data>
+  <data name="Main_Sensitivity" xml:space="preserve">
+    <value>灵敏度</value>
+    <comment>EN: Sensitivity</comment>
+  </data>
+  <data name="Main_HigherKeepsRatchetEngagedLonger" xml:space="preserve">
+    <value>数值越高，棘轮会保持更久才切换到自由滚动。</value>
+    <comment>EN: Higher keeps the ratchet engaged longer before free-spin.</comment>
+  </data>
+  <data name="Main_Lighting" xml:space="preserve">
+    <value>灯光</value>
+    <comment>EN: Lighting</comment>
+  </data>
+  <data name="Main_BacklightBrightness" xml:space="preserve">
+    <value>背光亮度</value>
+    <comment>EN: Backlight brightness</comment>
+  </data>
+  <data name="Main_KeyboardProfile" xml:space="preserve">
+    <value>键盘配置文件</value>
+    <comment>EN: Keyboard profile</comment>
+  </data>
+  <data name="Main_ProfileRunsKeyboardSBuilt" xml:space="preserve">
+    <value>配置文件会在设备上运行键盘内置灯光（平滑，并在关闭此应用后保留）。“无配置文件”会使用下面配置的自定义颜色。</value>
+    <comment>EN: A profile runs the keyboard's built-in lighting on the device (smooth, stays after this app closes). 'No profile' uses the custom color configured below.</comment>
+  </data>
+  <data name="Main_Lighting2" xml:space="preserve">
+    <value>开启灯光</value>
+    <comment>EN: Lighting on</comment>
+  </data>
+  <data name="Main_Effect" xml:space="preserve">
+    <value>效果</value>
+    <comment>EN: Effect</comment>
+  </data>
+  <data name="Main_BreathingSpeed" xml:space="preserve">
+    <value>呼吸速度</value>
+    <comment>EN: Breathing speed</comment>
+  </data>
+  <data name="Main_Color" xml:space="preserve">
+    <value>颜色</value>
+    <comment>EN: Color</comment>
+  </data>
+  <data name="Main_ColorIntensity" xml:space="preserve">
+    <value>颜色强度</value>
+    <comment>EN: Color intensity</comment>
+  </data>
+  <data name="Main_RestoreKeyboardDefault" xml:space="preserve">
+    <value>恢复键盘默认值</value>
+    <comment>EN: Restore keyboard default</comment>
+  </data>
+  <data name="Main_SaveLightingProfile" xml:space="preserve">
+    <value>将灯光保存到此配置文件</value>
+    <comment>EN: Save lighting to this profile</comment>
+  </data>
+  <data name="Main_PerKeyColors" xml:space="preserve">
+    <value>单键颜色…</value>
+    <comment>EN: Per-key colors…</comment>
+  </data>
+  <data name="Main_NoProfileColorAppliesLive" xml:space="preserve">
+    <value>使用“无配置文件”时，颜色会实时应用；“恢复键盘默认值”会把灯光交还给板载配置文件。</value>
+    <comment>EN: With 'No profile', the color applies live; 'Restore keyboard default' hands lighting back to the onboard profile.</comment>
+  </data>
+  <data name="Main_ChooseEffectColorSpeedSave" xml:space="preserve">
+    <value>选择效果、颜色和速度，然后点击“将灯光保存到此配置文件”，它会写入键盘的板载配置文件（持久、设备端、平滑）。循环颜色使用设备的默认速度。</value>
+    <comment>EN: Choose an effect, color and speed, then 'Save lighting to this profile' — it writes into the keyboard's onboard profile (persistent, device-side, smooth). Cycle colors uses the device's default speed.</comment>
+  </data>
+  <data name="Main_GKeys" xml:space="preserve">
+    <value>G 键</value>
+    <comment>EN: G-Keys</comment>
+  </data>
+  <data name="Main_MacroKeysProfile" xml:space="preserve">
+    <value>宏按键 — 配置文件 {0}</value>
+    <comment>EN: Macro keys — profile {0}</comment>
+  </data>
+  <data name="Main_Change" xml:space="preserve">
+    <value>⌨ 更改</value>
+    <comment>EN: ⌨ Change</comment>
+  </data>
+  <data name="Main_ReassignG1G5MacroKeys" xml:space="preserve">
+    <value>为当前配置文件重新分配 G1–G5 宏按键。更改会写入键盘的板载配置文件，并在应用关闭后保留。</value>
+    <comment>EN: Reassign the G1–G5 macro keys for the active profile. Changes write to the keyboard's onboard profile and persist after the app closes.</comment>
+  </data>
+  <data name="Main_Device" xml:space="preserve">
+    <value>设备</value>
+    <comment>EN: Device</comment>
+  </data>
+  <data name="Main_Name" xml:space="preserve">
+    <value>名称</value>
+    <comment>EN: Name</comment>
+  </data>
+  <data name="Main_Type" xml:space="preserve">
+    <value>类型</value>
+    <comment>EN: Type</comment>
+  </data>
+  <data name="Main_Status" xml:space="preserve">
+    <value>状态</value>
+    <comment>EN: Status</comment>
+  </data>
+  <data name="Main_Battery" xml:space="preserve">
+    <value>电池</value>
+    <comment>EN: Battery</comment>
+  </data>
+  <data name="Main_Connection" xml:space="preserve">
+    <value>连接</value>
+    <comment>EN: Connection</comment>
+  </data>
+  <data name="Main_HostsEasyswitch" xml:space="preserve">
+    <value>主机 (EasySwitch)</value>
+    <comment>EN: Hosts (EasySwitch)</comment>
+  </data>
+  <data name="Main_Switch" xml:space="preserve">
+    <value>切换</value>
+    <comment>EN: Switch</comment>
+  </data>
+  <data name="Main_Forget" xml:space="preserve">
+    <value>忘记</value>
+    <comment>EN: Forget</comment>
+  </data>
+  <data name="Main_SwitchingMovesDeviceAnotherPaired" xml:space="preserve">
+    <value>切换会将设备移动到另一台已配对电脑，并在这里断开连接。</value>
+    <comment>EN: Switching moves the device to another paired computer and disconnects it here.</comment>
+  </data>
+  <data name="Main_ForgettingHostClearsItsPairing" xml:space="preserve">
+    <value>忘记主机会清除其配对；该电脑必须重新配对才能再次连接。</value>
+    <comment>EN: Forgetting a host clears its pairing — that computer must pair again to reconnect.</comment>
+  </data>
+  <data name="Main_DeviceDoesnTSupportClearing" xml:space="preserve">
+    <value>此设备不支持通过软件清除主机槽位。</value>
+    <comment>EN: This device doesn't support clearing host slots from software.</comment>
+  </data>
+  <!-- PerKeyColorWindow -->
+  <data name="PerKeyColor_ColorKeys" xml:space="preserve">
+    <value>给按键着色</value>
+    <comment>EN: Color keys</comment>
+  </data>
+  <data name="PerKeyColor_PressPhysicalKeyKeyboardPaint" xml:space="preserve">
+    <value>按下键盘上的实体按键，用下方颜色为其着色。再次按下同一按键可重置为基础颜色。</value>
+    <comment>EN: Press a physical key on the keyboard to paint it with the color below. Press the same key again to reset it to the base color.</comment>
+  </data>
+  <data name="PerKeyColor_PaintColor" xml:space="preserve">
+    <value>绘制颜色</value>
+    <comment>EN: Paint color</comment>
+  </data>
+  <data name="PerKeyColor_BaseColor" xml:space="preserve">
+    <value>基础颜色</value>
+    <comment>EN: Base color</comment>
+  </data>
+  <data name="PerKeyColor_ResetAllKeysBaseAlt" xml:space="preserve">
+    <value>将所有按键重置为基础颜色 (Alt+R)</value>
+    <comment>EN: Reset all keys to base (Alt+R)</comment>
+  </data>
+  <data name="PerKeyColor_SpecialKeysOSSwallowsThese" xml:space="preserve">
+    <value>特殊按键（操作系统会拦截这些按键，请点击着色）</value>
+    <comment>EN: Special keys (OS swallows these — click to paint)</comment>
+  </data>
+  <!-- Actions (action picker rows) -->
+  <data name="Action_BrowserBack" xml:space="preserve">
+    <value>浏览器后退</value>
+    <comment>EN: Browser Back</comment>
+  </data>
+  <data name="Action_BrowserForward" xml:space="preserve">
+    <value>浏览器前进</value>
+    <comment>EN: Browser Forward</comment>
+  </data>
+  <data name="Action_CaptureRegion" xml:space="preserve">
+    <value>截取区域</value>
+    <comment>EN: Capture Region</comment>
+  </data>
+  <data name="Action_CloseTab" xml:space="preserve">
+    <value>关闭标签页</value>
+    <comment>EN: Close Tab</comment>
+  </data>
+  <data name="Action_Copy" xml:space="preserve">
+    <value>复制</value>
+    <comment>EN: Copy</comment>
+  </data>
+  <data name="Action_Cut" xml:space="preserve">
+    <value>剪切</value>
+    <comment>EN: Cut</comment>
+  </data>
+  <data name="Action_CycleDpiPresets" xml:space="preserve">
+    <value>循环 DPI 预设</value>
+    <comment>EN: Cycle DPI Presets</comment>
+  </data>
+  <data name="Action_Find" xml:space="preserve">
+    <value>查找</value>
+    <comment>EN: Find</comment>
+  </data>
+  <data name="Action_HorizontalScrollLeft" xml:space="preserve">
+    <value>向左滚动</value>
+    <comment>EN: Scroll Left</comment>
+  </data>
+  <data name="Action_HorizontalScrollRight" xml:space="preserve">
+    <value>向右滚动</value>
+    <comment>EN: Scroll Right</comment>
+  </data>
+  <data name="Action_LeftClick" xml:space="preserve">
+    <value>左键点击</value>
+    <comment>EN: Left Click</comment>
+  </data>
+  <data name="Action_LockScreen" xml:space="preserve">
+    <value>锁定屏幕</value>
+    <comment>EN: Lock Screen</comment>
+  </data>
+  <data name="Action_MaximizeWindow" xml:space="preserve">
+    <value>最大化窗口</value>
+    <comment>EN: Maximize Window</comment>
+  </data>
+  <data name="Action_MiddleClick" xml:space="preserve">
+    <value>中键点击</value>
+    <comment>EN: Middle Click</comment>
+  </data>
+  <data name="Action_MinimizeWindow" xml:space="preserve">
+    <value>最小化窗口</value>
+    <comment>EN: Minimize Window</comment>
+  </data>
+  <data name="Action_MouseBack" xml:space="preserve">
+    <value>后退（按钮 4）</value>
+    <comment>EN: Back (Button 4)</comment>
+  </data>
+  <data name="Action_MouseForward" xml:space="preserve">
+    <value>前进（按钮 5）</value>
+    <comment>EN: Forward (Button 5)</comment>
+  </data>
+  <data name="Action_MuteVolume" xml:space="preserve">
+    <value>静音</value>
+    <comment>EN: Mute</comment>
+  </data>
+  <data name="Action_NewTab" xml:space="preserve">
+    <value>新建标签页</value>
+    <comment>EN: New Tab</comment>
+  </data>
+  <data name="Action_NextDesktop" xml:space="preserve">
+    <value>下一个桌面</value>
+    <comment>EN: Next Desktop</comment>
+  </data>
+  <data name="Action_NextTab" xml:space="preserve">
+    <value>下一个标签页</value>
+    <comment>EN: Next Tab</comment>
+  </data>
+  <data name="Action_NextTrack" xml:space="preserve">
+    <value>下一曲</value>
+    <comment>EN: Next Track</comment>
+  </data>
+  <data name="Action_None" xml:space="preserve">
+    <value>不执行操作</value>
+    <comment>EN: Do Nothing</comment>
+  </data>
+  <data name="Action_Paste" xml:space="preserve">
+    <value>粘贴</value>
+    <comment>EN: Paste</comment>
+  </data>
+  <data name="Action_PlayPause" xml:space="preserve">
+    <value>播放 / 暂停</value>
+    <comment>EN: Play / Pause</comment>
+  </data>
+  <data name="Action_PrevTab" xml:space="preserve">
+    <value>上一个标签页</value>
+    <comment>EN: Previous Tab</comment>
+  </data>
+  <data name="Action_PrevTrack" xml:space="preserve">
+    <value>上一曲</value>
+    <comment>EN: Previous Track</comment>
+  </data>
+  <data name="Action_PreviousDesktop" xml:space="preserve">
+    <value>上一个桌面</value>
+    <comment>EN: Previous Desktop</comment>
+  </data>
+  <data name="Action_Redo" xml:space="preserve">
+    <value>重做</value>
+    <comment>EN: Redo</comment>
+  </data>
+  <data name="Action_ReloadPage" xml:space="preserve">
+    <value>重新加载页面</value>
+    <comment>EN: Reload Page</comment>
+  </data>
+  <data name="Action_ReopenTab" xml:space="preserve">
+    <value>重新打开标签页</value>
+    <comment>EN: Reopen Tab</comment>
+  </data>
+  <data name="Action_RightClick" xml:space="preserve">
+    <value>右键点击</value>
+    <comment>EN: Right Click</comment>
+  </data>
+  <data name="Action_Save" xml:space="preserve">
+    <value>保存</value>
+    <comment>EN: Save</comment>
+  </data>
+  <data name="Action_Screenshot" xml:space="preserve">
+    <value>截图</value>
+    <comment>EN: Screenshot</comment>
+  </data>
+  <data name="Action_ScrollDown" xml:space="preserve">
+    <value>向下滚动</value>
+    <comment>EN: Scroll Down</comment>
+  </data>
+  <data name="Action_ScrollUp" xml:space="preserve">
+    <value>向上滚动</value>
+    <comment>EN: Scroll Up</comment>
+  </data>
+  <data name="Action_SelectAll" xml:space="preserve">
+    <value>全选</value>
+    <comment>EN: Select All</comment>
+  </data>
+  <data name="Action_SetDpiPreset" xml:space="preserve">
+    <value>DPI 预设 {0}</value>
+    <comment>EN: DPI Preset {0}</comment>
+  </data>
+  <data name="Action_ShowDesktop" xml:space="preserve">
+    <value>显示桌面</value>
+    <comment>EN: Show Desktop</comment>
+  </data>
+  <data name="Action_SnapWindowLeft" xml:space="preserve">
+    <value>窗口贴靠左侧</value>
+    <comment>EN: Snap Window Left</comment>
+  </data>
+  <data name="Action_SnapWindowRight" xml:space="preserve">
+    <value>窗口贴靠右侧</value>
+    <comment>EN: Snap Window Right</comment>
+  </data>
+  <data name="Action_StartMenu" xml:space="preserve">
+    <value>开始菜单</value>
+    <comment>EN: Start Menu</comment>
+  </data>
+  <data name="Action_TaskView" xml:space="preserve">
+    <value>任务视图</value>
+    <comment>EN: Task View</comment>
+  </data>
+  <data name="Action_ToggleSmartShift" xml:space="preserve">
+    <value>切换 SmartShift</value>
+    <comment>EN: Toggle SmartShift</comment>
+  </data>
+  <data name="Action_Undo" xml:space="preserve">
+    <value>撤销</value>
+    <comment>EN: Undo</comment>
+  </data>
+  <data name="Action_VolumeDown" xml:space="preserve">
+    <value>降低音量</value>
+    <comment>EN: Volume Down</comment>
+  </data>
+  <data name="Action_VolumeUp" xml:space="preserve">
+    <value>提高音量</value>
+    <comment>EN: Volume Up</comment>
+  </data>
+  <!-- Mouse button names -->
+  <data name="Button_Back" xml:space="preserve">
+    <value>后退</value>
+    <comment>EN: Back</comment>
+  </data>
+  <data name="Button_DpiToggle" xml:space="preserve">
+    <value>DPI 切换</value>
+    <comment>EN: DPI Toggle</comment>
+  </data>
+  <data name="Button_Forward" xml:space="preserve">
+    <value>前进</value>
+    <comment>EN: Forward</comment>
+  </data>
+  <data name="Button_GestureButton" xml:space="preserve">
+    <value>手势按键</value>
+    <comment>EN: Gesture Button</comment>
+  </data>
+  <data name="Button_LeftClick" xml:space="preserve">
+    <value>左键点击</value>
+    <comment>EN: Left Click</comment>
+  </data>
+  <data name="Button_MiddleClick" xml:space="preserve">
+    <value>中键点击</value>
+    <comment>EN: Middle Click</comment>
+  </data>
+  <data name="Button_RightClick" xml:space="preserve">
+    <value>右键点击</value>
+    <comment>EN: Right Click</comment>
+  </data>
+  <data name="Button_Thumbwheel" xml:space="preserve">
+    <value>拇指滚轮</value>
+    <comment>EN: Thumb Wheel</comment>
+  </data>
+  <data name="Button_ThumbwheelScrollDown" xml:space="preserve">
+    <value>拇指滚轮向下</value>
+    <comment>EN: Thumb Wheel Down</comment>
+  </data>
+  <data name="Button_ThumbwheelScrollUp" xml:space="preserve">
+    <value>拇指滚轮向上</value>
+    <comment>EN: Thumb Wheel Up</comment>
+  </data>
+  <!-- Gesture directions -->
+  <data name="Gesture_Click" xml:space="preserve">
+    <value>点击</value>
+    <comment>EN: Click</comment>
+  </data>
+  <data name="Gesture_Down" xml:space="preserve">
+    <value>向下</value>
+    <comment>EN: Down</comment>
+  </data>
+  <data name="Gesture_Left" xml:space="preserve">
+    <value>向左</value>
+    <comment>EN: Left</comment>
+  </data>
+  <data name="Gesture_Right" xml:space="preserve">
+    <value>向右</value>
+    <comment>EN: Right</comment>
+  </data>
+  <data name="Gesture_Up" xml:space="preserve">
+    <value>向上</value>
+    <comment>EN: Up</comment>
+  </data>
+  <!-- Action picker group headers -->
+  <data name="Category_Browser" xml:space="preserve">
+    <value>浏览器和标签页</value>
+    <comment>EN: Browser &amp; Tabs</comment>
+  </data>
+  <data name="Category_Dpi" xml:space="preserve">
+    <value>DPI 和滚轮</value>
+    <comment>EN: DPI &amp; Wheel</comment>
+  </data>
+  <data name="Category_Editing" xml:space="preserve">
+    <value>编辑</value>
+    <comment>EN: Editing</comment>
+  </data>
+  <data name="Category_Media" xml:space="preserve">
+    <value>媒体和音量</value>
+    <comment>EN: Media &amp; Volume</comment>
+  </data>
+  <data name="Category_Mouse" xml:space="preserve">
+    <value>鼠标按键</value>
+    <comment>EN: Mouse Buttons</comment>
+  </data>
+  <data name="Category_Navigation" xml:space="preserve">
+    <value>窗口和桌面</value>
+    <comment>EN: Windows &amp; Desktops</comment>
+  </data>
+  <data name="Category_Scroll" xml:space="preserve">
+    <value>滚动</value>
+    <comment>EN: Scrolling</comment>
+  </data>
+  <data name="Category_System" xml:space="preserve">
+    <value>系统</value>
+    <comment>EN: System</comment>
+  </data>
+  <!-- View models, dialogs, tray and notifications -->
+  <data name="Effect_Solid" xml:space="preserve">
+    <value>常亮</value>
+    <comment>EN: Solid</comment>
+  </data>
+  <data name="Effect_Breathing" xml:space="preserve">
+    <value>呼吸</value>
+    <comment>EN: Breathing</comment>
+  </data>
+  <data name="Effect_Cycle" xml:space="preserve">
+    <value>循环颜色</value>
+    <comment>EN: Cycle colors</comment>
+  </data>
+  <data name="Effect_Off" xml:space="preserve">
+    <value>关闭</value>
+    <comment>EN: Off</comment>
+  </data>
+  <data name="Device_Online" xml:space="preserve">
+    <value>在线</value>
+    <comment>EN: Online</comment>
+  </data>
+  <data name="Device_Asleep" xml:space="preserve">
+    <value>休眠</value>
+    <comment>EN: Asleep</comment>
+  </data>
+  <data name="Connection_Bluetooth" xml:space="preserve">
+    <value>Bluetooth</value>
+    <comment>EN: Bluetooth</comment>
+  </data>
+  <data name="Connection_Lightspeed" xml:space="preserve">
+    <value>LIGHTSPEED 接收器</value>
+    <comment>EN: LIGHTSPEED dongle</comment>
+  </data>
+  <data name="Connection_Unifying" xml:space="preserve">
+    <value>Unifying 接收器</value>
+    <comment>EN: Unifying dongle</comment>
+  </data>
+  <data name="Connection_Bolt" xml:space="preserve">
+    <value>Bolt 接收器</value>
+    <comment>EN: Bolt dongle</comment>
+  </data>
+  <data name="Connection_Usb" xml:space="preserve">
+    <value>USB</value>
+    <comment>EN: USB</comment>
+  </data>
+  <data name="Connection_DirectDevice" xml:space="preserve">
+    <value>直连设备</value>
+    <comment>EN: Direct device</comment>
+  </data>
+  <data name="Capability_Buttons" xml:space="preserve">
+    <value>按键</value>
+    <comment>EN: Buttons</comment>
+  </data>
+  <data name="Capability_Dpi" xml:space="preserve">
+    <value>DPI</value>
+    <comment>EN: DPI</comment>
+  </data>
+  <data name="Capability_Lighting" xml:space="preserve">
+    <value>灯光</value>
+    <comment>EN: Lighting</comment>
+  </data>
+  <data name="BatteryStatus_Discharging" xml:space="preserve">
+    <value>正在放电</value>
+    <comment>EN: Discharging</comment>
+  </data>
+  <data name="BatteryStatus_Charging" xml:space="preserve">
+    <value>正在充电</value>
+    <comment>EN: Charging</comment>
+  </data>
+  <data name="BatteryStatus_ChargingSlow" xml:space="preserve">
+    <value>慢速充电</value>
+    <comment>EN: Charging slowly</comment>
+  </data>
+  <data name="BatteryStatus_Full" xml:space="preserve">
+    <value>已充满</value>
+    <comment>EN: Full</comment>
+  </data>
+  <data name="BatteryStatus_Error" xml:space="preserve">
+    <value>电池错误</value>
+    <comment>EN: Battery error</comment>
+  </data>
+  <data name="BatteryStatus_Unknown" xml:space="preserve">
+    <value>未知</value>
+    <comment>EN: Unknown</comment>
+  </data>
+  <data name="Host_Unnamed" xml:space="preserve">
+    <value>主机 {0}</value>
+    <comment>EN: Host {0}</comment>
+  </data>
+  <data name="Host_Current" xml:space="preserve">
+    <value>当前</value>
+    <comment>EN: current</comment>
+  </data>
+  <data name="Host_Paired" xml:space="preserve">
+    <value>已配对</value>
+    <comment>EN: paired</comment>
+  </data>
+  <data name="Host_Empty" xml:space="preserve">
+    <value>空</value>
+    <comment>EN: empty</comment>
+  </data>
+  <data name="Binding_Gestures" xml:space="preserve">
+    <value>手势</value>
+    <comment>EN: Gestures</comment>
+  </data>
+  <data name="GestureOwner_GestureButton" xml:space="preserve">
+    <value>手势按键</value>
+    <comment>EN: Gesture button</comment>
+  </data>
+  <data name="GestureOwner_DpiToggle" xml:space="preserve">
+    <value>滚轮 / DPI 按键</value>
+    <comment>EN: Wheel / DPI button</comment>
+  </data>
+  <data name="Gestures_Summary" xml:space="preserve">
+    <value>手势：{0}</value>
+    <comment>EN: Gestures: {0}</comment>
+  </data>
+  <data name="Status_SwitchingHost" xml:space="preserve">
+    <value>正在切换到主机 {0}…</value>
+    <comment>EN: Switching to host {0}…</comment>
+  </data>
+  <data name="Status_ForgettingHost" xml:space="preserve">
+    <value>正在忘记主机 {0}…</value>
+    <comment>EN: Forgetting host {0}…</comment>
+  </data>
+  <data name="Status_ForgetHostFailed" xml:space="preserve">
+    <value>无法忘记主机 {0}。</value>
+    <comment>EN: Could not forget host {0}.</comment>
+  </data>
+  <data name="Status_HostForgotten" xml:space="preserve">
+    <value>已忘记主机 {0} — 设备已断开连接。</value>
+    <comment>EN: Host {0} forgotten — device disconnected.</comment>
+  </data>
+  <data name="Status_HostForgottenKeptConnected" xml:space="preserve">
+    <value>已忘记主机 {0}。</value>
+    <comment>EN: Host {0} forgotten.</comment>
+  </data>
+  <data name="Status_RemappingGKey" xml:space="preserve">
+    <value>正在重新映射 G{0}…</value>
+    <comment>EN: Remapping G{0}…</comment>
+  </data>
+  <data name="Status_GKeyRemapped" xml:space="preserve">
+    <value>G{0} 已重新映射（配置文件 {1}）。</value>
+    <comment>EN: G{0} remapped (profile {1}).</comment>
+  </data>
+  <data name="Status_GKeyRemapFailed" xml:space="preserve">
+    <value>G 键重新映射失败。</value>
+    <comment>EN: G-key remap failed.</comment>
+  </data>
+  <data name="Status_SavingLighting" xml:space="preserve">
+    <value>正在将灯光保存到配置文件 {0}…</value>
+    <comment>EN: Saving lighting to profile {0}…</comment>
+  </data>
+  <data name="Status_LightingSaved" xml:space="preserve">
+    <value>已保存到配置文件 {0}。</value>
+    <comment>EN: Saved to profile {0}.</comment>
+  </data>
+  <data name="Status_LightingSaveFailed" xml:space="preserve">
+    <value>配置文件保存失败。</value>
+    <comment>EN: Profile save failed.</comment>
+  </data>
+  <data name="Update_Available" xml:space="preserve">
+    <value>有可用更新：v{0}</value>
+    <comment>EN: Update available: v{0}</comment>
+  </data>
+  <data name="Update_Installing" xml:space="preserve">
+    <value>正在安装 v{0} — {1} 将重新启动…</value>
+    <comment>EN: Installing v{0} — {1} will restart…</comment>
+  </data>
+  <data name="Update_InstallerFailed" xml:space="preserve">
+    <value>无法启动安装程序 — 请改用“下载”。</value>
+    <comment>EN: Couldn't start the installer — try Download instead.</comment>
+  </data>
+  <data name="Update_SavedToDownloads" xml:space="preserve">
+    <value>v{0} 已保存到“下载”</value>
+    <comment>EN: v{0} saved to Downloads</comment>
+  </data>
+  <data name="Update_Downloading" xml:space="preserve">
+    <value>正在下载 v{0}…</value>
+    <comment>EN: Downloading v{0}…</comment>
+  </data>
+  <data name="Update_DownloadFailed" xml:space="preserve">
+    <value>v{0} 下载失败 — 请尝试“在 GitHub 上查看”。</value>
+    <comment>EN: Download of v{0} failed — try View on GitHub.</comment>
+  </data>
+  <data name="LogiWarning_One" xml:space="preserve">
+    <value>{0} 正在运行 — Logitech 软件可能接管接收器；同一时间只有一个应用能可靠地控制你的设备。</value>
+    <comment>EN: {0} is running — Logitech software can take over the receiver; only one app at a time can reliably control your devices.</comment>
+  </data>
+  <data name="LogiWarning_Many" xml:space="preserve">
+    <value>{0} 正在运行 — Logitech 软件可能接管接收器；同一时间只有一个应用能可靠地控制你的设备。</value>
+    <comment>EN: {0} are running — Logitech software can take over the receiver; only one app at a time can reliably control your devices.</comment>
+  </data>
+  <data name="Status_RescanFailed" xml:space="preserve">
+    <value>重新扫描失败：{0}</value>
+    <comment>EN: Rescan failed: {0}</comment>
+  </data>
+  <data name="Preset_Custom" xml:space="preserve">
+    <value>自定义</value>
+    <comment>EN: Custom</comment>
+  </data>
+  <data name="Preset_Disabled" xml:space="preserve">
+    <value>已禁用</value>
+    <comment>EN: Disabled</comment>
+  </data>
+  <data name="Preset_WindowsDesktops" xml:space="preserve">
+    <value>窗口和桌面</value>
+    <comment>EN: Windows &amp; Desktops</comment>
+  </data>
+  <data name="Preset_MediaVolume" xml:space="preserve">
+    <value>媒体和音量</value>
+    <comment>EN: Media &amp; Volume</comment>
+  </data>
+  <data name="Preset_ArrangeWindows" xml:space="preserve">
+    <value>排列窗口</value>
+    <comment>EN: Arrange Windows</comment>
+  </data>
+  <data name="Preset_BrowserTabs" xml:space="preserve">
+    <value>浏览器标签页</value>
+    <comment>EN: Browser Tabs</comment>
+  </data>
+  <data name="Preset_Scrolling" xml:space="preserve">
+    <value>滚动</value>
+    <comment>EN: Scrolling</comment>
+  </data>
+  <data name="Status_LoadingDevices" xml:space="preserve">
+    <value>正在加载设备…</value>
+    <comment>EN: Loading devices…</comment>
+  </data>
+  <data name="Status_Scanning" xml:space="preserve">
+    <value>正在扫描 Logitech 设备…</value>
+    <comment>EN: Scanning for Logitech devices…</comment>
+  </data>
+  <data name="Status_NoDevicesFound" xml:space="preserve">
+    <value>未找到 Logitech HID++ 设备。</value>
+    <comment>EN: No Logitech HID++ devices found.</comment>
+  </data>
+  <data name="Status_DeviceCount" xml:space="preserve">
+    <value>{0} 个设备。</value>
+    <comment>EN: {0} device(s).</comment>
+  </data>
+  <data name="Status_EnumerationFailed" xml:space="preserve">
+    <value>枚举失败：{0}</value>
+    <comment>EN: Enumeration failed: {0}</comment>
+  </data>
+  <data name="PerKey_Hint" xml:space="preserve">
+    <value>选择一种颜色，然后按下按键为其着色。再次按下可重置。</value>
+    <comment>EN: Pick a color, then press a key to paint it. Press it again to reset.</comment>
+  </data>
+  <data name="PerKey_NotPaintable" xml:space="preserve">
+    <value>{0} 不是可着色按键。</value>
+    <comment>EN: {0} isn't a paintable key.</comment>
+  </data>
+  <data name="PerKey_AllReset" xml:space="preserve">
+    <value>所有按键已重置为基础颜色。</value>
+    <comment>EN: All keys reset to base.</comment>
+  </data>
+  <data name="PerKey_KeyReset" xml:space="preserve">
+    <value>{0} 已重置。</value>
+    <comment>EN: {0} reset.</comment>
+  </data>
+  <data name="PerKey_KeyPainted" xml:space="preserve">
+    <value>{0} → #{1}</value>
+    <comment>EN: {0} → #{1}</comment>
+  </data>
+  <data name="About_LogiWarning" xml:space="preserve">
+    <value>⚠ {0} — Logitech 软件可能接管接收器；同一时间只有一个应用能可靠地控制你的设备。</value>
+    <comment>EN: ⚠ {0} — Logitech software can take over the receiver; only one app at a time can reliably control your devices.</comment>
+  </data>
+  <data name="About_Copied" xml:space="preserve">
+    <value>已复制 ✓</value>
+    <comment>EN: Copied ✓</comment>
+  </data>
+  <data name="Tray_Open" xml:space="preserve">
+    <value>打开 OpenLogi.net</value>
+    <comment>EN: Open OpenLogi.net</comment>
+  </data>
+  <data name="Tray_Quit" xml:space="preserve">
+    <value>退出</value>
+    <comment>EN: Quit</comment>
+  </data>
+  <data name="Notify_UpdateTitle" xml:space="preserve">
+    <value>OpenLogi.net 有可用更新</value>
+    <comment>EN: OpenLogi.net update available</comment>
+  </data>
+  <data name="Notify_UpdateBody" xml:space="preserve">
+    <value>版本 {0} 已就绪。点击可打开 OpenLogi.net。</value>
+    <comment>EN: Version {0} is ready. Click to open OpenLogi.net.</comment>
+  </data>
+  <data name="ForgetHost_CurrentTitle" xml:space="preserve">
+    <value>忘记主机 {0} — 也就是你正在使用的这个？</value>
+    <comment>EN: Forget host {0} — the one you're using?</comment>
+  </data>
+  <data name="ForgetHost_CurrentBody" xml:space="preserve">
+    <value>此设备正通过主机 {0} 连接到这台电脑。忘记它会立即断开设备连接，之后你必须重新配对才能使用。</value>
+    <comment>EN: This device is connected to this computer through host {0}. Forgetting it disconnects the device now, and you'll have to pair it again to use it.</comment>
+  </data>
+  <data name="ForgetHost_Title" xml:space="preserve">
+    <value>忘记主机 {0}？</value>
+    <comment>EN: Forget host {0}?</comment>
+  </data>
+  <data name="ForgetHost_Body" xml:space="preserve">
+    <value>此槽位中配对的电脑必须重新配对才能再次连接。</value>
+    <comment>EN: The computer paired in this slot will have to pair again to reconnect.</comment>
+  </data>
+  <data name="ForgetHost_Confirm" xml:space="preserve">
+    <value>忘记主机</value>
+    <comment>EN: Forget host</comment>
+  </data>
+  <data name="Profile_None" xml:space="preserve">
+    <value>无配置文件</value>
+    <comment>EN: No profile</comment>
+  </data>
+  <data name="Profile_Numbered" xml:space="preserve">
+    <value>配置文件 {0}</value>
+    <comment>EN: Profile {0}</comment>
+  </data>
+</root>

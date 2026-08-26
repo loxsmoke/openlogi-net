@@ -39,6 +39,13 @@ public class LocalizationTests
     });
 
     [Fact]
+    public void SimplifiedChineseStringsResolve() => InCulture("zh-Hans", () =>
+    {
+        Assert.Equal("设置", Loc.Current["Settings_Title"]);
+        Assert.Equal("配置文件 2", Loc.Current.Format("Profile_Numbered", 2));
+    });
+
+    [Fact]
     public void GesturePresetNameFollowsCurrentCulture()
     {
         var preset = new GesturePreset("Preset_Disabled",
@@ -147,6 +154,7 @@ public class LocalizationTests
     {
         Assert.Equal("en-US", LanguageCatalog.Resolve("en-US").Name);
         Assert.Equal("de", LanguageCatalog.Resolve("de").Name);
+        Assert.Equal("zh-Hans", LanguageCatalog.Resolve("zh-Hans").Name);
     }
 
     [Fact]
@@ -155,6 +163,7 @@ public class LocalizationTests
         // Neither has resources of its own; the shipped language for it serves.
         Assert.Equal("en-US", LanguageCatalog.Resolve("en-GB").Name);
         Assert.Equal("de", LanguageCatalog.Resolve("de-CH").Name);
+        Assert.Equal("zh-Hans", LanguageCatalog.Resolve("zh-CN").Name);
     }
 
     [Fact]
@@ -174,6 +183,7 @@ public class LocalizationTests
         Assert.Equal("en-US", LanguageCatalog.OptionFor("en-US").Code);
         Assert.Equal("en-US", LanguageCatalog.OptionFor("EN-us").Code);
         Assert.Equal("de", LanguageCatalog.OptionFor("de").Code);
+        Assert.Equal("zh-Hans", LanguageCatalog.OptionFor("zh-Hans").Code);
     }
 
     [Fact]
@@ -181,6 +191,7 @@ public class LocalizationTests
     {
         Assert.Equal("en-US", LanguageCatalog.OptionFor("en-GB").Code);
         Assert.Equal("de", LanguageCatalog.OptionFor("de-DE").Code);
+        Assert.Equal("zh-Hans", LanguageCatalog.OptionFor("zh-CN").Code);
     }
 
     [Fact]
@@ -202,6 +213,7 @@ public class LocalizationTests
         // Endonyms: each language names itself, whatever the UI language is.
         Assert.Equal("English US", LanguageCatalog.All.Single(o => o.Code == "en-US").Display);
         Assert.Equal("Deutsch", LanguageCatalog.All.Single(o => o.Code == "de").Display);
+        Assert.Equal("简体中文", LanguageCatalog.All.Single(o => o.Code == "zh-Hans").Display);
     });
 
     /// <summary>Run <paramref name="body"/> with the UI language pinned, then restore it.</summary>
@@ -227,10 +239,10 @@ public class LocalizationTests
     [Fact]
     public void TrExtensionBindsToTheCultureAndLooksUpItsKey()
     {
-        var binding = Assert.IsType<Binding>(new TrExtension("Settings_Title").ProvideValue(null!));
+        var binding = Assert.IsType<CompiledBinding>(new TrExtension("Settings_Title").ProvideValue(null!));
 
         Assert.Same(Loc.Current, binding.Source);
-        Assert.Equal(nameof(Loc.Culture), binding.Path);
+        Assert.Equal(nameof(Loc.Culture), binding.Path?.ToString());
         Assert.Equal(BindingMode.OneWay, binding.Mode);
         Assert.Equal("Settings_Title",
             Assert.IsType<string>(binding.ConverterParameter));

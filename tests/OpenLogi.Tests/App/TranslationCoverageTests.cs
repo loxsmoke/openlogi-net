@@ -62,7 +62,7 @@ public class TranslationCoverageTests
 
         // Language endonyms: a language names itself in its own language, so these
         // read the same whatever the UI language is. Every new language adds one.
-        "English US", "Deutsch",
+        "English US", "Deutsch", "简体中文",
 
         // Developer-facing exception, never surfaced in the UI.
         "localized text is one-way",
@@ -126,6 +126,7 @@ public class TranslationCoverageTests
     /// </summary>
     [Theory]
     [InlineData("de")]
+    [InlineData("zh-Hans")]
     public void TranslationCoversEveryKey(string culture)
     {
         var neutral = ResourceKeys("Strings.resx");
@@ -149,6 +150,7 @@ public class TranslationCoverageTests
     /// </summary>
     [Theory]
     [InlineData("de")]
+    [InlineData("zh-Hans")]
     public void PlaceholdersSurviveTranslation(string culture)
     {
         var neutral = ResourceValues("Strings.resx");
