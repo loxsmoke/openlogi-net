@@ -29,6 +29,13 @@ receiver), or a Bluetooth-direct / wired connection, without
 running Logi Options+. Everything is local: there is no account, no cloud
 sync, and no telemetry.
 
+The desktop app currently supports
+<img src="https://flagcdn.com/16x12/us.png" width="16" height="12" alt="United States flag"> English US,
+<img src="https://flagcdn.com/16x12/de.png" width="16" height="12" alt="Germany flag"> German, and
+<img src="https://flagcdn.com/16x12/cn.png" width="16" height="12" alt="China flag"> Simplified Chinese.
+Its "System" language option follows the operating system when possible, with
+English US as the fallback.
+
 It ships two binaries:
 
 - **OpenLogi.App** — an Avalonia desktop app with an interactive device view,
@@ -151,54 +158,14 @@ Run with no arguments to default to `list`. Additional diagnostic subcommands
 (profile dump/copy, per-key color, effects) are available — see
 [`src/OpenLogi.Cli/Program.cs`](src/OpenLogi.Cli/Program.cs).
 
+## Development
+
+Build, test, and release-build instructions live in
+[docs/development.md](docs/development.md).
+
 ## License
 
 Licensed under the [MIT License](LICENSE).
 
 **Not affiliated with Logitech.** "Logitech", "MX Master", and "Options+" are
 trademarks of Logitech International S.A.
-
-## Building
-
-### Prerequisites
-
-- [.NET 10 SDK](https://dotnet.microsoft.com/download) or newer
-- Windows (the app and tests target `net10.0-windows`)
-
-### Build and run
-
-```sh
-git clone https://github.com/loxsmoke/openlogi-net.git
-cd openlogi-net
-
-# build the whole solution
-dotnet build OpenLogi.slnx
-
-# run the desktop app
-dotnet run --project src/OpenLogi.App
-
-# run the CLI
-dotnet run --project src/OpenLogi.Cli -- list
-```
-
-### Test
-
-```sh
-dotnet test OpenLogi.slnx
-```
-
-### Build an installable release
-
-Releases are produced by the [`Release`](.github/workflows/release.yml)
-GitHub Action (manually triggered): it fetches the next version, stamps it into
-the projects, publishes a self-contained, trimmed build, and packages both an
-Inno Setup installer and a portable zip. To reproduce the release build locally:
-
-```sh
-dotnet publish src/OpenLogi.App/OpenLogi.App.csproj -c Release -r win-x64 \
-  --self-contained -p:PublishTrimmed=true -p:TrimMode=partial -o publish
-```
-
-The build is self-contained (the .NET runtime is bundled) and trimmed in
-partial mode — only the .NET base libraries are trimmed, keeping the package
-around 20 MB while leaving device I/O, config, and UI code untouched.
