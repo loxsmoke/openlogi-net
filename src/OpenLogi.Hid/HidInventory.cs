@@ -377,7 +377,20 @@ public static class HidInventory
                 catch { /* stays unreachable */ }
             }
             if (!reachable)
-                return new PairedDevice { Slot = slot, Codename = codename, Wpid = wpid, Kind = kind, Online = false };
+            {
+                // A sleeping HID++ 1.0 device can still be named from its wpid (the
+                // catalog lists 1.0 models only, so a hit also pins the protocol).
+                var legacy = wpid is { } w ? LegacyDeviceCatalog.Lookup(w) : null;
+                return new PairedDevice
+                {
+                    Slot = slot,
+                    Codename = codename ?? legacy?.Name,
+                    Wpid = wpid,
+                    Kind = kind == DeviceKind.Unknown && legacy is not null ? legacy.Kind : kind,
+                    Online = false,
+                    IsHidpp10 = legacy is not null,
+                };
+            }
             DiagnosticLog.Info("sweep", $"  slot {slot}: announced offline but answers a ping — link parked, treating as online");
             online = true;
         }
@@ -391,6 +404,12 @@ public static class HidInventory
         {
             if (attempt > 0) await Task.Delay(400).ConfigureAwait(false);
             try { device = await HidppDevice.NewAsync(channel, slot).ConfigureAwait(false); }
+            catch (DeviceException ex) when (ex.Kind == DeviceErrorKind.UnsupportedProtocolVersion)
+            {
+                // The device answered the ping with a HID++ 1.0 error — it's awake and
+                // reachable, just register-based. No point retrying the 2.0 probe.
+                return await ProbeLegacyAsync(channel, slot, kind, online, wpid, codename).ConfigureAwait(false);
+            }
             catch (Exception ex) { failure = ex; }
         }
         if (device is null)
@@ -405,6 +424,51 @@ public static class HidInventory
             catch (Exception ex) { DiagnosticLog.Warn("sweep", $"  slot {slot}: post-probe hook failed: {ex.Message}"); }
         }
         return result;
+    }
+
+    /// <summary>
+    /// Identity + battery for a HID++ 1.0 device (issue #13, Marathon M705 M-R0009 on a
+    /// Unifying receiver). There's no feature table to enumerate: the name comes from
+    /// the wpid catalog (the receiver's codename register wins when it answered) and
+    /// the battery from register 0x07 / 0x0D on the device's slot — a short-register
+    /// read with a short reply, which rides the control interface fine. Capabilities
+    /// stay empty on purpose: nothing HID++ 2.0 applies, and the kind-presumed guess
+    /// would offer panels that can't work.
+    /// </summary>
+    private static async Task<PairedDevice> ProbeLegacyAsync(
+        HidppChannel channel, byte slot, DeviceKind kind, bool online, ushort? wpid, string? codename)
+    {
+        var legacy = wpid is { } w ? LegacyDeviceCatalog.Lookup(w) : null;
+        var name = codename ?? legacy?.Name;
+        if (kind == DeviceKind.Unknown && legacy is not null) kind = legacy.Kind;
+
+        BatteryInfo? battery = null;
+        try
+        {
+            if (await V10Battery.ReadAsync(channel, slot).ConfigureAwait(false) is { } b)
+                battery = MapBattery(b);
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLog.Debug("sweep", $"  slot {slot}: HID++ 1.0 battery read failed: {ex.Message}");
+        }
+
+        var wpidTag = wpid is { } id ? $"wpid {id:x4}" : "wpid unknown";
+        DiagnosticLog.Info("sweep",
+            $"  slot {slot}: HID++ 1.0 device ({wpidTag}{(name is null ? ", not in catalog" : "")}) — "
+            + $"listed read-only, battery {(battery is { } bi ? $"{bi.Percentage}% ({bi.Level})" : "unavailable")}");
+
+        return new PairedDevice
+        {
+            Slot = slot,
+            Codename = name,
+            Wpid = wpid,
+            Kind = kind,
+            Online = online,
+            Battery = battery,
+            Capabilities = new Capabilities(),
+            IsHidpp10 = true,
+        };
     }
 
     private static async Task<PairedDevice> ProbeOnDeviceAsync(

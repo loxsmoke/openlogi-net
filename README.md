@@ -49,6 +49,8 @@ It ships two binaries:
 
 - **Discover devices** behind Bolt / Unifying / LIGHTSPEED receivers and direct
   Bluetooth / wired connections, with per-device online state and battery level.
+  Older HID++ 1.0 devices (Marathon M705, M510, Performance MX, K800…) are listed
+  with their name and battery level but have no configurable settings yet.
 - **Remap buttons** to a catalog of actions and custom keyboard shortcuts.
 - **Mouse gestures** — hold a button and swipe up / down / left / right for four
   actions, with a plain tap as a fifth. Works with the dedicated MX gesture
@@ -152,6 +154,7 @@ OpenLogi.Cli diag      # dump HID++ feature tables per device
 OpenLogi.Cli hosts     # list paired hosts on multi-host devices
 OpenLogi.Cli kbinfo    # keyboard brightness and RGB effect inventory
 OpenLogi.Cli light <RRGGBB>   # set device lighting to a solid color
+OpenLogi.Cli v10probe  # dump HID++ 1.0 registers of devices behind a receiver
 ```
 
 Run with no arguments to default to `list`. Additional diagnostic subcommands
