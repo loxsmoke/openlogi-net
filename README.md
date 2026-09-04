@@ -11,9 +11,11 @@ buttons, set up hold-and-swipe mouse gestures, drive DPI and SmartShift, control
 RGB lighting, and switch profiles over HID++ — without a Logitech account,
 telemetry, or the Options+ install.
 
-This is a C# / .NET 10 / [Avalonia](https://avaloniaui.net/) rewrite of
-[AprilNEA/OpenLogi](https://github.com/AprilNEA/OpenLogi) (originally written in
-Rust), focused on Windows.
+This project started as a C# / .NET 10 /
+[Avalonia](https://avaloniaui.net/) port of
+[AprilNEA/OpenLogi](https://github.com/AprilNEA/OpenLogi), which is written in
+Rust. It has since diverged into a Windows-focused app with its own HID++ stack,
+UI, configuration model, diagnostics, and device-support roadmap.
 
 <p align="center">
     <img src="images/screenshot.png" width="640" alt="OpenLogi.net device view"/>
@@ -49,6 +51,11 @@ It ships two binaries:
 
 - **Discover devices** behind Bolt / Unifying / LIGHTSPEED receivers and direct
   Bluetooth / wired connections, with per-device online state and battery level.
+  Older HID++ 1.0 devices are recognized as read-only devices: known WPIDs are
+  resolved through a legacy catalog (for example Marathon M705, M510,
+  Performance MX, K800, Anywhere MX, M505, and M350), their battery is read from
+  the old HID++ 1.0 battery registers when available, and the UI labels them as
+  identity-and-battery-only until configurable settings are implemented.
 - **Remap buttons** to a catalog of actions and custom keyboard shortcuts.
 - **Mouse gestures** — hold a button and swipe up / down / left / right for four
   actions, with a plain tap as a fifth. Works with the dedicated MX gesture
@@ -88,7 +95,8 @@ It ships two binaries:
 
 The upstream [OpenLogi](https://github.com/AprilNEA/OpenLogi) is a Rust + GPUI
 application that treats **macOS and Linux** as first-class platforms and ships
-Windows only as an early, untested preview. openlogi-net flips that priority:
+Windows only as an early, untested preview. openlogi-net began as a port of that
+idea, but it now intentionally follows its own Windows-first direction:
 
 | | Original OpenLogi | openlogi-net |
 |---|---|---|
@@ -96,12 +104,16 @@ Windows only as an early, untested preview. openlogi-net flips that priority:
 | Primary platform | macOS + Linux | **Windows** |
 | HID++ transport | macOS/Linux HID stacks | Windows raw HID |
 | Mouse gestures | One gesture button per device (MX gesture button, or OS-hook capture) | **Any capable button, several at once**, all over HID++, with gesture-set presets |
+| Legacy devices | Outside the current Windows focus | Read-only HID++ 1.0 inventory with catalog names and battery reporting |
 | Distribution | `.dmg`, Homebrew, `.deb`/`.rpm` | Windows installer + portable zip |
 
-This is an independent rewrite, not a fork of the Rust code — the core logic
-(device model, HID++ feature handling, brand/deep-link vocabulary) has been
-ported to C#. It is **not affiliated with Logitech or with the upstream
-OpenLogi project.**
+Although early pieces were translated from the Rust project, openlogi-net is now
+an independent codebase rather than a line-for-line port or a fork. The Windows
+raw-HID transport, Avalonia UI, tray/update flow, localization system,
+multi-button gesture support, smooth scrolling, pointer locator, onboard-profile
+work, and HID++ 1.0 read-only inventory are implemented here around the needs of
+the .NET app. It is **not affiliated with Logitech or with the upstream OpenLogi
+project.**
 
 ## Download
 
@@ -152,6 +164,7 @@ OpenLogi.Cli diag      # dump HID++ feature tables per device
 OpenLogi.Cli hosts     # list paired hosts on multi-host devices
 OpenLogi.Cli kbinfo    # keyboard brightness and RGB effect inventory
 OpenLogi.Cli light <RRGGBB>   # set device lighting to a solid color
+OpenLogi.Cli v10probe  # identify HID++ 1.0 devices and dump legacy registers
 ```
 
 Run with no arguments to default to `list`. Additional diagnostic subcommands
