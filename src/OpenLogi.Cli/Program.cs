@@ -83,13 +83,16 @@ switch (command)
     case "powerset":
         await Commands.PowerSetAsync(args.Length > 1 ? Convert.ToByte(args[1], 16) : (byte)0);
         break;
+    case "v10probe":
+        await Commands.V10ProbeAsync();
+        break;
     case "rawfeat":
         await Commands.RawFeatureAsync(Convert.ToUInt16(args[1], 16),
             args.Length > 2 ? Convert.ToByte(args[2], 16) : (byte)0,
             args[3..].Select(h => Convert.ToByte(h, 16)).ToArray());
         break;
     default:
-        Console.Error.WriteLine($"unknown command '{command}'. Available: list, diag, controls, assets, light <RRGGBB>, hosts, kbinfo, bright <0-100>, kbmode <onboard|host>, effect <idx> [params hex...]");
+        Console.Error.WriteLine($"unknown command '{command}'. Available: list, diag, controls, assets, light <RRGGBB>, hosts, kbinfo, bright <0-100>, kbmode <onboard|host>, effect <idx> [params hex...], v10probe");
         return 1;
 }
 

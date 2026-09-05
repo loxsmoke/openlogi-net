@@ -724,6 +724,13 @@
                                     <TextBlock Grid.Row="4" Grid.Column="0" Text="{loc:Tr Main_Connection}" Opacity="0.6"/>
                                     <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding ReceiverName}"/>
                                 </Grid>
+                                <!-- HID++ 1.0 device: identity + battery only, nothing to configure -->
+                                <Grid IsVisible="{Binding IsHidpp10}" ColumnDefinitions="Auto,*" Margin="0,6,0,0">
+                                    <TextBlock Grid.Column="0" Text="ⓘ" FontSize="12" Opacity="0.6"
+                                               Margin="0,0,6,0" VerticalAlignment="Top"/>
+                                    <TextBlock Grid.Column="1" Opacity="0.6" FontSize="12" TextWrapping="Wrap"
+                                               Text="{loc:Tr Device_Hidpp10ReadOnly}"/>
+                                </Grid>
                             </StackPanel>
 
                             <!-- Hosts (EasySwitch) -->

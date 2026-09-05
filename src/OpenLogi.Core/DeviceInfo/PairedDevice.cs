@@ -12,4 +12,11 @@ public sealed record PairedDevice
     public BatteryInfo? Battery { get; init; }
     public DeviceModelInfo? ModelInfo { get; init; }
     public Capabilities? Capabilities { get; init; }
+    /// <summary>
+    /// The device speaks only HID++ 1.0 (register-based; Unifying-era models such as
+    /// the Marathon M705 M-R0009). Identified by wpid via <see cref="LegacyDeviceCatalog"/>,
+    /// battery read from a register, no configurable features — the UI shows it
+    /// read-only and never opens a HID++ 2.0 session to it.
+    /// </summary>
+    public bool IsHidpp10 { get; init; }
 }

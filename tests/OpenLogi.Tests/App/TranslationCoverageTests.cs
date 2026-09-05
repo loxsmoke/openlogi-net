@@ -45,6 +45,11 @@ public class TranslationCoverageTests
         // Avalonia's view-location convention ("View" suffix, missing-view text).
         ["OpenLogi.App/ViewLocator.cs"] = "framework plumbing",
 
+        // Logitech product names for HID++ 1.0 devices (which can't name themselves),
+        // as printed on the box — the same untranslated marketing names a HID++ 2.0
+        // device reports through its DeviceTypeAndName feature.
+        ["OpenLogi.Core/DeviceInfo/LegacyDeviceCatalog.cs"] = "product names",
+
         // Physical key legends. These follow the keyboard, not the UI language: a
         // German user on a QWERTZ board wants what is printed on the key.
         ["OpenLogi.App/ViewModels/KeyboardLayout.cs"] = "physical key legends",
