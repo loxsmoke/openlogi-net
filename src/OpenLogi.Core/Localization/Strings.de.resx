@@ -804,6 +804,10 @@
     <value>Schläft</value>
     <comment>EN: Asleep</comment>
   </data>
+  <data name="Device_Hidpp10ReadOnly" xml:space="preserve">
+    <value>Dieses Gerät verwendet das ältere HID++ 1.0-Protokoll. OpenLogi kann Name und Akkustand anzeigen, hat aber noch keine Einstellungen, die sich dafür konfigurieren lassen.</value>
+    <comment>EN: This device uses the older HID++ 1.0 protocol. OpenLogi can show its name and battery level, but has no settings to configure for it yet.</comment>
+  </data>
   <data name="Connection_Bluetooth" xml:space="preserve">
     <value>Bluetooth</value>
     <comment>EN: Bluetooth</comment>

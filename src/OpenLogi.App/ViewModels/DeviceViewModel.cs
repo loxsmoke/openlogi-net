@@ -107,6 +107,12 @@ public sealed partial class DeviceViewModel : ObservableObject
     [ObservableProperty]
     private Bitmap? _image;
 
+    /// <summary>
+    /// HID++ 1.0 device: shown with name and battery only. Drives the read-only note
+    /// on the Device tab; the page never opens a session for it.
+    /// </summary>
+    public bool IsHidpp10 => Device.IsHidpp10;
+
     public bool HasPointer => Device.Capabilities?.Pointer ?? false;
     public bool HasButtons => Device.Capabilities?.Buttons ?? false;
     public bool HasLighting => Device.Capabilities?.Lighting ?? false;

@@ -829,6 +829,10 @@
     <value>Asleep</value>
     <comment>Device tile status: the device is paired but off its wireless link.</comment>
   </data>
+  <data name="Device_Hidpp10ReadOnly" xml:space="preserve">
+    <value>This device uses the older HID++ 1.0 protocol. OpenLogi can show its name and battery level, but has no settings to configure for it yet.</value>
+    <comment>Note on the Device tab for a legacy (HID++ 1.0) device such as the Marathon M705, which the app lists read-only.</comment>
+  </data>
   <data name="Connection_Bluetooth" xml:space="preserve">
     <value>Bluetooth</value>
     <comment>Tooltip on the tile's connection icon: Bluetooth.</comment>

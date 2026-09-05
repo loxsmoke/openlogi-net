@@ -65,7 +65,9 @@ public partial class MainWindowViewModel
         // ActivateAgentMiceAsync — never dispose them here, only throwaway sessions.
         if (old is not null && !IsPersistentSession(old)) await old.DisposeAsync();
 
-        if (device?.Route is not { } route) { IsLoadingDevice = false; return; }
+        // A HID++ 1.0 device has no session to open (the 2.0 probe would fail six
+        // times over, each a full HID sweep) — its battery is the scan-time reading.
+        if (device is null || device.IsHidpp10 || device.Route is not { } route) { IsLoadingDevice = false; return; }
         IsLoadingDevice = true; // show the thin loading line while the device's controls load
 
         var session = await AcquireSessionAsync(device, route);
