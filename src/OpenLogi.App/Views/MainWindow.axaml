@@ -48,7 +48,7 @@
         <!-- One gesture-direction editor row (glyph + name + grouped action dropdown).
              Shared by the Gestures panel's Click row and its four swipe rows. -->
         <DataTemplate x:Key="GestureDirectionRow" x:DataType="vm:GestureDirectionBindingViewModel">
-            <Grid ColumnDefinitions="104,*" Margin="0,3">
+            <Grid ColumnDefinitions="116,*" Margin="0,3">
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Spacing="6">
                     <!-- Collapses for the glyph-less Click row, so its text left-aligns
                          with the Button / Gestures labels. -->
@@ -245,7 +245,8 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
 
-                                <!-- Side labels (name + current action; click opens the picker) -->
+                                <!-- Side labels (name + current action); clicking one selects that button
+                                     in the panel on the right (no picker here) -->
                                 <ItemsControl ItemsSource="{Binding Annotations}"
                                               Width="{Binding DiagramWidth}" Height="{Binding DiagramHeight}">
                                     <ItemsControl.ItemsPanel><ItemsPanelTemplate><Canvas/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
@@ -267,58 +268,7 @@
                                             <Button Width="{Binding LabelWidth}" Padding="6,2"
                                                     Background="Transparent" BorderThickness="0"
                                                     HorizontalContentAlignment="Right"
-                                                    Click="OnAnnotationLabelClick">
-                                                <Button.Flyout>
-                                                    <Flyout>
-                                                        <StackPanel Width="240" Spacing="6">
-                                                            <TextBlock Text="{Binding Binding.Label}" FontWeight="SemiBold"/>
-                                                            <!-- Single-action buttons: one picker, grouped by category -->
-                                                            <ListBox IsVisible="{Binding !Binding.IsGesture}"
-                                                                     ItemsSource="{Binding Binding.GroupedChoices}"
-                                                                     SelectedItem="{Binding Binding.SelectedPickerItem}" MaxHeight="280">
-                                                                <ListBox.Styles>
-                                                                    <!-- Headers: disabled container (mouse + keyboard skip it), compact row. -->
-                                                                    <Style Selector="ListBoxItem" x:DataType="vm:IActionPickerItem">
-                                                                        <Setter Property="IsEnabled" Value="{Binding Selectable}"/>
-                                                                    </Style>
-                                                                    <Style Selector="ListBoxItem:disabled">
-                                                                        <Setter Property="MinHeight" Value="0"/>
-                                                                        <Setter Property="Padding" Value="8,3"/>
-                                                                        <Setter Property="Opacity" Value="1"/>
-                                                                    </Style>
-                                                                </ListBox.Styles>
-                                                            </ListBox>
-                                                            <!-- Gesture button: one action per swipe direction (+ centre Click) -->
-                                                            <ItemsControl IsVisible="{Binding Binding.IsGesture}"
-                                                                          ItemsSource="{Binding Binding.Directions}">
-                                                                <ItemsControl.ItemTemplate>
-                                                                    <DataTemplate x:DataType="vm:GestureDirectionBindingViewModel">
-                                                                        <Grid ColumnDefinitions="64,*" Margin="0,2">
-                                                                            <StackPanel Grid.Column="0" Orientation="Horizontal"
-                                                                                        VerticalAlignment="Center" Spacing="4">
-                                                                                <TextBlock Text="{Binding Glyph}" FontWeight="SemiBold" Width="14"/>
-                                                                                <TextBlock Text="{Binding Label}" Opacity="0.8"/>
-                                                                            </StackPanel>
-                                                                            <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
-                                                                                      ItemsSource="{Binding GroupedChoices}" SelectedItem="{Binding SelectedPickerItem}">
-                                                                                <ComboBox.Styles>
-                                                                                    <Style Selector="ComboBoxItem" x:DataType="vm:IActionPickerItem">
-                                                                                        <Setter Property="IsEnabled" Value="{Binding Selectable}"/>
-                                                                                    </Style>
-                                                                                    <Style Selector="ComboBoxItem:disabled">
-                                                                                        <Setter Property="MinHeight" Value="0"/>
-                                                                                        <Setter Property="Padding" Value="8,3"/>
-                                                                                        <Setter Property="Opacity" Value="1"/>
-                                                                                    </Style>
-                                                                                </ComboBox.Styles>
-                                                                            </ComboBox>
-                                                                        </Grid>
-                                                                    </DataTemplate>
-                                                                </ItemsControl.ItemTemplate>
-                                                            </ItemsControl>
-                                                        </StackPanel>
-                                                    </Flyout>
-                                                </Button.Flyout>
+                                                    Click="OnAnnotationClick">
                                                 <Border Classes="frame" Classes.hl="{Binding Highlighted}"
                                                         BorderThickness="1" CornerRadius="4" Padding="5,2"
                                                         HorizontalAlignment="Right">
@@ -337,7 +287,7 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
 
-                                <!-- Hotspot markers -->
+                                <!-- Hotspot markers (click: select in the panel, plus the quick-edit flyout) -->
                                 <ItemsControl ItemsSource="{Binding Annotations}"
                                               Width="{Binding DiagramWidth}" Height="{Binding DiagramHeight}">
                                     <ItemsControl.ItemsPanel><ItemsPanelTemplate><Canvas/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
@@ -365,7 +315,8 @@
                                             <Button Width="{Binding Size}" Height="{Binding Size}" Padding="0"
                                                     Background="Transparent" BorderThickness="0" CornerRadius="20"
                                                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                                    ToolTip.Tip="{Binding Binding.Label}">
+                                                    ToolTip.Tip="{Binding Binding.Label}"
+                                                    Click="OnAnnotationClick">
                                                 <Ellipse Width="10" Height="10" Stroke="#8895A5"
                                                          StrokeThickness="1.2" Fill="Transparent"/>
                                                 <Button.Flyout>
@@ -426,43 +377,48 @@
                             </Canvas>
                         </Panel>
 
-                        <!-- Gestures: pick the button that drives gestures, then set an action per direction.
+                        <!-- Button panel: always beside the diagram. Pick a button here (or click its
+                             label on the diagram) and set its plain-click action. Under the rule: the
+                             device-wide gestures switch and the selected button's swipe editor.
                              Ctrl+Z (while focus is in the panel) undoes click/category/swipe edits. -->
                         <Border Margin="0,16,16,16" Padding="16" Background="#11000000" CornerRadius="8"
-                                VerticalAlignment="Top" MinWidth="360" MaxWidth="440"
-                                IsVisible="{Binding ShowGestures}">
+                                VerticalAlignment="Top" MinWidth="360" MaxWidth="440">
                             <Border.KeyBindings>
                                 <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoGestureEditCommand}"/>
                             </Border.KeyBindings>
                             <StackPanel Spacing="10">
-                                <!-- Master switch: gestures on/off for ALL of this mouse's buttons -->
-                                <CheckBox Content="{loc:Tr Main_GesturesEnabled}" FontWeight="SemiBold"
-                                          IsChecked="{Binding GesturesEnabled}"/>
-                                <!-- Always visible, so it's clear what enabling gestures buys -->
-                                <TextBlock Text="{loc:Tr Main_GesturesTurnMouseButtonInto}"
-                                           TextWrapping="Wrap" Opacity="0.6" FontSize="12"/>
-                                <StackPanel Spacing="10" IsVisible="{Binding GesturesEnabled}">
-                                    <!-- Same 104px label column + stretched dropdown on every row -->
-                                    <Grid ColumnDefinitions="104,*" Margin="0,3">
-                                        <TextBlock Text="{loc:Tr Main_Button}" VerticalAlignment="Center"/>
-                                        <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
-                                                  ItemsSource="{Binding GestureOwnerChoices}"
-                                                  SelectedItem="{Binding SelectedGestureOwner}">
-                                            <ComboBox.ItemTemplate>
-                                                <DataTemplate x:DataType="vm:GestureOwnerChoice">
-                                                    <TextBlock Text="{Binding Label}"/>
-                                                </DataTemplate>
-                                            </ComboBox.ItemTemplate>
-                                        </ComboBox>
-                                    </Grid>
-                                    <!-- Plain tap action for the selected button -->
-                                    <ContentControl Content="{Binding GestureClick}"
-                                                    ContentTemplate="{StaticResource GestureDirectionRow}"
-                                                    IsVisible="{Binding GestureOwnerSelected}"/>
-                                    <Border Height="1" Background="#338895A5" Margin="0,2"
-                                            IsVisible="{Binding GestureOwnerSelected}"/>
+                                <!-- Same 116px label column + stretched dropdown on every row -->
+                                <Grid ColumnDefinitions="116,*" Margin="0,3">
+                                    <TextBlock Text="{loc:Tr Main_Button}" VerticalAlignment="Center"/>
+                                    <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
+                                              ItemsSource="{Binding GestureOwnerChoices}"
+                                              SelectedItem="{Binding SelectedGestureOwner}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:GestureOwnerChoice">
+                                                <TextBlock Text="{Binding Label}"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </Grid>
+                                <!-- Plain tap action for the selected button (stays usable with gestures off) -->
+                                <ContentControl Content="{Binding GestureClick}"
+                                                ContentTemplate="{StaticResource GestureDirectionRow}"
+                                                IsVisible="{Binding GestureOwnerSelected}"/>
+                                <!-- Gestures: only for mice that expose a HID++-capturable gesture control -->
+                                <StackPanel Spacing="10" IsVisible="{Binding ShowGestures}">
+                                    <Border Height="1" Background="#338895A5" Margin="0,2"/>
+                                    <!-- Master switch: gestures on/off for ALL of this mouse's buttons -->
+                                    <CheckBox Content="{loc:Tr Main_GesturesEnabled}" FontWeight="SemiBold"
+                                              IsChecked="{Binding GesturesEnabled}"/>
+                                    <!-- Always visible, so it's clear what enabling gestures buys -->
+                                    <TextBlock Text="{loc:Tr Main_GesturesTurnMouseButtonInto}"
+                                               TextWrapping="Wrap" Opacity="0.6" FontSize="12"/>
+                                    <!-- Gestures are on, but the selected button can't be diverted for them -->
+                                    <TextBlock Text="{loc:Tr Main_ButtonCannotGesture}"
+                                               TextWrapping="Wrap" Opacity="0.6" FontSize="12"
+                                               IsVisible="{Binding GestureUnavailableForSelected}"/>
                                     <!-- Gesture set preset; "Disabled" turns this button's swipes off -->
-                                    <Grid ColumnDefinitions="104,*" Margin="0,3" IsVisible="{Binding GestureOwnerSelected}">
+                                    <Grid ColumnDefinitions="116,*" Margin="0,3" IsVisible="{Binding GestureRowsVisible}">
                                         <TextBlock Text="{loc:Tr Main_Gestures}" VerticalAlignment="Center"/>
                                         <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
                                                   ItemsSource="{Binding GestureCategories}"

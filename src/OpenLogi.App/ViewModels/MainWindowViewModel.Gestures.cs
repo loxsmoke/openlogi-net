@@ -8,8 +8,9 @@ using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.ViewModels;
 
-// The Gestures panel: owner selection, category presets, the five-direction
-// editors, undo, and the diagram's gesture summaries/highlight.
+// The button panel beside the diagram: which button is being edited, its gesture
+// category preset and five-direction editors, undo, the device-wide gestures
+// switch, and the diagram's gesture summaries/highlight.
 public partial class MainWindowViewModel
 {
     /// <summary>
@@ -45,7 +46,17 @@ public partial class MainWindowViewModel
                     : d == GestureDirection.Click ? clickSeed
                     : Core.Actions.MouseAction.None;
                 return new GestureDirectionBindingViewModel(d, action, ButtonBindingViewModel.Catalog,
-                    (dir, act) => PersistGesture(configKey, owner, dir, act));
+                    (dir, act) =>
+                    {
+                        // A physical button's plain click is an ordinary binding edit (a
+                        // Single unless the button already has a gesture map) — the same
+                        // path as the diagram picker, so the two can never disagree. The
+                        // dedicated gesture button always edits its map.
+                        if (dir == GestureDirection.Click && owner != ButtonId.GestureButton)
+                            Persist(configKey, owner, act);
+                        else
+                            PersistGesture(configKey, owner, dir, act);
+                    });
             })
             .ToList();
     }
@@ -84,9 +95,10 @@ public partial class MainWindowViewModel
     }
 
     /// <summary>
-    /// Populate the Gestures section for the selected mouse: the owner dropdown (Off +
-    /// the device's HID++-capturable gesture buttons) and the five-direction editor.
-    /// Hidden when the device exposes no eligible gesture control.
+    /// Load the panel's gestures section for the selected mouse: the device's HID++-
+    /// capturable gesture buttons (merged into the Button dropdown, flagged as able to
+    /// gesture) and the device-wide switch. Hidden when the device exposes no eligible
+    /// gesture control — the Button and Click rows stay regardless.
     /// </summary>
     private async Task BuildGestureSectionAsync(DeviceSession session, DeviceViewModel device)
     {
@@ -98,22 +110,61 @@ public partial class MainWindowViewModel
             return;
         }
 
+        _gestureEligible = [.. eligible];
+        _suppressGesturePanel = true;
+        GesturesEnabled = _config.GesturesEnabled(ck);
+        _suppressGesturePanel = false;
+        // Prefer the stored gesture selection; otherwise keep what the diagram picked.
+        RebuildGestureOwnerChoices(ck, StoredGestureOwner(ck) ?? SelectedGestureOwner?.Button);
+        ShowGestures = true;
+    }
+
+    /// <summary>
+    /// (Re)fill the panel's Button dropdown: every button on the diagram, plus any
+    /// gesture-capable control the diagram has no hotspot for. Called whenever either
+    /// source arrives (diagram metadata and the gesture-capable list load independently).
+    /// Selects <paramref name="preferred"/> when listed, else the first button, so the
+    /// panel always edits something.
+    /// </summary>
+    private void RebuildGestureOwnerChoices(string configKey, ButtonId? preferred)
+    {
+        var ids = Buttons.Select(b => b.Button).ToList();
+        foreach (var b in _gestureEligible)
+            if (!ids.Contains(b)) ids.Add(b);
+
+        _suppressGestureOwner = true;
+        GestureOwnerChoices.Clear();
+        foreach (var id in ids)
+            GestureOwnerChoices.Add(new GestureOwnerChoice(id, _gestureEligible.Contains(id)));
+        SelectedGestureOwner = GestureOwnerChoices.FirstOrDefault(c => c.Button == preferred)
+            ?? GestureOwnerChoices.FirstOrDefault();
+        _suppressGestureOwner = false;
+        RebuildGestureDirections(configKey);
+        RefreshGestureHighlight();
+    }
+
+    /// <summary>The recorded gesture selection, when gestures are on and that button can gesture here.</summary>
+    private ButtonId? StoredGestureOwner(string configKey) =>
+        _config.GesturesEnabled(configKey) && _config.GestureOwner(configKey) is { } o && _gestureEligible.Contains(o)
+            ? o
+            : null;
+
+    /// <summary>Blank the panel's button list and editors (a different device is loading).</summary>
+    private void ClearGestureSection()
+    {
+        _gestureEligible = [];
         _suppressGestureOwner = true;
         _suppressGesturePanel = true;
         GestureOwnerChoices.Clear();
-        foreach (var b in eligible)
-            GestureOwnerChoices.Add(new GestureOwnerChoice(b));
-
-        GesturesEnabled = _config.GesturesEnabled(ck);
-        var owner = _config.GestureOwner(ck);
-        SelectedGestureOwner = GesturesEnabled && owner is { } o && eligible.Contains(o)
-            ? GestureOwnerChoices.First(c => c.Button == o)
-            : null;
+        SelectedGestureOwner = null;
+        GestureDirections.Clear();
+        GestureClick = null;
+        GestureOwnerSelected = false;
+        SelectedGestureCategory = null;
+        _gestureUndo.Clear();
+        _lastGestureState = null;
         _suppressGesturePanel = false;
-        RebuildGestureDirections(ck);
-        ShowGestures = true;
         _suppressGestureOwner = false;
-        RefreshGestureHighlight();
     }
 
     private void RebuildGestureDirections(string configKey)
@@ -195,8 +246,11 @@ public partial class MainWindowViewModel
         RefreshGestureHighlight();
         if (_suppressGestureOwner || SelectedDevice?.ConfigKey is not { } ck) return;
         // Selecting a button only retargets the editor — it must not create or
-        // clear any button's gesture map. Global on/off is the checkbox's job.
-        if (value?.Button is { } button)
+        // clear any button's gesture map. It is recorded as the gesture selection
+        // only while gestures are on and the button can gesture: recording it with
+        // gestures off would flip the device-wide switch back on, which is the
+        // checkbox's job alone.
+        if (GesturesEnabled && value is { CanGesture: true, Button: { } button })
         {
             _config.SetGestureSelection(ck, button);
             try { _config.SaveAtomic(); } catch { /* keep editing fluid */ }
@@ -210,19 +264,18 @@ public partial class MainWindowViewModel
         if (_suppressGesturePanel || SelectedDevice?.ConfigKey is not { } ck) return;
         if (value)
         {
-            // Globally back on: every configured button's map comes back to life.
+            // Globally back on: every configured button's map comes back to life, and
+            // the button being edited becomes the recorded gesture selection.
             _config.EnableGestures(ck);
+            if (SelectedGestureOwner is { CanGesture: true, Button: { } button })
+                _config.SetGestureSelection(ck, button);
         }
         else
         {
-            // Globally off: silence every button, keep all maps, and clear the
-            // editing selection so the per-button rows collapse.
+            // Globally off: silence every button but keep all maps. The selection
+            // stays — the Button and Click rows keep working with gestures off; only
+            // the category/swipe rows hide.
             _config.DisableGestures(ck);
-            _suppressGestureOwner = true;
-            SelectedGestureOwner = null;
-            _suppressGestureOwner = false;
-            RebuildGestureDirections(ck);
-            RefreshGestureHighlight();
         }
         try { _config.SaveAtomic(); } catch { /* keep editing fluid */ }
         RefreshGestureSummaries(ck);
@@ -264,7 +317,7 @@ public partial class MainWindowViewModel
             !p.IsCustom && GestureDirections.All(vm => vm.Selected.Action.Equals(p.For(vm.Direction))))
         ?? CustomGesturePreset;
 
-    /// <summary>Accent the gesture owner's label + leader line on the mouse diagram.</summary>
+    /// <summary>Accent the selected button's label + leader line on the mouse diagram.</summary>
     private void RefreshGestureHighlight()
     {
         var owner = SelectedGestureOwner?.Button;
@@ -273,9 +326,9 @@ public partial class MainWindowViewModel
     }
 
     /// <summary>
-    /// Select <paramref name="button"/> in the Gestures panel (clicking its diagram
-    /// label). A no-op for buttons that can't gesture — selection alone never
-    /// creates or clears a gesture map, so this is always safe.
+    /// Select <paramref name="button"/> in the panel (clicking its diagram label or
+    /// marker). Selection alone never creates or clears a gesture map, so this is
+    /// always safe; a no-op for a button the dropdown doesn't list.
     /// </summary>
     public void SelectGestureOwnerFor(ButtonId button)
     {

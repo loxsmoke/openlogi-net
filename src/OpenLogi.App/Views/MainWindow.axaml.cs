@@ -263,10 +263,11 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Clicking a button's diagram label (which also opens its picker flyout)
-    /// selects that button in the Gestures panel, when it can gesture.
+    /// Clicking a button's diagram label or hotspot marker selects that button in
+    /// the panel beside the diagram (the marker additionally opens its quick-edit
+    /// flyout; the label opens nothing — the panel is its editor).
     /// </summary>
-    private void OnAnnotationLabelClick(object? sender, RoutedEventArgs e)
+    private void OnAnnotationClick(object? sender, RoutedEventArgs e)
     {
         if (sender is Control { DataContext: DiagramAnnotationViewModel annotation }
             && DataContext is MainWindowViewModel vm)

@@ -257,8 +257,12 @@
     <comment>EN: Button</comment>
   </data>
   <data name="Main_Gestures" xml:space="preserve">
-    <value>Gesten</value>
-    <comment>EN: Gestures</comment>
+    <value>Tastengesten</value>
+    <comment>EN: Button Gestures</comment>
+  </data>
+  <data name="Main_ButtonCannotGesture" xml:space="preserve">
+    <value>Diese Taste kann auf dieser Maus keine Gesten steuern.</value>
+    <comment>EN: This button can't drive gestures on this mouse.</comment>
   </data>
   <data name="Main_Pointer" xml:space="preserve">
     <value>Zeiger</value>

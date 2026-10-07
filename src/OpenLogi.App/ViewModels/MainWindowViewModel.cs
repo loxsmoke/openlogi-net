@@ -49,27 +49,44 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public ObservableCollection<ProfileSlotViewModel> Profiles { get; } = [];
     public ObservableCollection<GKeyViewModel> GKeys { get; } = [];
 
-    // Gestures section (Buttons tab): choose which button drives gestures, its
-    // plain-tap Click action, whether the four swipes are active, and a category
-    // preset (or per-direction custom actions). Shown for mice that expose a
-    // HID++-capturable gesture control, even without a gesture-button hotspot.
+    // Button panel (Buttons tab, beside the diagram): the button being edited (every
+    // diagram button, plus any HID++-capturable gesture control without a hotspot),
+    // its plain-tap Click action, and — for mice that expose a capturable gesture
+    // control — the device-wide gestures switch, a category preset and the four
+    // swipe editors for the selected button.
     public ObservableCollection<GestureOwnerChoice> GestureOwnerChoices { get; } = [];
     public ObservableCollection<GestureDirectionBindingViewModel> GestureDirections { get; } = [];
-    [ObservableProperty] private bool _showGestures;
-    [ObservableProperty] private GestureOwnerChoice? _selectedGestureOwner;
+    /// <summary>Whether the panel shows its gestures section (the device has a gesture-capable button).</summary>
+    [ObservableProperty][NotifyPropertyChangedFor(nameof(GestureRowsVisible), nameof(GestureSwipesVisible), nameof(GestureUnavailableForSelected))]
+    private bool _showGestures;
+    /// <summary>The button being edited in the panel (its diagram label is accented).</summary>
+    [ObservableProperty][NotifyPropertyChangedFor(nameof(GestureRowsVisible), nameof(GestureSwipesVisible), nameof(GestureUnavailableForSelected))]
+    private GestureOwnerChoice? _selectedGestureOwner;
     /// <summary>The Click (plain tap) editor row; null while no button is selected.</summary>
     [ObservableProperty] private GestureDirectionBindingViewModel? _gestureClick;
-    /// <summary>Whether a button is selected for editing (shows Click + Category rows).</summary>
-    [ObservableProperty][NotifyPropertyChangedFor(nameof(GestureSwipesVisible))]
+    /// <summary>Whether a button is selected for editing (shows the Click row).</summary>
+    [ObservableProperty][NotifyPropertyChangedFor(nameof(GestureRowsVisible), nameof(GestureSwipesVisible), nameof(GestureUnavailableForSelected))]
     private bool _gestureOwnerSelected;
-    /// <summary>The panel-header checkbox: gestures on/off for ALL buttons of this device.</summary>
-    [ObservableProperty] private bool _gesturesEnabled;
+    /// <summary>The checkbox under the rule: gestures on/off for ALL buttons of this device.</summary>
+    [ObservableProperty][NotifyPropertyChangedFor(nameof(GestureRowsVisible), nameof(GestureSwipesVisible), nameof(GestureUnavailableForSelected))]
+    private bool _gesturesEnabled;
     [ObservableProperty][NotifyPropertyChangedFor(nameof(GestureSwipesVisible))]
     private GesturePreset? _selectedGestureCategory;
 
-    /// <summary>The four swipe rows show only for a selected button whose category isn't Disabled.</summary>
+    /// <summary>The Gestures (category) row: gestures on, and the selected button can drive them.</summary>
+    public bool GestureRowsVisible =>
+        ShowGestures && GesturesEnabled && GestureOwnerSelected && SelectedGestureOwner is { CanGesture: true };
+
+    /// <summary>The hint shown instead of the category row when the selected button can't gesture.</summary>
+    public bool GestureUnavailableForSelected =>
+        ShowGestures && GesturesEnabled && GestureOwnerSelected && SelectedGestureOwner is { CanGesture: false };
+
+    /// <summary>The four swipe rows show under the category row unless the category is Disabled.</summary>
     public bool GestureSwipesVisible =>
-        GestureOwnerSelected && SelectedGestureCategory is { } p && !ReferenceEquals(p, DisabledGesturePreset);
+        GestureRowsVisible && SelectedGestureCategory is { } p && !ReferenceEquals(p, DisabledGesturePreset);
+
+    /// <summary>The device's HID++-capturable gesture buttons (empty until the section loads, or when it has none).</summary>
+    private IReadOnlyList<ButtonId> _gestureEligible = [];
 
     // Suppresses the owner-changed handler while the section is populated programmatically.
     private bool _suppressGestureOwner;
@@ -583,6 +600,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         ShowScrollInvert = false;
         ShowSmoothScroll = false;
         ShowGestures = false;
+        ClearGestureSection();
         ShowHosts = false;
         ShowBacklight = false;
         ShowPerKeyEditor = false;

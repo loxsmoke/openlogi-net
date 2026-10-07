@@ -53,12 +53,15 @@ public sealed partial class ActionGroupHeader : ObservableObject, IActionPickerI
 }
 
 /// <summary>
-/// A choice in the gesture-owner dropdown: which button drives gestures on the
-/// device, or <c>null</c> for "All off". <see cref="Label"/> is the display text.
+/// A choice in the panel's Button dropdown: a button to edit, flagged with whether
+/// the device can divert it for gestures. <see cref="Label"/> is the display text.
 /// </summary>
 public sealed partial class GestureOwnerChoice : ObservableObject
 {
     public ButtonId? Button { get; }
+
+    /// <summary>Whether the device can capture this button for gestures (HID++-divertible).</summary>
+    public bool CanGesture { get; }
 
     public string Label => Button switch
     {
@@ -68,9 +71,10 @@ public sealed partial class GestureOwnerChoice : ObservableObject
         _ => "",
     };
 
-    public GestureOwnerChoice(ButtonId? button)
+    public GestureOwnerChoice(ButtonId? button, bool canGesture = false)
     {
         Button = button;
+        CanGesture = canGesture;
         Loc.Current.WeakSubscribe(this, static (self, e) =>
         {
             if (e.PropertyName is nameof(Loc.Culture) or "Item[]")

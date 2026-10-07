@@ -58,15 +58,20 @@ public partial class MainWindowViewModel
 
         // Derive the side button list from the device's actual buttons (the mapped
         // hotspots), falling back to a default mouse set when no metadata is available.
+        // Ordered top-to-bottom by hotspot centre — the same order LabelYs stacks the
+        // diagram's labels in — so the panel's Button dropdown reads like the left column.
         var buttonIds = hotspots.Count > 0
-            ? hotspots.Select(h => h.Id).Distinct().OrderBy(b => (int)b).ToArray()
+            ? hotspots.OrderBy(h => h.Y + h.Size / 2).Select(h => h.Id).Distinct().ToArray()
             : DefaultMouseButtons;
 
         Buttons.Clear();
         foreach (var id in buttonIds)
             Buttons.Add(BindingFor(id, configKey));
 
-        // Annotations may be (re)built after the gesture section chose its owner.
+        // The panel's Button dropdown lists these; keep whatever is selected (or the
+        // stored gesture selection) when the list is refilled.
+        RebuildGestureOwnerChoices(configKey, SelectedGestureOwner?.Button ?? StoredGestureOwner(configKey));
+        // Annotations may be (re)built after the panel chose its button.
         RefreshGestureHighlight();
     }
 
@@ -119,16 +124,18 @@ public partial class MainWindowViewModel
         return binding;
     }
 
+    /// <summary>
+    /// Persist a plain-click edit for <paramref name="button"/> — from the diagram's
+    /// hotspot picker or the panel's Click row — and mirror it into the other one.
+    /// </summary>
     private void Persist(string configKey, ButtonId button, Core.Actions.MouseAction action)
     {
-        // A button that drives gestures is diverted at the device, so its plain click is
-        // dispatched from the gesture map's Click entry — its single binding is ignored,
-        // and writing a Single here would also drop its swipe map. Route the diagram
-        // picker's edit into the gesture Click instead (preserving the swipes) and mirror
-        // it into the Gestures panel's Click row, so picking an action on the diagram
-        // actually takes effect. Covers a button already gesturing or one just chosen as
-        // the panel's gesture owner.
-        if (ClickEditRoutesToGesture(_config, configKey, button, SelectedGestureOwner?.Button))
+        // A button with a gesture map is diverted at the device while gestures are on, so
+        // its plain click is dispatched from the map's Click entry — its single binding is
+        // ignored, and writing a Single here would also drop its swipe map (which is kept
+        // through a global off, for when gestures come back). Route the edit into the
+        // gesture Click instead; PersistGesture mirrors it into the diagram label.
+        if (ClickEditRoutesToGesture(_config, configKey, button))
         {
             PersistGesture(configKey, button, GestureDirection.Click, action);
             if (SelectedGestureOwner?.Button == button)
@@ -138,15 +145,26 @@ public partial class MainWindowViewModel
         _config.SetBinding(configKey, button, new Binding.Single(action));
         try { _config.SaveAtomic(); }
         catch { /* keep editing fluid */ }
+        // Keep the diagram label and the panel's Click row in agreement, whichever was edited.
+        if (_bindings.TryGetValue(button, out var diagramBinding) && !diagramBinding.IsGesture)
+            diagramBinding.SetSelectedSilently(action);
+        if (SelectedGestureOwner?.Button == button)
+        {
+            GestureClick?.SetSelectedSilently(action);
+            if (!_suppressGesturePanel)
+                PushGestureUndo(); // one click edit = one undo step, like a gesture-map click
+        }
     }
 
     /// <summary>
-    /// Whether a plain-click edit for <paramref name="button"/> (from the diagram picker)
-    /// must be written into its gesture map's Click entry rather than a single binding.
-    /// True when the button already drives gestures, or is the current gesture owner:
-    /// such a button is diverted at the device, so its click is dispatched from the
-    /// gesture map — a single binding would be ignored (and would drop the swipe map).
+    /// Whether a plain-click edit for <paramref name="button"/> must be written into its
+    /// gesture map's Click entry rather than a single binding. True when the button has a
+    /// gesture map: it is diverted at the device while gestures are on, so its click is
+    /// dispatched from the map, and a single binding would drop its swipes (also while
+    /// gestures are globally off, where the maps are kept for later). Merely being
+    /// selected in the panel doesn't count — a button becomes a gesture button on its
+    /// first swipe edit, not by having its click changed.
     /// </summary>
-    public static bool ClickEditRoutesToGesture(Config config, string configKey, ButtonId button, ButtonId? selectedGestureOwner) =>
-        config.GestureButtons(configKey).Contains(button) || selectedGestureOwner == button;
+    public static bool ClickEditRoutesToGesture(Config config, string configKey, ButtonId button) =>
+        config.GestureButtons(configKey).Contains(button) || config.GestureBindingsFor(configKey, button).Count > 0;
 }

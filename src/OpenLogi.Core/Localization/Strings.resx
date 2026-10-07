@@ -270,8 +270,12 @@
     <comment>MainWindow: TextBlock text.</comment>
   </data>
   <data name="Main_Gestures" xml:space="preserve">
-    <value>Gestures</value>
+    <value>Button Gestures</value>
     <comment>MainWindow: TextBlock text.</comment>
+  </data>
+  <data name="Main_ButtonCannotGesture" xml:space="preserve">
+    <value>This button can't drive gestures on this mouse.</value>
+    <comment>MainWindow: TextBlock text (hint under the gestures switch).</comment>
   </data>
   <data name="Main_Pointer" xml:space="preserve">
     <value>Pointer</value>

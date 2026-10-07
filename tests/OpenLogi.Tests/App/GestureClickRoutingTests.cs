@@ -7,11 +7,12 @@ using OpenLogi.Core.Gestures;
 namespace OpenLogi.Tests.App;
 
 /// <summary>
-/// A gesture-owner button is diverted at the device, so its plain click is dispatched
-/// from the gesture map's Click entry — not its single binding. These guard the diagram
-/// picker routing its click edit into the gesture map (issue: picking an action on the
-/// left-side button showed "assigned" but the click stayed dead / the panel showed
-/// "Do nothing").
+/// A button with a gesture map is diverted at the device, so its plain click is dispatched
+/// from the map's Click entry — not its single binding. These guard the click editors (the
+/// diagram picker and the panel's Click row share one path) routing their edit into the
+/// gesture map (issue: picking an action on the left-side button showed "assigned" but the
+/// click stayed dead / the panel showed "Do nothing"), while a button without a map keeps
+/// getting an ordinary single binding — being selected in the panel doesn't make it gesture.
 /// </summary>
 public class GestureClickRoutingTests
 {
@@ -27,22 +28,39 @@ public class GestureClickRoutingTests
     public void RoutesToGesture_WhenButtonAlreadyDrivesGestures()
     {
         var cfg = WithBackSwipes();
-        Assert.True(MainWindowViewModel.ClickEditRoutesToGesture(cfg, "dev", ButtonId.Back, selectedGestureOwner: null));
+        Assert.True(MainWindowViewModel.ClickEditRoutesToGesture(cfg, "dev", ButtonId.Back));
     }
 
     [Fact]
-    public void RoutesToGesture_WhenButtonIsSelectedOwnerEvenWithNoMapYet()
+    public void RoutesToGesture_WhileGesturesAreGloballyOff_SoTheKeptMapIsNotDropped()
     {
+        var cfg = WithBackSwipes();
+        cfg.DisableGestures("dev");
+        // Off keeps every map for when gestures come back; a click edit must not clobber it.
+        Assert.True(MainWindowViewModel.ClickEditRoutesToGesture(cfg, "dev", ButtonId.Back));
+
+        cfg.SetGestureDirection("dev", ButtonId.Back, GestureDirection.Click, MouseAction.Copy);
+        cfg.EnableGestures("dev");
+        var stored = cfg.GestureBindingsFor("dev", ButtonId.Back);
+        Assert.Equal(MouseAction.BrowserBack, stored[GestureDirection.Left]);
+        Assert.Equal(MouseAction.Copy, stored[GestureDirection.Click]);
+    }
+
+    [Fact]
+    public void DoesNotRouteToGesture_ForAButtonWithNoMapYet()
+    {
+        // Selecting a button in the panel alone never makes it a gesture button: its
+        // click stays an ordinary single binding until its first swipe is configured.
         var cfg = new Config();
-        Assert.True(MainWindowViewModel.ClickEditRoutesToGesture(cfg, "dev", ButtonId.Back, selectedGestureOwner: ButtonId.Back));
+        Assert.False(MainWindowViewModel.ClickEditRoutesToGesture(cfg, "dev", ButtonId.Back));
     }
 
     [Fact]
     public void DoesNotRouteToGesture_ForAPlainButton()
     {
         var cfg = WithBackSwipes();
-        // Forward has no gesture map and is not the owner — a normal single binding.
-        Assert.False(MainWindowViewModel.ClickEditRoutesToGesture(cfg, "dev", ButtonId.Forward, selectedGestureOwner: ButtonId.Back));
+        // Forward has no gesture map — a normal single binding.
+        Assert.False(MainWindowViewModel.ClickEditRoutesToGesture(cfg, "dev", ButtonId.Forward));
     }
 
     [Fact]
