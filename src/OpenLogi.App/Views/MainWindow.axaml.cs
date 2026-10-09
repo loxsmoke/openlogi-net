@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -7,6 +8,7 @@ using Avalonia.Interactivity;
 using Avalonia.Platform;
 using Avalonia.Threading;
 using OpenLogi.App.ViewModels;
+using OpenLogi.Core.Actions;
 using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.Views;
@@ -60,7 +62,21 @@ public partial class MainWindow : Window
 
         _subscribedViewModel = DataContext as MainWindowViewModel;
         if (_subscribedViewModel is not null)
+        {
             _subscribedViewModel.UpdateOfferShown += OnUpdateOfferShown;
+            _subscribedViewModel.ShortcutRecorder = RecordShortcutAsync;
+        }
+    }
+
+    /// <summary>
+    /// The chord recorder behind a Keyboard Shortcut pick: a modal over this window.
+    /// Yields first so the dialog never opens inside the picker's selection/popup-close
+    /// handling. Returns null when cancelled, an empty combo when cleared.
+    /// </summary>
+    private async Task<KeyCombo?> RecordShortcutAsync(KeyCombo current)
+    {
+        await Task.Yield();
+        return await new ShortcutRecorderWindow(current).ShowDialog<KeyCombo?>(this);
     }
 
     // Launch/open update check. The setting defaults on for new configs and can be

@@ -207,15 +207,8 @@ public static class ConfigCodec
     private static object SerializeAction(Actions.MouseAction action) => action.Kind switch
     {
         ActionKind.SetDpiPreset => new TomlTable { ["SetDpiPreset"] = (long)action.DpiPreset },
-        ActionKind.CustomShortcut => new TomlTable
-        {
-            ["CustomShortcut"] = new TomlTable
-            {
-                ["modifiers"] = (long)action.Combo!.Modifiers,
-                ["key_code"] = (long)action.Combo!.KeyCode,
-                ["display"] = action.Combo!.Display,
-            },
-        },
+        // The chord's text form ("Ctrl+Shift+P"; "" when cleared) — see KeyCombo.ToString.
+        ActionKind.CustomShortcut => new TomlTable { ["CustomShortcut"] = action.Combo!.ToString() },
         _ => action.Kind.ToString(),
     };
 
@@ -413,13 +406,11 @@ public static class ConfigCodec
         {
             if (table.TryGetValue("SetDpiPreset", out var idx))
                 return Actions.MouseAction.SetDpiPreset((byte)Convert.ToInt64(idx));
-            if (table.TryGetValue("CustomShortcut", out var cs) && cs is TomlTable combo)
-                return Actions.MouseAction.CustomShortcut(new KeyCombo
-                {
-                    Modifiers = (byte)GetLong(combo, "modifiers", 0),
-                    KeyCode = (ushort)GetLong(combo, "key_code", 0),
-                    Display = GetString(combo, "display") ?? "",
-                });
+            if (table.TryGetValue("CustomShortcut", out var cs) && cs is string chord)
+            {
+                try { return Actions.MouseAction.CustomShortcut(KeyCombo.Parse(chord)); }
+                catch (FormatException e) { throw new ConfigException($"unknown shortcut '{chord}': {e.Message}"); }
+            }
         }
         throw new ConfigException("unknown action payload shape");
     }

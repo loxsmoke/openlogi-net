@@ -1104,4 +1104,48 @@
     <value>Profil {0}</value>
     <comment>EN: Profile {0}</comment>
   </data>
+  <data name="Action_CustomShortcut" xml:space="preserve">
+    <value>Tastenkürzel</value>
+    <comment>EN: Keyboard Shortcut</comment>
+  </data>
+  <data name="Category_Keyboard" xml:space="preserve">
+    <value>Tastatur</value>
+    <comment>EN: Keyboard</comment>
+  </data>
+  <data name="Shortcut_None" xml:space="preserve">
+    <value>Keine</value>
+    <comment>EN: None</comment>
+  </data>
+  <data name="Shortcut_Change" xml:space="preserve">
+    <value>Ändern…</value>
+    <comment>EN: Change…</comment>
+  </data>
+  <data name="ShortcutRecorder_Title" xml:space="preserve">
+    <value>Tastenkürzel aufzeichnen</value>
+    <comment>EN: Record Keyboard Shortcut</comment>
+  </data>
+  <data name="ShortcutRecorder_HintCapturing" xml:space="preserve">
+    <value>Drücken Sie die gewünschte Tastenkombination. Shift, Ctrl, Win und Alt folgen den gehaltenen Tasten; Sie können sie auch per Klick ein- oder ausschalten, vor oder nach dem Tastendruck. Einige Kombinationen sind von Windows reserviert und können nicht erfasst werden.</value>
+    <comment>EN: Press the key combination to assign. Shift, Ctrl, Win and Alt follow the keys you hold, and you can also turn them on or off by clicking, before or after the key is pressed. Some combinations are reserved by Windows and cannot be captured.</comment>
+  </data>
+  <data name="ShortcutRecorder_HintRecorded" xml:space="preserve">
+    <value>Um eine andere Taste zuzuweisen, löschen Sie zuerst das aktuelle Tastenkürzel. Sie können Shift, Ctrl, Win und Alt weiterhin per Klick ein- oder ausschalten.</value>
+    <comment>EN: To assign a different key, clear the current shortcut first. You can still turn Shift, Ctrl, Win and Alt on or off by clicking them.</comment>
+  </data>
+  <data name="ShortcutRecorder_PressKey" xml:space="preserve">
+    <value>Taste drücken…</value>
+    <comment>EN: Press a key…</comment>
+  </data>
+  <data name="ShortcutRecorder_OK" xml:space="preserve">
+    <value>OK</value>
+    <comment>EN: OK</comment>
+  </data>
+  <data name="ShortcutRecorder_Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+    <comment>EN: Cancel</comment>
+  </data>
+  <data name="ShortcutRecorder_Clear" xml:space="preserve">
+    <value>Löschen</value>
+    <comment>EN: Clear</comment>
+  </data>
 </root>

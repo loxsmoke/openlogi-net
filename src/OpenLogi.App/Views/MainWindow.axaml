@@ -34,6 +34,14 @@
         <DataTemplate DataType="vm:ActionChoice">
             <TextBlock Text="{Binding Label}"/>
         </DataTemplate>
+        <!-- The Keyboard group's one row: title left, the recorded chord (or "None") right. -->
+        <DataTemplate DataType="vm:ShortcutChoice">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="{Binding Label}"/>
+                <TextBlock Grid.Column="1" Text="{Binding Detail}" Opacity="0.7" Margin="12,0,0,0"
+                           HorizontalAlignment="Right"/>
+            </Grid>
+        </DataTemplate>
         <DataTemplate DataType="vm:ActionGroupHeader">
             <Grid ColumnDefinitions="Auto,*" VerticalAlignment="Center">
                 <TextBlock Text="{Binding Name}" FontSize="10" FontWeight="SemiBold"
@@ -48,7 +56,7 @@
         <!-- One gesture-direction editor row (glyph + name + grouped action dropdown).
              Shared by the Gestures panel's Click row and its four swipe rows. -->
         <DataTemplate x:Key="GestureDirectionRow" x:DataType="vm:GestureDirectionBindingViewModel">
-            <Grid ColumnDefinitions="116,*" Margin="0,3">
+            <Grid ColumnDefinitions="116,*,Auto" Margin="0,3">
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Spacing="6">
                     <!-- Collapses for the glyph-less Click row, so its text left-aligns
                          with the Button / Gestures labels. -->
@@ -56,11 +64,13 @@
                                IsVisible="{Binding Glyph, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                     <TextBlock Text="{Binding Label}" Opacity="0.85"/>
                 </StackPanel>
-                <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
+                <!-- Stretched content so the shortcut row's chord text reaches the right edge -->
+                <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
                           ItemsSource="{Binding GroupedChoices}" SelectedItem="{Binding SelectedPickerItem}">
                     <ComboBox.Styles>
                         <Style Selector="ComboBoxItem" x:DataType="vm:IActionPickerItem">
                             <Setter Property="IsEnabled" Value="{Binding Selectable}"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                         </Style>
                         <Style Selector="ComboBoxItem:disabled">
                             <Setter Property="MinHeight" Value="0"/>
@@ -69,6 +79,9 @@
                         </Style>
                     </ComboBox.Styles>
                 </ComboBox>
+                <!-- Re-record (or clear) the chord; only while the Keyboard Shortcut row is selected -->
+                <Button Grid.Column="2" Content="{loc:Tr Shortcut_Change}" Margin="6,0,0,0" Padding="8,4"
+                        Command="{Binding ChangeShortcutCommand}" IsVisible="{Binding IsShortcutAssigned}"/>
             </Grid>
         </DataTemplate>
     </Window.Resources>
@@ -331,6 +344,7 @@
                                                                     <!-- Headers: disabled container (mouse + keyboard skip it), compact row. -->
                                                                     <Style Selector="ListBoxItem" x:DataType="vm:IActionPickerItem">
                                                                         <Setter Property="IsEnabled" Value="{Binding Selectable}"/>
+                                                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                                                                     </Style>
                                                                     <Style Selector="ListBoxItem:disabled">
                                                                         <Setter Property="MinHeight" Value="0"/>
@@ -339,22 +353,27 @@
                                                                     </Style>
                                                                 </ListBox.Styles>
                                                             </ListBox>
+                                                            <!-- Re-record the chord of a selected Keyboard Shortcut -->
+                                                            <Button Content="{loc:Tr Shortcut_Change}" HorizontalAlignment="Right" Padding="8,4"
+                                                                    Command="{Binding Binding.ChangeShortcutCommand}"
+                                                                    IsVisible="{Binding Binding.IsShortcutAssigned}"/>
                                                             <!-- Gesture button: one action per swipe direction (+ centre Click) -->
                                                             <ItemsControl IsVisible="{Binding Binding.IsGesture}"
                                                                           ItemsSource="{Binding Binding.Directions}">
                                                                 <ItemsControl.ItemTemplate>
                                                                     <DataTemplate x:DataType="vm:GestureDirectionBindingViewModel">
-                                                                        <Grid ColumnDefinitions="64,*" Margin="0,2">
+                                                                        <Grid ColumnDefinitions="64,*,Auto" Margin="0,2">
                                                                             <StackPanel Grid.Column="0" Orientation="Horizontal"
                                                                                         VerticalAlignment="Center" Spacing="4">
                                                                                 <TextBlock Text="{Binding Glyph}" FontWeight="SemiBold" Width="14"/>
                                                                                 <TextBlock Text="{Binding Label}" Opacity="0.8"/>
                                                                             </StackPanel>
-                                                                            <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
+                                                                            <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
                                                                                       ItemsSource="{Binding GroupedChoices}" SelectedItem="{Binding SelectedPickerItem}">
                                                                                 <ComboBox.Styles>
                                                                                     <Style Selector="ComboBoxItem" x:DataType="vm:IActionPickerItem">
                                                                                         <Setter Property="IsEnabled" Value="{Binding Selectable}"/>
+                                                                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                                                                                     </Style>
                                                                                     <Style Selector="ComboBoxItem:disabled">
                                                                                         <Setter Property="MinHeight" Value="0"/>
@@ -363,6 +382,8 @@
                                                                                     </Style>
                                                                                 </ComboBox.Styles>
                                                                             </ComboBox>
+                                                                            <Button Grid.Column="2" Content="{loc:Tr Shortcut_Change}" Margin="4,0,0,0" Padding="6,3"
+                                                                                    Command="{Binding ChangeShortcutCommand}" IsVisible="{Binding IsShortcutAssigned}"/>
                                                                         </Grid>
                                                                     </DataTemplate>
                                                                 </ItemsControl.ItemTemplate>

@@ -55,6 +55,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     // control — the device-wide gestures switch, a category preset and the four
     // swipe editors for the selected button.
     public ObservableCollection<GestureOwnerChoice> GestureOwnerChoices { get; } = [];
+    /// <summary>
+    /// Opens the chord recorder for a Keyboard Shortcut pick. Installed by the window
+    /// (it needs an owner for the modal); null until then, so picks are inert.
+    /// </summary>
+    public ShortcutRecorder? ShortcutRecorder { get; set; }
     public ObservableCollection<GestureDirectionBindingViewModel> GestureDirections { get; } = [];
     /// <summary>Whether the panel shows its gestures section (the device has a gesture-capable button).</summary>
     [ObservableProperty][NotifyPropertyChangedFor(nameof(GestureRowsVisible), nameof(GestureSwipesVisible), nameof(GestureUnavailableForSelected))]

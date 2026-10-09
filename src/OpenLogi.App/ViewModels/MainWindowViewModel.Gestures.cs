@@ -56,10 +56,18 @@ public partial class MainWindowViewModel
                             Persist(configKey, owner, act);
                         else
                             PersistGesture(configKey, owner, dir, act);
-                    });
+                    },
+                    RecordShortcut);
             })
             .ToList();
     }
+
+    /// <summary>
+    /// The window-installed chord recorder (a modal dialog), or a no-op when none is
+    /// installed — headless construction (tests, the designer) must never block.
+    /// </summary>
+    private Task<KeyCombo?> RecordShortcut(KeyCombo current) =>
+        ShortcutRecorder is { } recorder ? recorder(current) : Task.FromResult<KeyCombo?>(null);
 
     private void PersistGesture(string configKey, ButtonId owner, GestureDirection direction, Core.Actions.MouseAction action)
     {
@@ -231,11 +239,7 @@ public partial class MainWindowViewModel
         var editors = new List<GestureDirectionBindingViewModel> { GestureClick };
         editors.AddRange(GestureDirections);
         for (var i = 0; i < editors.Count && i < actions.Length; i++)
-        {
-            var choice = ButtonBindingViewModel.Catalog.FirstOrDefault(c => c.Action.Equals(actions[i]));
-            if (choice is not null)
-                editors[i].Selected = choice; // persists via the editor's own callback
-        }
+            editors[i].Apply(actions[i]); // persists via the editor's own callback (shortcuts included)
         SelectedGestureCategory = MatchGestureCategory();
         _suppressGesturePanel = false;
         _lastGestureState = CurrentGestureSnapshot();
@@ -302,9 +306,7 @@ public partial class MainWindowViewModel
         foreach (var vm in GestureDirections)
         {
             if (preset.For(vm.Direction) is not { } action) continue;
-            var choice = ButtonBindingViewModel.Catalog.FirstOrDefault(c => c.Action.Equals(action));
-            if (choice is not null)
-                vm.Selected = choice; // fires the editor's persist callback
+            vm.Apply(action); // fires the editor's persist callback
         }
         if (updateCategory)
             SelectedGestureCategory = preset;

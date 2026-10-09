@@ -53,6 +53,10 @@ public class TranslationCoverageTests
         // Physical key legends. These follow the keyboard, not the UI language: a
         // German user on a QWERTZ board wants what is printed on the key.
         ["OpenLogi.App/ViewModels/KeyboardLayout.cs"] = "physical key legends",
+
+        // Key and modifier names of a recorded shortcut ("Ctrl+Shift+P"): legends and
+        // the config-file vocabulary, deliberately the same in every language.
+        ["OpenLogi.Core/Actions/KeyCombo.cs"] = "physical key legends",
     };
 
     /// <summary>

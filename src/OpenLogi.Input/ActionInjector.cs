@@ -9,7 +9,7 @@ namespace OpenLogi.Input;
 /// (DPI/SmartShift) are no-ops here — they're handled by the HID layer.
 ///
 /// HARDWARE-UNVERIFIED: actual injection needs an interactive desktop to observe.
-/// <see cref="MacVkToWindows"/> is pure and unit-tested.
+/// <see cref="ModifierKeys"/> and <see cref="IsExtendedKey"/> are pure and unit-tested.
 /// </summary>
 public static class ActionInjector
 {
@@ -120,17 +120,22 @@ public static class ActionInjector
 
     private static void PostScroll(uint flags, int data) => SendInputs([MouseInput(flags, data)]);
 
+    /// <summary>A recorded chord: its modifiers held, the key tapped. A cleared (empty) chord injects nothing.</summary>
     private static void PostCustomShortcut(KeyCombo combo)
     {
-        if (combo.KeyCode == 0) return;
-        if (MacVkToWindows(combo.KeyCode) is not { } vk) return;
+        if (combo.IsEmpty) return;
+        PostKey(combo.KeyCode, ModifierKeys(combo.Modifiers));
+    }
 
-        var modifiers = new List<ushort>();
-        if ((combo.Modifiers & KeyCombo.ModCmd) != 0) modifiers.Add(VK_CONTROL);
-        if ((combo.Modifiers & KeyCombo.ModShift) != 0) modifiers.Add(VK_SHIFT);
-        if ((combo.Modifiers & KeyCombo.ModCtrl) != 0 && !modifiers.Contains(VK_CONTROL)) modifiers.Add(VK_CONTROL);
-        if ((combo.Modifiers & KeyCombo.ModOption) != 0) modifiers.Add(VK_MENU);
-        PostKey(vk, [.. modifiers]);
+    /// <summary>The virtual keys to hold for <paramref name="modifiers"/>, in press order (released in reverse).</summary>
+    public static ushort[] ModifierKeys(ShortcutModifiers modifiers)
+    {
+        var keys = new List<ushort>(4);
+        if (modifiers.HasFlag(ShortcutModifiers.Ctrl)) keys.Add(VK_CONTROL);
+        if (modifiers.HasFlag(ShortcutModifiers.Shift)) keys.Add(VK_SHIFT);
+        if (modifiers.HasFlag(ShortcutModifiers.Alt)) keys.Add(VK_MENU);
+        if (modifiers.HasFlag(ShortcutModifiers.Win)) keys.Add(VK_LWIN);
+        return [.. keys];
     }
 
     private static void SendInputs(Native.INPUT[] inputs) =>
@@ -139,7 +144,32 @@ public static class ActionInjector
     private static Native.INPUT KeyInput(ushort vk, bool keyUp) => new()
     {
         type = Native.INPUT_KEYBOARD,
-        u = new Native.INPUTUNION { ki = new Native.KEYBDINPUT { wVk = vk, dwFlags = keyUp ? Native.KEYEVENTF_KEYUP : 0 } },
+        u = new Native.INPUTUNION
+        {
+            ki = new Native.KEYBDINPUT
+            {
+                wVk = vk,
+                dwFlags = (keyUp ? Native.KEYEVENTF_KEYUP : 0) | (IsExtendedKey(vk) ? Native.KEYEVENTF_EXTENDEDKEY : 0),
+            },
+        },
+    };
+
+    /// <summary>
+    /// Whether <paramref name="vk"/> is an "extended" key (navigation cluster, arrows,
+    /// right-hand modifiers, Win/Apps, numpad Enter/Divide). Without the extended flag
+    /// Windows derives the numpad scan code for these, so an injected ← reads as numpad 4
+    /// to anything that inspects the scan code.
+    /// </summary>
+    public static bool IsExtendedKey(ushort vk) => vk switch
+    {
+        0x21 or 0x22 or 0x23 or 0x24 => true,        // PgUp, PgDn, End, Home
+        0x25 or 0x26 or 0x27 or 0x28 => true,        // arrows
+        0x2C or 0x2D or 0x2E => true,                // PrintScreen, Insert, Delete
+        0x5B or 0x5C or 0x5D => true,                // LWin, RWin, Apps
+        0x6F or 0x90 => true,                        // numpad Divide, NumLock
+        0xA3 or 0xA5 => true,                        // RControl, RMenu
+        >= 0xA6 and <= 0xB7 => true,                 // browser / volume / media / launch keys
+        _ => false,
     };
 
     private static Native.INPUT MouseInput(uint flags, int data) => new()
@@ -153,30 +183,4 @@ public static class ActionInjector
         long p = (long)a * b;
         return p > int.MaxValue ? int.MaxValue : p < int.MinValue ? int.MinValue : (int)p;
     }
-
-    /// <summary>
-    /// Map a macOS virtual key code (the form stored in <see cref="KeyCombo.KeyCode"/>)
-    /// to a Windows virtual-key code, or <c>null</c> if unmapped. Ported from Rust
-    /// <c>mac_virtual_key_to_windows</c>.
-    /// </summary>
-    public static ushort? MacVkToWindows(ushort keyCode) => keyCode switch
-    {
-        0x00 => 0x41, 0x0B => 0x42, 0x08 => 0x43, 0x02 => 0x44, 0x0E => 0x45, 0x03 => 0x46,
-        0x05 => 0x47, 0x04 => 0x48, 0x22 => 0x49, 0x26 => 0x4A, 0x28 => 0x4B, 0x25 => 0x4C,
-        0x2E => 0x4D, 0x2D => 0x4E, 0x1F => 0x4F, 0x23 => 0x50, 0x0C => 0x51, 0x0F => 0x52,
-        0x01 => 0x53, 0x11 => 0x54, 0x20 => 0x55, 0x09 => 0x56, 0x0D => 0x57, 0x07 => 0x58,
-        0x10 => 0x59, 0x06 => 0x5A,
-        0x1D => 0x30, 0x12 => 0x31, 0x13 => 0x32, 0x14 => 0x33, 0x15 => 0x34, 0x17 => 0x35,
-        0x16 => 0x36, 0x1A => 0x37, 0x1C => 0x38, 0x19 => 0x39,
-        0x1B => 0xBD, 0x18 => 0xBB, 0x21 => 0xDB, 0x1E => 0xDD, 0x2A => 0xDC, 0x29 => 0xBA,
-        0x27 => 0xDE, 0x2B => 0xBC, 0x2F => 0xBE, 0x2C => 0xBF, 0x32 => 0xC0,
-        0x24 => 0x0D, 0x30 => 0x09, 0x31 => 0x20, 0x33 => 0x08, 0x35 => 0x1B,
-        0x73 => 0x24, 0x77 => 0x23, 0x74 => 0x21, 0x79 => 0x22, 0x75 => 0x2E,
-        0x7B => 0x25, 0x7C => 0x27, 0x7D => 0x28, 0x7E => 0x26,
-        0x7A => 0x70, 0x78 => 0x71, 0x63 => 0x72, 0x76 => 0x73, 0x60 => 0x74, 0x61 => 0x75,
-        0x62 => 0x76, 0x64 => 0x77, 0x65 => 0x78, 0x6D => 0x79, 0x67 => 0x7A, 0x6F => 0x7B,
-        0x69 => 0x7C, 0x6B => 0x7D, 0x71 => 0x7E, 0x6A => 0x7F, 0x40 => 0x80, 0x4F => 0x81,
-        0x50 => 0x82, 0x5A => 0x83,
-        _ => null,
-    };
 }

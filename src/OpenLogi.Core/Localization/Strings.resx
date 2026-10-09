@@ -1129,4 +1129,48 @@
     <value>Profile {0}</value>
     <comment>Onboard-profile picker row. {0} is the profile number.</comment>
   </data>
+  <data name="Action_CustomShortcut" xml:space="preserve">
+    <value>Keyboard Shortcut</value>
+    <comment>Action picker row for the CustomShortcut action (the row title; the chord text is shown beside it).</comment>
+  </data>
+  <data name="Category_Keyboard" xml:space="preserve">
+    <value>Keyboard</value>
+    <comment>Action picker group header for the Keyboard category.</comment>
+  </data>
+  <data name="Shortcut_None" xml:space="preserve">
+    <value>None</value>
+    <comment>Shown beside the Keyboard Shortcut row (and on the diagram) when no chord is recorded.</comment>
+  </data>
+  <data name="Shortcut_Change" xml:space="preserve">
+    <value>Change…</value>
+    <comment>Button beside the action dropdown that reopens the chord recorder for the selected Keyboard Shortcut.</comment>
+  </data>
+  <data name="ShortcutRecorder_Title" xml:space="preserve">
+    <value>Record Keyboard Shortcut</value>
+    <comment>Title of the chord recorder dialog.</comment>
+  </data>
+  <data name="ShortcutRecorder_HintCapturing" xml:space="preserve">
+    <value>Press the key combination to assign. Shift, Ctrl, Win and Alt follow the keys you hold, and you can also turn them on or off by clicking, before or after the key is pressed. Some combinations are reserved by Windows and cannot be captured.</value>
+    <comment>Chord recorder hint while waiting for a key (after Clear, or with no shortcut yet).</comment>
+  </data>
+  <data name="ShortcutRecorder_HintRecorded" xml:space="preserve">
+    <value>To assign a different key, clear the current shortcut first. You can still turn Shift, Ctrl, Win and Alt on or off by clicking them.</value>
+    <comment>Chord recorder hint once a key is recorded: the chord is frozen until Clear.</comment>
+  </data>
+  <data name="ShortcutRecorder_PressKey" xml:space="preserve">
+    <value>Press a key…</value>
+    <comment>Chord recorder preview text while no key has been recorded yet.</comment>
+  </data>
+  <data name="ShortcutRecorder_OK" xml:space="preserve">
+    <value>OK</value>
+    <comment>Chord recorder confirm button.</comment>
+  </data>
+  <data name="ShortcutRecorder_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Chord recorder cancel button.</comment>
+  </data>
+  <data name="ShortcutRecorder_Clear" xml:space="preserve">
+    <value>Clear</value>
+    <comment>Chord recorder button that removes the recorded chord (the button then does nothing).</comment>
+  </data>
 </root>

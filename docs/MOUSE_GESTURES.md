@@ -270,7 +270,7 @@ Two structural notes from the same data:
 | Start menu | `StartMenu` ✔ |
 | Volume up / down, Prev / Next track, Play/Pause | `VolumeUp/Down`, `PrevTrack/NextTrack`, `PlayPause` ✔ (one-shot, not speed-scaled) |
 | Middle button | `MiddleClick` ✔ |
-| Any keystroke (Custom) | `CustomShortcut` ✔ |
+| Any keystroke (Custom) | `CustomShortcut` ✔ — the picker's "Keyboard Shortcut" row; stored as text, e.g. `{ CustomShortcut = "Ctrl+Shift+P" }` (modifiers Ctrl, Alt, Shift, Win in that order, then a key name such as `F5`, `Left`, `Num0`, `Comma`; `""` = cleared, does nothing) |
 | Maximize / Minimize window | `MaximizeWindow` / `MinimizeWindow` ✔ (Win+↑ / Win+↓) |
 | Snap left / right | `SnapWindowLeft` / `SnapWindowRight` ✔ (Win+← / Win+→) |
 | Switch application (held Alt-Tab UI) | ✘ (no one-shot equivalent; `TaskView` is the nearest) |

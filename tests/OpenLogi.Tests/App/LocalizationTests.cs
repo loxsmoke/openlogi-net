@@ -5,6 +5,7 @@ using Avalonia.Data;
 using OpenLogi.App.Localization;
 using OpenLogi.App.ViewModels;
 using OpenLogi.App.Views;
+using OpenLogi.Core.Actions;
 using OpenLogi.Core.Config;
 using OpenLogi.Core.DeviceInfo;
 using OpenLogi.Core.Gestures;
@@ -314,6 +315,21 @@ public class LocalizationTests
                         $"{Path.GetFileName(file)} uses localization key {key}, which is not in Strings.resx");
                 }
         }
+    }
+
+    /// <summary>
+    /// Label keys declared on enum members (<see cref="ActionAttribute"/>, <see cref="LabelAttribute"/>)
+    /// are not call sites, so the source scan above cannot see them.
+    /// </summary>
+    [Fact]
+    public void EveryEnumLabelKeyExists()
+    {
+        var defined = ResourceKeys();
+        foreach (var kind in Enum.GetValues<ActionKind>())
+            Assert.True(defined.Contains(MouseAction.Info(kind).LabelKey), $"{kind} label key is not in Strings.resx");
+        foreach (var category in Enum.GetValues<Category>())
+            Assert.True(defined.Contains(EnumMetadata.Get<Category, LabelAttribute>(category).ResourceKey),
+                $"{category} label key is not in Strings.resx");
     }
 
     [Fact]

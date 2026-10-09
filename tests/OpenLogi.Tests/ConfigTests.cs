@@ -151,12 +151,7 @@ public class ConfigTests
     {
         var cfg = new Config();
         cfg.SetBinding("2b042", ButtonId.Back, new Binding.Single(MouseAction.Copy));
-        cfg.SetBinding("2b042", ButtonId.DpiToggle, new Binding.Single(MouseAction.CustomShortcut(new KeyCombo
-        {
-            Modifiers = KeyCombo.ModCmd,
-            KeyCode = 0x23,
-            Display = "⌘P",
-        })));
+        cfg.SetBinding("2b042", ButtonId.DpiToggle, new Binding.Single(MouseAction.CustomShortcut(KeyCombo.Parse("Ctrl+P"))));
         cfg.SetBinding("4082d", ButtonId.Back, new Binding.Single(MouseAction.Paste));
 
         var parsed = WriteAndRead(cfg);
@@ -164,7 +159,7 @@ public class ConfigTests
         var a = parsed.BindingsFor("2b042");
         Assert.Equal(new Binding.Single(MouseAction.Copy), a[ButtonId.Back]);
         Assert.Equal(
-            new Binding.Single(MouseAction.CustomShortcut(new KeyCombo { Modifiers = KeyCombo.ModCmd, KeyCode = 0x23, Display = "⌘P" })),
+            new Binding.Single(MouseAction.CustomShortcut(KeyCombo.Parse("Ctrl+P"))),
             a[ButtonId.DpiToggle]);
 
         var b = parsed.BindingsFor("4082d");

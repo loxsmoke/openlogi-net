@@ -1,3 +1,4 @@
+using OpenLogi.Core.Actions;
 using OpenLogi.Core.Config;
 using OpenLogi.Core.Cursor;
 using OpenLogi.Input;
@@ -98,18 +99,50 @@ public class CursorSizeTests
     }
 }
 
-/// <summary>Ported from the Rust <c>inject</c> mac_virtual_key_to_windows tests.</summary>
-public class ActionInjectorMappingTests
+/// <summary>The pure translation step of the low-level keyboard hook.</summary>
+public class KeyboardHookTranslateTests
 {
     [Fact]
-    public void CustomShortcutKeycodesMapAcrossCategories()
+    public void KeyDownAndUpTranslate_SysKeysIncluded()
     {
-        Assert.Equal((ushort)0x41, ActionInjector.MacVkToWindows(0x00)); // A → VK_A
-        Assert.Equal((ushort)0x31, ActionInjector.MacVkToWindows(0x12)); // 1 → VK_1
-        Assert.Equal((ushort)0x70, ActionInjector.MacVkToWindows(0x7A)); // F1 → VK_F1
-        Assert.Equal((ushort)0x25, ActionInjector.MacVkToWindows(0x7B)); // LeftArrow → VK_LEFT
-        Assert.Equal((ushort)0x20, ActionInjector.MacVkToWindows(0x31)); // Space → VK_SPACE
-        Assert.Equal((ushort)0xBA, ActionInjector.MacVkToWindows(0x29)); // ; → VK_OEM_1
-        Assert.Null(ActionInjector.MacVkToWindows(0x37));                // Command is a modifier
+        var data = new Native.KBDLLHOOKSTRUCT { vkCode = 0x09 };
+        Assert.Equal(new KeyboardHookEvent(0x09, Pressed: true), KeyboardHook.TranslateEvent(Native.WM_KEYDOWN, data));
+        Assert.Equal(new KeyboardHookEvent(0x09, Pressed: true), KeyboardHook.TranslateEvent(Native.WM_SYSKEYDOWN, data)); // Alt+Tab
+        Assert.Equal(new KeyboardHookEvent(0x09, Pressed: false), KeyboardHook.TranslateEvent(Native.WM_KEYUP, data));
+        Assert.Equal(new KeyboardHookEvent(0x09, Pressed: false), KeyboardHook.TranslateEvent(Native.WM_SYSKEYUP, data));
+    }
+
+    [Fact]
+    public void InjectedKeysAreDropped()
+    {
+        var injected = new Native.KBDLLHOOKSTRUCT { vkCode = 0x50, flags = Native.LLKHF_INJECTED };
+        Assert.Null(KeyboardHook.TranslateEvent(Native.WM_KEYDOWN, injected)); // our own SendInput
+        Assert.Null(KeyboardHook.TranslateEvent(0x0200, new Native.KBDLLHOOKSTRUCT { vkCode = 0x50 })); // not a key message
+    }
+}
+
+/// <summary>The pure parts of shortcut injection: which keys are held, and which are "extended".</summary>
+public class ActionInjectorKeyTests
+{
+    [Fact]
+    public void ModifierKeysAreHeldInCtrlShiftAltWinOrder()
+    {
+        var all = ShortcutModifiers.Ctrl | ShortcutModifiers.Alt | ShortcutModifiers.Shift | ShortcutModifiers.Win;
+        Assert.Equal(new ushort[] { 0x11, 0x10, 0x12, 0x5B }, ActionInjector.ModifierKeys(all));
+        Assert.Equal(new ushort[] { 0x12 }, ActionInjector.ModifierKeys(ShortcutModifiers.Alt));
+        Assert.Empty(ActionInjector.ModifierKeys(ShortcutModifiers.None));
+    }
+
+    [Theory]
+    [InlineData(0x25, true)]  // VK_LEFT
+    [InlineData(0x2E, true)]  // VK_DELETE
+    [InlineData(0xA5, true)]  // VK_RMENU
+    [InlineData(0x5B, true)]  // VK_LWIN
+    [InlineData(0x41, false)] // VK_A
+    [InlineData(0x10, false)] // VK_SHIFT
+    [InlineData(0x64, false)] // VK_NUMPAD4
+    public void ExtendedKeysAreTheNavigationClusterAndRightHandModifiers(int vk, bool extended)
+    {
+        Assert.Equal(extended, ActionInjector.IsExtendedKey((ushort)vk));
     }
 }

@@ -23,7 +23,7 @@ public partial class MainWindowViewModel
             }
             var action = current.TryGetValue(button, out var a) ? a : Bindings.DefaultBinding(button);
             _bindings[button] = new ButtonBindingViewModel(button, action, ButtonBindingViewModel.Catalog,
-                (b, act) => Persist(configKey, b, act));
+                (b, act) => Persist(configKey, b, act), RecordShortcut);
         }
         RefreshGestureSummaries(configKey);
     }
@@ -118,7 +118,7 @@ public partial class MainWindowViewModel
         if (!_bindings.TryGetValue(id, out var binding))
         {
             binding = new ButtonBindingViewModel(id, Bindings.DefaultBinding(id), ButtonBindingViewModel.Catalog,
-                (b, act) => Persist(configKey, b, act));
+                (b, act) => Persist(configKey, b, act), RecordShortcut);
             _bindings[id] = binding;
         }
         return binding;

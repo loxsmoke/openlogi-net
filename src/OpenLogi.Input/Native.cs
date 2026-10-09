@@ -6,9 +6,23 @@ namespace OpenLogi.Input;
 public static class Native
 {
     // ── Hook constants ───────────────────────────────────────────────────────
+    public const int WH_KEYBOARD_LL = 13;
     public const int WH_MOUSE_LL = 14;
     public const int HC_ACTION = 0;
     public const uint LLMHF_INJECTED = 0x00000001;
+    public const uint LLKHF_INJECTED = 0x00000010;
+
+    public const uint WM_KEYDOWN = 0x0100, WM_KEYUP = 0x0101, WM_SYSKEYDOWN = 0x0104, WM_SYSKEYUP = 0x0105;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct KBDLLHOOKSTRUCT
+    {
+        public uint vkCode;
+        public uint scanCode;
+        public uint flags;
+        public uint time;
+        public nuint dwExtraInfo;
+    }
 
     public const uint WM_QUIT = 0x0012;
     public const uint WM_MOUSEMOVE = 0x0200;
@@ -110,6 +124,7 @@ public static class Native
     public const uint MOUSEEVENTF_XDOWN = 0x0080, MOUSEEVENTF_XUP = 0x0100;
     public const uint MOUSEEVENTF_WHEEL = 0x0800, MOUSEEVENTF_HWHEEL = 0x1000;
 
+    public const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
     public const uint KEYEVENTF_KEYUP = 0x0002;
     public const uint KEYEVENTF_SCANCODE = 0x0008;
 
