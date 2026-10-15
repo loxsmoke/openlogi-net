@@ -27,7 +27,11 @@ public sealed class LogFile : IAsyncDisposable
     private readonly string _path;
     private readonly string _rotatedPath;
     private readonly long _maxBytes;
-    private readonly string _appVersion;
+    // The fixed part of every file-opening marker. Built once from the version
+    // string exactly as handed in, so the first line of log.txt and of a rotated
+    // file is identical from run to run except for the timestamp — greppable as-is,
+    // no version parsing or reformatting anywhere.
+    private readonly string _banner;
     private readonly Channel<Entry> _queue;
     private readonly Task _drain;
     private int _dropped;
@@ -44,7 +48,7 @@ public sealed class LogFile : IAsyncDisposable
         _path = Path.Combine(directory, "log.txt");
         _rotatedPath = Path.Combine(directory, "log.1.txt");
         _maxBytes = maxBytes;
-        _appVersion = appVersion ?? "?";
+        _banner = $"==== OpenLogi.net v{appVersion ?? "?"}";
         _queue = Channel.CreateBounded<Entry>(new BoundedChannelOptions(QueueCapacity)
         {
             SingleReader = true,
@@ -107,7 +111,9 @@ public sealed class LogFile : IAsyncDisposable
                 writer.Dispose();
                 File.Move(_path, _rotatedPath, overwrite: true);
                 (stream, writer) = Open();
-                writer?.WriteLine($"==== rotated from log.txt {Stamp(DateTime.Now)} ====");
+                // A rotated file is what gets pasted into an issue, so it must name the
+                // build on its first line just like a fresh session does.
+                writer?.WriteLine($"{_banner} rotated from log.txt {Stamp(DateTime.Now)} ====");
                 if (writer is null) return;
             }
             writer.WriteLine(line);
@@ -163,7 +169,7 @@ public sealed class LogFile : IAsyncDisposable
             try
             {
                 writer?.WriteLine(
-                    $"==== OpenLogi.net v{_appVersion} session start {Stamp(DateTime.Now)} (UTC{DateTimeOffset.Now.ToString("zzz", CultureInfo.InvariantCulture)}) ====");
+                    $"{_banner} session start {Stamp(DateTime.Now)} (UTC{DateTimeOffset.Now.ToString("zzz", CultureInfo.InvariantCulture)}) ====");
             }
             catch { /* keep draining; later writes retry the stream */ }
 

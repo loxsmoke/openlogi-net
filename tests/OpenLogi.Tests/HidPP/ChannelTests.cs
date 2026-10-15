@@ -192,6 +192,30 @@ public class ChannelTests
     }
 
     [Fact]
+    public async Task SustainedReadFailuresRaiseReadsDeadOnce()
+    {
+        // A stale handle (BLE link re-established behind Windows' back, node still
+        // present) fails every read and never recovers by itself — field logs show
+        // dozens of "read failed" with zero "reads recovered". The owner must be told
+        // to reopen, once, after the threshold; a napping device whose reads merely
+        // time out never gets here because a timeout is not a failure.
+        var raw = new MockRawHidChannel();
+        raw.FailReads(new IOException("the device is not connected"));
+        await using var channel = await HidppChannel.FromRawChannelAsync(raw, deadReadThreshold: TimeSpan.FromMilliseconds(300));
+        var raised = 0;
+        channel.ReadsDead += () => Interlocked.Increment(ref raised);
+
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (Volatile.Read(ref raised) == 0 && DateTime.UtcNow < deadline)
+            await Task.Delay(25);
+        Assert.Equal(1, Volatile.Read(ref raised));
+
+        // Still failing well past the threshold: no second notification.
+        await Task.Delay(TimeSpan.FromSeconds(1.5));
+        Assert.Equal(1, Volatile.Read(ref raised));
+    }
+
+    [Fact]
     public async Task DisposeClosesRawChannel()
     {
         // Regression: the channel owned the raw HID stream but never closed it,

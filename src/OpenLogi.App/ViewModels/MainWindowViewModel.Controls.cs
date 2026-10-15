@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.Input;
 using OpenLogi.Core.Config;
+using OpenLogi.Core.Logging;
 using OpenLogi.Hid;
 using OpenLogi.Core.Localization;
 
@@ -55,25 +56,54 @@ public partial class MainWindowViewModel
         ShowHosts = hosts.HostCount > 1;
     }
 
+    /// <summary>
+    /// A drag fires one value change per 50 DPI tick (20+ per drag, HARDWARE-OBSERVED
+    /// 2026-10-15), each of which used to be a config write and a HID++ round trip.
+    /// Only the value the slider settles on matters, so changes are coalesced: the
+    /// commit runs this long after the last change.
+    /// </summary>
+    private static readonly TimeSpan DpiDebounce = TimeSpan.FromMilliseconds(150);
+    private CancellationTokenSource? _dpiDebounce;
+
     partial void OnDpiValueChanged(double value)
     {
         if (_loadingControls) return;
-        var snapped = Snap((uint)Math.Round(value));
-        _ = ApplyDpiAsync(snapped);
+        var snapped = SnapDpi(_dpiOptions, (uint)Math.Round(value));
+        // Resolve the target at the moment of the change, not when the commit or the
+        // device round trip completes. The user can navigate to another device while
+        // the debounce runs or a slow write (a napping BLE mouse) is in flight, and
+        // reading SelectedDevice afterwards filed the DPI under that other device —
+        // the mouse then kept its stale saved value and every reconnect re-pushed it
+        // (gh-18). The commit saves the config first: it is the source of truth the
+        // keepalive re-pushes when the write is rejected.
+        var ck = SelectedDevice?.ConfigKey;
+        var session = _session;
+        _dpiDebounce?.Cancel();
+        var cts = _dpiDebounce = new CancellationTokenSource();
+        _ = CommitDpiAfterDebounceAsync(cts, ck, session, snapped);
     }
 
-    private async Task ApplyDpiAsync(uint dpi)
+    private async Task CommitDpiAfterDebounceAsync(CancellationTokenSource cts, string? ck, DeviceSession? session, uint dpi)
     {
-        if (_session is not null) await _session.ApplyDpiAsync((ushort)dpi);
-        if (SelectedDevice?.ConfigKey is { } ck) { _config.SetDpi(ck, dpi); SaveConfig(); }
+        try { await Task.Delay(DpiDebounce, cts.Token); }
+        catch (OperationCanceledException) { cts.Dispose(); return; } // superseded by a newer change
+        if (ReferenceEquals(_dpiDebounce, cts)) _dpiDebounce = null;
+        cts.Dispose();
+        // Back on the UI thread (Task.Delay resumed on the dispatcher context).
+        if (ck is not null) { _config.SetDpi(ck, dpi); SaveConfig(); }
+        await PushDpiAsync(session, ck, dpi);
     }
 
-    /// <summary>Snap a DPI value to the nearest device-supported value.</summary>
-    private uint Snap(uint dpi)
+    private static async Task PushDpiAsync(DeviceSession? session, string? ck, uint dpi)
     {
-        if (_dpiOptions.Count == 0) return dpi;
-        return _dpiOptions.MinBy(v => Math.Abs((long)v - dpi));
+        if (session is null) return;
+        var ok = await session.ApplyDpiAsync((ushort)dpi);
+        DiagnosticLog.Info("dpi", $"{ck ?? "?"}: slider push {dpi} {(ok ? "ok" : "failed — keepalive will retry")}");
     }
+
+    /// <summary>Snap a DPI value to the nearest device-supported value (the raw value when none are known).</summary>
+    internal static uint SnapDpi(IReadOnlyList<uint> options, uint dpi) =>
+        options.Count == 0 ? dpi : options.MinBy(v => Math.Abs((long)v - dpi));
 
     private static double SmallestGap(IReadOnlyList<uint> options)
     {
@@ -94,7 +124,7 @@ public partial class MainWindowViewModel
     [RelayCommand]
     private void AddDpiPreset()
     {
-        var dpi = Snap((uint)Math.Round(DpiValue));
+        var dpi = SnapDpi(_dpiOptions, (uint)Math.Round(DpiValue));
         DpiPresets.Add(dpi);
         SaveDpiPresets();
     }
@@ -144,12 +174,15 @@ public partial class MainWindowViewModel
         }
     }
 
-    partial void OnInvertScrollChanged(bool value) { if (!_loadingControls) _ = ApplyScrollInvertAsync(value); }
-
-    private async Task ApplyScrollInvertAsync(bool invert)
+    partial void OnInvertScrollChanged(bool value)
     {
-        if (_session is not null) await _session.ApplyScrollInvertAsync(invert);
-        if (SelectedDevice?.ConfigKey is { } ck) { _config.SetInvertScroll(ck, invert); SaveConfig(); }
+        if (_loadingControls) return;
+        // Same target-before-await rule as the DPI slider (gh-18): the invert bit is
+        // pushed alongside the DPI on reconnect, so it must be filed under the right device.
+        var ck = SelectedDevice?.ConfigKey;
+        var session = _session;
+        if (ck is not null) { _config.SetInvertScroll(ck, value); SaveConfig(); }
+        if (session is not null) _ = session.ApplyScrollInvertAsync(value);
     }
 
     partial void OnSmoothScrollChanged(bool value) { if (!_loadingControls) _ = ApplySmoothScrollAsync(value); }

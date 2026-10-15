@@ -15,6 +15,27 @@ public static class DiagnosticLog
     private static LogFile? _file;
     private static bool _initTried;
 
+    /// <summary>
+    /// The running app's version string, taken verbatim from the entry assembly's
+    /// informational version (e.g. <c>0.21.0+0ff3117…</c>, which names the exact
+    /// build) — never parsed into a <see cref="Version"/> and reformatted, so the
+    /// log header is a fixed string per build. Falls back to the assembly version
+    /// text, then <c>?</c>, when the attribute is absent (tests, odd hosts).
+    /// </summary>
+    public static readonly string AppVersion = ResolveAppVersion();
+
+    private static string ResolveAppVersion()
+    {
+        try
+        {
+            var entry = Assembly.GetEntryAssembly();
+            return entry?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                ?? entry?.GetName().Version?.ToString()
+                ?? "?";
+        }
+        catch { return "?"; }
+    }
+
     private static LogFile? File_
     {
         get
@@ -26,8 +47,7 @@ public static class DiagnosticLog
                 _initTried = true;
                 try
                 {
-                    var version = Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "?";
-                    _file = new LogFile(Paths.LogDir(), appVersion: version);
+                    _file = new LogFile(Paths.LogDir(), appVersion: AppVersion);
                     AppDomain.CurrentDomain.ProcessExit += (_, _) =>
                         _file?.ShutdownAsync("process exit").AsTask().Wait(1000);
                 }

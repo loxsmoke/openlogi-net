@@ -1,4 +1,5 @@
 using OpenLogi.Core.DeviceInfo;
+using OpenLogi.Core.Logging;
 using OpenLogi.Hid;
 
 namespace OpenLogi.App.ViewModels;
@@ -56,6 +57,7 @@ public partial class MainWindowViewModel
 
     private async Task LoadControlsAsync(DeviceViewModel? device)
     {
+        var gen = ++_activeLoadGen;
         // Stop the previous device's live battery listener before switching.
         if (_batteryMonitor is not null) { await _batteryMonitor.DisposeAsync(); _batteryMonitor = null; }
 
@@ -80,7 +82,7 @@ public partial class MainWindowViewModel
         _loadingControls = true;
         try
         {
-            await LoadDpiSectionAsync(session, device);
+            await LoadDpiSectionAsync(session, device, gen);
             await LoadSmartShiftSectionAsync(session, device);
             await LoadScrollSectionAsync(session, device);
             await BuildGestureSectionAsync(session, device);
@@ -90,8 +92,20 @@ public partial class MainWindowViewModel
             var gkeyProfile = await LoadProfilesSectionAsync(session, device);
             await LoadGKeysSectionAsync(session, device, gkeyProfile);
         }
-        finally { _loadingControls = false; IsLoadingDevice = false; }
+        finally
+        {
+            // Only the newest run may lift the guard — an older run finishing while a
+            // newer one is mid-load must not expose the newer run's property sets.
+            if (gen == _activeLoadGen) { _loadingControls = false; IsLoadingDevice = false; }
+        }
     }
+
+    /// <summary>
+    /// Whether a section load started as run <paramref name="gen"/> for <paramref name="device"/>
+    /// may still touch the controls: the selection has not moved on and no newer run owns the page.
+    /// </summary>
+    private bool IsCurrentLoad(DeviceViewModel device, int gen) =>
+        ReferenceEquals(SelectedDevice, device) && gen == _activeLoadGen;
 
     /// <summary>
     /// Resolve the session for a device page: reuse the mouse's already-open persistent
@@ -135,16 +149,30 @@ public partial class MainWindowViewModel
                 }));
     }
 
-    private async Task LoadDpiSectionAsync(DeviceSession session, DeviceViewModel device)
+    private async Task LoadDpiSectionAsync(DeviceSession session, DeviceViewModel device, int gen)
     {
-        if (await session.ReadDpiAsync() is not { } dpi || !ReferenceEquals(SelectedDevice, device)
+        if (await session.ReadDpiAsync() is not { } dpi || !IsCurrentLoad(device, gen)
             || dpi.Supported.Count == 0)
             return;
+        // The sensor DPI is volatile: firmware resets it on wake/reconnect. Showing the
+        // live reading let a reset masquerade as the app changing the user's setting
+        // (gh-18), so when a saved preference exists and differs, re-push it and show
+        // it; a rejected push shows the firmware value honestly (the keepalive retries).
+        // Without a saved preference the live value is shown and nothing is saved.
+        var shown = dpi.Current;
+        if (device.ConfigKey is { } ck && _config.Dpi(ck) is { } saved && saved != dpi.Current)
+        {
+            var ok = await session.ApplyDpiAsync((ushort)saved);
+            DiagnosticLog.Info("dpi",
+                $"{device.Name}: page open found {dpi.Current}, saved {saved} — re-pushed {(ok ? "ok" : "failed — keepalive will retry")}");
+            if (ok) shown = (ushort)saved;
+            if (!IsCurrentLoad(device, gen)) return;
+        }
         _dpiOptions = [.. dpi.Supported.Select(s => (uint)s)];
         DpiMin = _dpiOptions.Min();
         DpiMax = _dpiOptions.Max();
         DpiStep = SmallestGap(_dpiOptions);
-        DpiValue = dpi.Current;
+        DpiValue = shown;
         DpiRangeText = $"{(uint)DpiMin}–{(uint)DpiMax} · step {(uint)DpiStep}";
         LoadDpiPresets(device.ConfigKey);
         ShowDpi = true;

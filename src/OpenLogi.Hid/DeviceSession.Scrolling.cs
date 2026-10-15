@@ -104,6 +104,7 @@ public sealed partial class DeviceSession
                 var mode = await _wheel.GetModeAsync().ConfigureAwait(false);
                 if (!mode.Diverted || !mode.HighResolution)
                     await _wheel.SetModeAsync(mode with { Diverted = true, HighResolution = true }).ConfigureAwait(false);
+                return true;
             }, "smooth scroll", _cts.Token);
         }
 

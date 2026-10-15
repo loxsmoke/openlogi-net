@@ -23,7 +23,14 @@ public sealed class WindowsRawHidChannel : IRawHidChannel, IDisposable
     private WindowsRawHidChannel(HidDevice device, HidStream stream, (bool, bool)? support)
     {
         _stream = stream;
-        _stream.ReadTimeout = 250;
+        // No read timeout: a HidSharp read blocks until a report arrives or the stream
+        // is closed from another thread, which unblocks it within ~1 ms as an
+        // ObjectDisposedException("Closed.") — HARDWARE-VERIFIED 2026-10-15 on the MX
+        // Anywhere 3S over BLE. The former 250 ms timeout made HidSharp throw a
+        // TimeoutException four times a second per idle channel (caught and ignored,
+        // but a constant first-chance exception stream in the debugger). Cancellation
+        // now closes the stream instead; see ReadReportAsync.
+        _stream.ReadTimeout = Timeout.Infinite;
         _stream.WriteTimeout = 1000;
         _maxInput = Math.Max(device.GetMaxInputReportLength(), HidppMessage.LongReportLength);
         // Windows rejects HID writes that aren't exactly the interface's output
@@ -57,23 +64,27 @@ public sealed class WindowsRawHidChannel : IRawHidChannel, IDisposable
     public Task<int> ReadReportAsync(Memory<byte> buf, CancellationToken cancellationToken) =>
         Task.Run(() =>
         {
+            // Cancellation is only ever the channel being disposed, so closing the
+            // stream is the right way to unblock the read (the owner disposes the
+            // channel right after; a second Dispose is harmless). A token already
+            // cancelled fires the callback synchronously here, and the read below
+            // then fails as "Closed." and is reported as cancellation.
+            using var unblock = cancellationToken.Register(static s => ((HidStream)s!).Close(), _stream);
             var temp = new byte[_maxInput];
-            while (!cancellationToken.IsCancellationRequested)
+            try
             {
-                try
-                {
-                    var n = _stream.Read(temp, 0, temp.Length);
-                    var len = Math.Min(n, buf.Length);
-                    temp.AsSpan(0, len).CopyTo(buf.Span);
-                    return len;
-                }
-                catch (TimeoutException)
-                {
-                    // Transient: loop so cancellation is observed promptly.
-                }
+                var n = _stream.Read(temp, 0, temp.Length);
+                var len = Math.Min(n, buf.Length);
+                temp.AsSpan(0, len).CopyTo(buf.Span);
+                return len;
             }
-            cancellationToken.ThrowIfCancellationRequested();
-            return 0;
+            catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+            // Anything else (IOException from a stale handle, ObjectDisposedException
+            // from a close we did not request) propagates: the read loop treats it as a
+            // failed read, backs off, and after sustained failure asks for a reopen.
         }, cancellationToken);
 
     public (bool SupportsShort, bool SupportsLong)? SupportsShortLongHidpp() => _support;
@@ -81,7 +92,11 @@ public sealed class WindowsRawHidChannel : IRawHidChannel, IDisposable
     public Task<int> GetReportDescriptorAsync(Memory<byte> buf) =>
         throw new NotSupportedException("descriptor is parsed eagerly in SupportsShortLongHidpp");
 
-    public void Dispose() => _stream.Dispose();
+    public void Dispose()
+    {
+        // Idempotent: the read's cancellation callback may already have closed it.
+        try { _stream.Dispose(); } catch (ObjectDisposedException) { /* already closed */ }
+    }
 
     /// <summary>
     /// Detect HID++ short (report id 0x10) / long (0x11) support from the device's

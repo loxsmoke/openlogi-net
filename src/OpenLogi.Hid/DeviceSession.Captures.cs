@@ -178,9 +178,9 @@ public sealed partial class DeviceSession
     /// *transitions* are logged under <paramref name="what"/>: a gap in divert
     /// coverage is the prime suspect when a diverted button acts native.
     /// </summary>
-    private static async Task ReassertDivertLoopAsync(
+    internal static async Task ReassertDivertLoopAsync(
         ChannelReader<WirelessDeviceStatusFeature.StatusBroadcast>? wake,
-        Func<Task> reassert, string what, CancellationToken ct)
+        Func<Task<bool>> reassert, string what, CancellationToken ct)
     {
         var failing = false;
         try
@@ -203,23 +203,79 @@ public sealed partial class DeviceSession
                 {
                     await Task.Delay(DivertKeepalive, ct).ConfigureAwait(false);
                 }
+                // A rejected write is the EXPECTED outcome while the device naps, so it
+                // is reported by return value, not by exception: a throw every 20 s for
+                // the whole nap is noise in the debugger and nothing else.
+                string? failure = null;
                 try
                 {
-                    await reassert().ConfigureAwait(false);
+                    if (!await reassert().ConfigureAwait(false)) failure = "the device rejected the write";
+                }
+                catch (Exception ex) { failure = ex.Message; }
+
+                if (failure is null)
+                {
                     if (failing || wokeByBroadcast)
                         DiagnosticLog.Info("capture",
                             $"{what}: divert reasserted ({(wokeByBroadcast ? "reconnect broadcast" : "keepalive recovered")})");
                     failing = false;
                 }
-                catch (Exception ex)
+                else
                 {
                     if (!failing)
-                        DiagnosticLog.Info("capture", $"{what}: divert reassert failing: {ex.Message} (will retry)");
+                        DiagnosticLog.Info("capture", $"{what}: divert reassert failing: {failure} (will retry)");
                     failing = true;
                 }
             }
         }
         catch (OperationCanceledException) { /* disposing */ }
+    }
+
+    // ── Volatile sensor settings keepalive (DPI 0x2201, scroll direction 0x2121) ──
+
+    /// <summary>
+    /// Re-push the mouse's volatile sensor settings on the same cadence as the
+    /// diverts: every <see cref="DivertKeepalive"/> and instantly on the 0x1d4b
+    /// reconnect broadcast. Firmware resets the sensor DPI (and the wheel's invert
+    /// bit) on wake/reconnect, and a push to a napping mouse is rejected outright —
+    /// until now nothing retried either, so the mouse sat at its firmware default
+    /// until an unrelated rescan (gh-18: "DPI flops to 1000 every now and then").
+    /// <paramref name="push"/> must read the persisted values itself (so a change
+    /// made between ticks is what lands) and return <c>false</c> when the device
+    /// rejected a write — that drives the loop's fail/recover logging and the retry.
+    /// <c>null</c> when the device has no adjustable DPI — nothing volatile to keep.
+    /// </summary>
+    public IAsyncDisposable? StartVolatileSettingsKeepalive(Func<Task<bool>> push)
+    {
+        if (!SupportsDpi) return null;
+        var wireless = _device.GetFeature<WirelessDeviceStatusFeature>();
+        // Logged once so a log can show the keepalive was armed at all: the loop itself
+        // only logs fail/recover transitions, so a mouse that always answers leaves no trace.
+        DiagnosticLog.Info("dpi",
+            $"volatile settings keepalive armed (every {DivertKeepalive.TotalSeconds:0} s{(wireless is not null ? " + 0x1d4b reconnect broadcast" : "")})");
+        return new VolatileSettingsCapture(wireless, push);
+    }
+
+    /// <summary>Runs the volatile-settings re-push loop; stops it on dispose.</summary>
+    private sealed class VolatileSettingsCapture : IAsyncDisposable
+    {
+        private readonly WirelessDeviceStatusFeature? _wireless;
+        private readonly CancellationTokenSource _cts = new();
+        private readonly Task _loop;
+
+        public VolatileSettingsCapture(WirelessDeviceStatusFeature? wireless, Func<Task<bool>> push)
+        {
+            _wireless = wireless;
+            _loop = ReassertDivertLoopAsync(wireless?.Listen(), push, "volatile settings", _cts.Token);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            _cts.Cancel();
+            try { await _loop.ConfigureAwait(false); } catch { /* cancellation */ }
+            _wireless?.Dispose();
+            _cts.Dispose();
+        }
     }
 
     /// <summary>
@@ -245,10 +301,12 @@ public sealed partial class DeviceSession
             _cid = cid;
             _wireless = wireless;
             _pump = PumpAsync(rc.Listen(), onGesture, _cts.Token);
-            _keepalive = ReassertDivertLoopAsync(wireless?.Listen(),
-                () => _rc.SetCidReportingAsync(new ControlId(_cid),
-                    CidReportingChange.TemporaryDiversion(diverted: true, rawXy: true)),
-                $"gesture (cid 0x{cid:x4})", _cts.Token);
+            _keepalive = ReassertDivertLoopAsync(wireless?.Listen(), async () =>
+            {
+                await _rc.SetCidReportingAsync(new ControlId(_cid),
+                    CidReportingChange.TemporaryDiversion(diverted: true, rawXy: true)).ConfigureAwait(false);
+                return true;
+            }, $"gesture (cid 0x{cid:x4})", _cts.Token);
         }
 
         /// <summary>
@@ -366,6 +424,7 @@ public sealed partial class DeviceSession
                 foreach (var cid in _cids)
                     await _rc.SetCidReportingAsync(new ControlId(cid),
                         CidReportingChange.TemporaryDiversion(diverted: true, rawXy: false)).ConfigureAwait(false);
+                return true;
             }, "dpi button", _cts.Token);
         }
 

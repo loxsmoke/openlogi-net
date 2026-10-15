@@ -298,6 +298,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     // page — and dispatch that mouse's own bindings, so multiple mice differ.
     private readonly List<MouseCapture> _mouseCaptures = [];
     private bool _loadingControls;
+    // Identity of the newest LoadControlsAsync run. Two runs for one page can overlap
+    // (a topology event or resume while the page is open starts a second one), and
+    // the first one finishing used to lift _loadingControls under the second, so the
+    // second's late slider update was saved as a user change (gh-18).
+    private int _activeLoadGen;
 
     private sealed record MouseCapture(DeviceViewModel Device, DeviceSession Session, IAsyncDisposable Capture);
 

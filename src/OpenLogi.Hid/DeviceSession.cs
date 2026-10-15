@@ -35,6 +35,18 @@ public sealed partial class DeviceSession : IAsyncDisposable
     }
 
     /// <summary>
+    /// Raised (off the UI thread) when the session's HID handle has failed every read
+    /// for <see cref="HidppChannel.DefaultDeadReadThreshold"/>: writes have been
+    /// failing too, the captures riding this session are dead, and the device node is
+    /// typically still present so no rescan will come. The owner should reopen.
+    /// </summary>
+    public event Action? Faulted
+    {
+        add => _channel.ReadsDead += value;
+        remove => _channel.ReadsDead -= value;
+    }
+
+    /// <summary>
     /// Wrap an already-open channel + enumerated device in a session WITHOUT taking
     /// ownership — so lighting can be applied at the one moment a napping wireless
     /// keyboard is known reachable: during the inventory sweep's probe, before its
@@ -185,12 +197,26 @@ public sealed partial class DeviceSession : IAsyncDisposable
         catch { return null; }
     }
 
-    /// <summary>Apply a sensor DPI (sensor 0). Writes to the device.</summary>
+    /// <summary>Whether the device exposes an adjustable sensor DPI (AdjustableDpi 0x2201).</summary>
+    public bool SupportsDpi => _device.FeatureIndex(AdjustableDpiFeature.Id) is not null;
+
+    /// <summary>
+    /// Apply a sensor DPI (sensor 0). Writes to the device. <c>false</c> when the
+    /// device has no 0x2201 or rejected the write (typically a napping wireless
+    /// mouse, which fails every HID++ call for a while) — the failure is logged so a
+    /// "DPI went back to default" report can be traced (gh-18).
+    /// </summary>
     public async Task<bool> ApplyDpiAsync(ushort dpi)
     {
         if (_device.GetFeature<AdjustableDpiFeature>() is not { } feature) return false;
         try { await feature.SetSensorDpiAsync(0, dpi).ConfigureAwait(false); return true; }
-        catch { return false; }
+        catch (Exception ex)
+        {
+            // Debug, not Warn: the keepalive retries every 20 s for a whole nap and the
+            // callers already log the outcome once per push/transition.
+            DiagnosticLog.Debug("dpi", $"set {dpi} failed: {ex.Message}");
+            return false;
+        }
     }
 
     // ── SmartShift ─────────────────────────────────────────────────────────────

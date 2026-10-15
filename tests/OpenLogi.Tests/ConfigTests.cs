@@ -95,6 +95,24 @@ public class ConfigTests
     }
 
     [Fact]
+    public void SetDpiTouchesOnlyTheNamedDevice()
+    {
+        // gh-18: a DPI saved for one mouse must never show up under another device
+        // (a keyboard entry carrying `dpi = 200` was the signature of the misfile).
+        var cfg = new Config();
+        cfg.SetDpi("4b037", 1600);
+        cfg.SetDeviceIdentity("2b354", new DeviceIdentity
+        {
+            DisplayName = "G915",
+            Kind = DeviceKind.Keyboard,
+            Capabilities = new Capabilities { Buttons = true, Pointer = false },
+        });
+        var restored = WriteAndRead(cfg);
+        Assert.Equal(1600u, restored.Dpi("4b037"));
+        Assert.Null(restored.Dpi("2b354"));
+    }
+
+    [Fact]
     public void SmartShiftRoundtripsPerDevice()
     {
         var cfg = new Config();

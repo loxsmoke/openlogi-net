@@ -18,6 +18,22 @@ public sealed class HidppChannel : IAsyncDisposable
     /// <summary>Ceiling for the read-failure backoff.</summary>
     public static readonly TimeSpan MaxReadFailureBackoff = TimeSpan.FromSeconds(1);
 
+    /// <summary>
+    /// How long reads must fail without a break before <see cref="ReadsDead"/> is
+    /// raised. A napping BLE mouse never trips this: its reads merely time out
+    /// (no report), they don't fail. Only a stale handle fails every read, and in
+    /// two weeks of field logs such a handle never came back on its own — recovery
+    /// always needed a fresh open, which until now only a PnP node change triggered.
+    /// </summary>
+    public static readonly TimeSpan DefaultDeadReadThreshold = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Raised once (off the UI thread) when reads have failed continuously for the
+    /// dead-read threshold: the OS handle is presumed stale and the owner should
+    /// reopen the device. Re-armed if reads ever recover.
+    /// </summary>
+    public event Action? ReadsDead;
+
     public bool SupportsShort { get; }
     public bool SupportsLong { get; }
     public ushort VendorId { get; }
@@ -38,14 +54,16 @@ public sealed class HidppChannel : IAsyncDisposable
 
     private readonly CancellationTokenSource _cts = new();
     private readonly Task _readLoop;
+    private readonly TimeSpan _deadReadThreshold;
 
-    private HidppChannel(IRawHidChannel raw, bool supportsShort, bool supportsLong)
+    private HidppChannel(IRawHidChannel raw, bool supportsShort, bool supportsLong, TimeSpan deadReadThreshold)
     {
         _raw = raw;
         SupportsShort = supportsShort;
         SupportsLong = supportsLong;
         VendorId = raw.VendorId;
         ProductId = raw.ProductId;
+        _deadReadThreshold = deadReadThreshold;
         _readLoop = Task.Run(() => ReadLoopAsync(_cts.Token));
     }
 
@@ -54,7 +72,9 @@ public sealed class HidppChannel : IAsyncDisposable
     /// unsupported. Takes ownership of <paramref name="raw"/> either way: a
     /// rejected channel is disposed here rather than leaking its HID handle.
     /// </summary>
-    public static Task<HidppChannel> FromRawChannelAsync(IRawHidChannel raw)
+    /// <param name="raw">The HID collection to own.</param>
+    /// <param name="deadReadThreshold">Override of <see cref="DefaultDeadReadThreshold"/> (tests).</param>
+    public static Task<HidppChannel> FromRawChannelAsync(IRawHidChannel raw, TimeSpan? deadReadThreshold = null)
     {
         var support = raw.SupportsShortLongHidpp();
         if (support is null || (!support.Value.SupportsShort && !support.Value.SupportsLong))
@@ -65,7 +85,8 @@ public sealed class HidppChannel : IAsyncDisposable
                     "report-descriptor parsing is not implemented yet; the raw channel must report short/long support directly (section 4)")
                 : new ChannelException(ChannelErrorKind.HidppNotSupported);
         }
-        return Task.FromResult(new HidppChannel(raw, support.Value.SupportsShort, support.Value.SupportsLong));
+        return Task.FromResult(new HidppChannel(raw, support.Value.SupportsShort, support.Value.SupportsLong,
+            deadReadThreshold ?? DefaultDeadReadThreshold));
     }
 
     // ── Software id ──────────────────────────────────────────────────────────
@@ -225,6 +246,8 @@ public sealed class HidppChannel : IAsyncDisposable
         var buf = new byte[64];
         var backoff = TimeSpan.Zero;
         var firstBurst = true;
+        var failingSince = DateTime.MinValue;
+        var deadRaised = false;
         while (!ct.IsCancellationRequested)
         {
             int len;
@@ -234,6 +257,7 @@ public sealed class HidppChannel : IAsyncDisposable
                 if (backoff != TimeSpan.Zero)
                 {
                     backoff = TimeSpan.Zero;
+                    deadRaised = false;
                     Log(firstBurst, "reads recovered");
                     firstBurst = false;
                 }
@@ -253,11 +277,21 @@ public sealed class HidppChannel : IAsyncDisposable
                 if (backoff == TimeSpan.Zero)
                 {
                     backoff = InitialReadFailureBackoff;
+                    failingSince = DateTime.UtcNow;
                     Log(firstBurst, $"read failed ({e.Message}) — retrying with backoff");
                 }
                 else if (backoff < MaxReadFailureBackoff)
                 {
                     backoff = TimeSpan.FromTicks(Math.Min(backoff.Ticks * 2, MaxReadFailureBackoff.Ticks));
+                }
+                if (!deadRaised && DateTime.UtcNow - failingSince >= _deadReadThreshold)
+                {
+                    // Sustained failure = stale handle (the device node may well still be
+                    // present, so no PnP event will come): tell the owner to reopen.
+                    deadRaised = true;
+                    Log(firstBurst, $"reads failing for {_deadReadThreshold.TotalSeconds:0} s — handle presumed dead, asking owner to reopen");
+                    try { ReadsDead?.Invoke(); }
+                    catch (Exception ex) { DiagnosticLog.Warn("channel", $"ReadsDead handler threw: {ex.Message}"); }
                 }
                 try { await Task.Delay(backoff, ct).ConfigureAwait(false); }
                 catch (OperationCanceledException) { break; }

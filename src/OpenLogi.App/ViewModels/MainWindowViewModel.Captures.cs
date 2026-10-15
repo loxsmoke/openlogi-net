@@ -70,10 +70,20 @@ public partial class MainWindowViewModel
         {
             var session = await DeviceSession.OpenAsync(route);
             if (session is null) return false;
+            // A stale handle (BLE link dropped and came back without a PnP node change,
+            // LIVE-OBSERVED 2026-10-15: node present, fresh open fine, this handle failing
+            // every read for 8+ min) kills every capture on it and no rescan comes.
+            session.Faulted += () => OnMouseSessionFaulted(mouse, session);
             var ck = mouse.ConfigKey; // capture this mouse's bindings, not the global selection
             if (ck is not null) await session.ApplyScrollInvertAsync(_config.InvertScroll(ck));
             if (ck is not null && _config.Dpi(ck) is { } savedDpi)
-                await session.ApplyDpiAsync((ushort)savedDpi);
+            {
+                // A rejected push (the mouse is napping right now) is not retried here —
+                // the volatile-settings keepalive armed below carries it (gh-18).
+                var ok = await session.ApplyDpiAsync((ushort)savedDpi);
+                DiagnosticLog.Info("dpi",
+                    $"{mouse.Name}: reconnect push {savedDpi} {(ok ? "ok" : "failed — keepalive will retry")}");
+            }
 
             var captures = await StartMouseCapturesAsync(session, ck);
             if (gen != _mouseActivationGen)
@@ -107,6 +117,25 @@ public partial class MainWindowViewModel
         }
         catch { return false; } // unreachable — worth retrying
     }
+
+    /// <summary>
+    /// The persistent session's HID handle is dead (reads failing continuously past the
+    /// channel's threshold). Rebuild the capture set — and the open page, if it is this
+    /// mouse — exactly as a resume does: that path disposes the dead handle, opens a
+    /// fresh one, re-pushes DPI/scroll-invert and re-arms the captures, and falls back
+    /// to the unreachable-mice retry loop when the device really is gone.
+    /// </summary>
+    private void OnMouseSessionFaulted(DeviceViewModel mouse, DeviceSession session) =>
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            // A session already replaced by a newer activation can still fault late — ignore it.
+            var live = ReferenceEquals(_session, session)
+                || _mouseCaptures.Any(mc => ReferenceEquals(mc.Session, session));
+            if (!live) return;
+            DiagnosticLog.Warn("capture",
+                $"{mouse.Name}: HID handle dead while the device node is still present — reopening");
+            _ = ReconnectAfterResumeAsync();
+        });
 
     // Wakes the unreachable-mice retry loop early: a returning device raises a
     // node/receiver event long before the loop's backoff expires (observed
@@ -198,6 +227,17 @@ public partial class MainWindowViewModel
         if (ck is not null && _config.SmoothScroll(ck)
             && await session.StartSmoothScrollCaptureAsync(w => _agent.DispatchSmoothScroll(w)) is { } smooth)
             captures.Add(smooth);
+        // Keep the persisted DPI (and an inverted scroll direction) on the mouse: the
+        // firmware resets both on wake/reconnect and rejects writes while napping, so
+        // the one-shot push at (re)connect is not enough (gh-18). The callback reads the
+        // config on every tick, so a slider change made meanwhile is what lands.
+        // Returning false is the loop's "rejected, retry later" signal.
+        if (ck is not null && session.StartVolatileSettingsKeepalive(async () =>
+            {
+                if (_config.Dpi(ck) is { } dpi && !await session.ApplyDpiAsync((ushort)dpi)) return false;
+                return !_config.InvertScroll(ck) || await session.ApplyScrollInvertAsync(true);
+            }) is { } settings)
+            captures.Add(settings);
         return captures;
     }
 

@@ -17,12 +17,14 @@ public interface IRawHidChannel
     Task<int> WriteReportAsync(ReadOnlyMemory<byte> src);
 
     /// <summary>
-    /// Read a raw report into <paramref name="buf"/>; returns bytes read.
-    /// Implementations absorb their own read timeouts internally (looping so
-    /// cancellation is observed promptly). Any exception thrown here is treated
-    /// by the read loop as a failed read and retried with exponential backoff —
-    /// a stale handle (device asleep, unplugged, or re-enumerated) fails
-    /// instantly on every call, so the loop must never retry it hot.
+    /// Read a raw report into <paramref name="buf"/>; returns bytes read. Blocks
+    /// until a report arrives: an idle channel must not throw. Cancellation (the
+    /// channel being disposed) must unblock the read promptly and surface as an
+    /// <see cref="OperationCanceledException"/>. Any other exception thrown here is
+    /// treated by the read loop as a failed read and retried with exponential
+    /// backoff — a stale handle (device asleep, unplugged, or re-enumerated) fails
+    /// instantly on every call, so the loop must never retry it hot — and after
+    /// sustained failure the loop raises <see cref="HidppChannel.ReadsDead"/>.
     /// </summary>
     Task<int> ReadReportAsync(Memory<byte> buf, CancellationToken cancellationToken);
 

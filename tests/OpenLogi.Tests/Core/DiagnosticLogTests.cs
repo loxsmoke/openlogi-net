@@ -102,7 +102,9 @@ public class DiagnosticLogTests : IDisposable
 
         Assert.True(File.Exists(Path.Combine(_dir, "log.1.txt")), "rotated file should exist");
         var lines = ReadLines();
-        Assert.StartsWith("==== rotated from log.txt ", lines[0]);
+        // The rotated-into file names the build on its first line, same fixed prefix
+        // as a session start, so a pasted log.txt fragment always carries the version.
+        Assert.StartsWith("==== OpenLogi.net v1.2.3 rotated from log.txt ", lines[0]);
         // Current file stays near the cap: at most one line past it before rotating.
         Assert.True(new FileInfo(Path.Combine(_dir, "log.txt")).Length < 2048 + 256);
     }
