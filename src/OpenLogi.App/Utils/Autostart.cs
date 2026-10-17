@@ -1,6 +1,6 @@
 using Microsoft.Win32;
 
-namespace OpenLogi.App;
+namespace OpenLogi.App.Utils;
 
 /// <summary>
 /// Windows launch-at-login via the per-user <c>Run</c> registry key (the

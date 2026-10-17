@@ -4,6 +4,7 @@ using OpenLogi.App.Localization;
 using OpenLogi.Core.Localization;
 using OpenLogi.Core.Config;
 using OpenLogi.Core.Logging;
+using OpenLogi.App.Utils;
 
 namespace OpenLogi.App.ViewModels;
 
@@ -23,6 +24,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _checkForUpdates;
     [ObservableProperty] private bool _autoDownloadAssets;
     [ObservableProperty] private bool _minimizeToTray;
+    [ObservableProperty] private bool _showBatteryInTray;
     [ObservableProperty] private bool _suppressLogging;
     [ObservableProperty] private LanguageOption _selectedLanguage;
 
@@ -38,6 +40,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         CheckForUpdates = config.AppSettings.CheckForUpdates;
         AutoDownloadAssets = config.AppSettings.AutoDownloadAssets;
         MinimizeToTray = config.AppSettings.MinimizeToTray;
+        ShowBatteryInTray = config.AppSettings.ShowBatteryInTray;
         SuppressLogging = config.AppSettings.SuppressLogging;
         SelectedLanguage = LanguageCatalog.OptionFor(config.AppSettings.Language);
         _loading = false;
@@ -71,6 +74,13 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         if (_loading) return;
         _config.AppSettings.MinimizeToTray = value;
+        Save();
+    }
+
+    partial void OnShowBatteryInTrayChanged(bool value)
+    {
+        if (_loading) return;
+        _config.AppSettings.ShowBatteryInTray = value;
         Save();
     }
 

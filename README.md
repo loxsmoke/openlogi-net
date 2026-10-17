@@ -56,6 +56,8 @@ It ships two binaries:
   Performance MX, K800, Anywhere MX, M505, and M350), their battery is read from
   the old HID++ 1.0 battery registers when available, and the UI labels them as
   identity-and-battery-only until configurable settings are implemented.
+- **Battery level** of each device is shown in the system tray. See
+  [docs/battery_icon.md](docs/battery_icon.md).
 - **Remap buttons** to a catalog of actions and custom keyboard shortcuts.
 - **Mouse gestures** — hold a button and swipe up / down / left / right for four
   actions, with a plain tap as a fifth. Works with the dedicated MX gesture

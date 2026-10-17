@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Microsoft.Win32;
 
-namespace OpenLogi.App;
+namespace OpenLogi.App.Utils;
 
 /// <summary>
 /// Diagnostic system facts for the About window: the Windows build (Logitech

@@ -7,6 +7,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform;
 using Avalonia.Threading;
+using OpenLogi.App.Tray;
 using OpenLogi.App.ViewModels;
 using OpenLogi.Core.Actions;
 using OpenLogi.Core.Localization;
@@ -18,6 +19,15 @@ public partial class MainWindow : Window
     private TrayIcon? _tray;
     private NativeMenuItem? _trayOpenItem;
     private NativeMenuItem? _trayQuitItem;
+    // Per-device battery icons. While any are showing they also carry the Open/Quit
+    // menu and click-to-restore, so the plain app icon stays hidden; it comes back
+    // the moment they go (device unplugged while the window is hidden).
+    private TrayBatteryIcons? _batteryTray;
+    // An update offer pins the plain icon (with its tooltip) until the window is restored.
+    private bool _updateOfferPending;
+    // True between HideToTray and RestoreFromTray (Window.IsVisible is also false
+    // before the first Show, which must not put an icon in the tray).
+    private bool _hiddenToTray;
     // Set once the user confirmed quitting (or quit from the tray menu), so the
     // resumed close isn't intercepted again.
     private bool _exitConfirmed;
@@ -59,13 +69,45 @@ public partial class MainWindow : Window
     {
         if (_subscribedViewModel is not null)
             _subscribedViewModel.UpdateOfferShown -= OnUpdateOfferShown;
+        _batteryTray?.Dispose();
+        _batteryTray = null;
 
         _subscribedViewModel = DataContext as MainWindowViewModel;
         if (_subscribedViewModel is not null)
         {
             _subscribedViewModel.UpdateOfferShown += OnUpdateOfferShown;
             _subscribedViewModel.ShortcutRecorder = RecordShortcutAsync;
+            var vm = _subscribedViewModel;
+            _batteryTray = new TrayBatteryIcons(vm,
+                enabled: () => vm.Configuration.AppSettings.ShowBatteryInTray,
+                scaling: () => Screens.Primary?.Scaling ?? RenderScaling,
+                open: RestoreFromTray,
+                quit: QuitFromTray);
+            _batteryTray.VisibilityChanged += SyncAppTrayIcon;
         }
+        SyncAppTrayIcon();
+    }
+
+    /// <summary>
+    /// The plain app icon fills in whenever no battery icon is standing in for it:
+    /// with "Show battery in tray" on, the tray always holds something — the device
+    /// icons, or the app icon when no device reports a battery. With the setting off
+    /// the app icon keeps its old minimize-only behaviour. An update offer pins it on.
+    /// </summary>
+    private void SyncAppTrayIcon()
+    {
+        if (_tray is null) return;
+        var batteryIconsShowing = _batteryTray?.HasVisibleIcons ?? false;
+        var alwaysInTray = DataContext is MainWindowViewModel vm && vm.Configuration.AppSettings.ShowBatteryInTray;
+        _tray.IsVisible = _updateOfferPending || (!batteryIconsShowing && (alwaysInTray || _hiddenToTray));
+    }
+
+    private void QuitFromTray()
+    {
+        // Quit from the tray menu is already an explicit choice (and the window
+        // may be hidden, so there's nothing to own a dialog) — skip the prompt.
+        _exitConfirmed = true;
+        (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown();
     }
 
     /// <summary>
@@ -103,13 +145,7 @@ public partial class MainWindow : Window
         _trayOpenItem.Click += (_, _) => Dispatcher.UIThread.Post(RestoreFromTray);
 
         _trayQuitItem = new NativeMenuItem { Header = Loc.Current["Tray_Quit"] };
-        _trayQuitItem.Click += (_, _) => Dispatcher.UIThread.Post(() =>
-        {
-            // Quit from the tray menu is already an explicit choice (and the window
-            // may be hidden, so there's nothing to own a dialog) — skip the prompt.
-            _exitConfirmed = true;
-            (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown();
-        });
+        _trayQuitItem.Click += (_, _) => Dispatcher.UIThread.Post(QuitFromTray);
 
         var menu = new NativeMenu
         {
@@ -163,9 +199,10 @@ public partial class MainWindow : Window
 
     private void HideToTray()
     {
-        if (_tray is not null) _tray.IsVisible = true;
-        ShowInTaskbar = false; // hide from the taskbar; the tray icon restores it
+        ShowInTaskbar = false; // hide from the taskbar; a tray icon restores it
         Hide();
+        _hiddenToTray = true;
+        SyncAppTrayIcon();
     }
 
     /// <summary>
@@ -213,11 +250,10 @@ public partial class MainWindow : Window
         WindowState = WindowState.Normal;
         ShowInTaskbar = true;
         Activate();
-        if (_tray is not null)
-        {
-            _tray.ToolTipText = "OpenLogi.net";
-            _tray.IsVisible = false;
-        }
+        _hiddenToTray = false;
+        _updateOfferPending = false;
+        if (_tray is not null) _tray.ToolTipText = "OpenLogi.net";
+        SyncAppTrayIcon();
     }
 
     private void OnUpdateOfferShown(string version)
@@ -226,7 +262,8 @@ public partial class MainWindow : Window
 
         _lastTrayUpdateVersion = version;
         _tray.ToolTipText = $"{Loc.Current["Notify_UpdateTitle"]}{Environment.NewLine}{Loc.Current.Format("Notify_UpdateBody", version)}";
-        _tray.IsVisible = true;
+        _updateOfferPending = true;
+        SyncAppTrayIcon();
     }
 
     private static WindowIcon AppIcon() =>
@@ -237,6 +274,7 @@ public partial class MainWindow : Window
         Loc.Current.PropertyChanged -= OnCultureChanged;
         if (_subscribedViewModel is not null)
             _subscribedViewModel.UpdateOfferShown -= OnUpdateOfferShown;
+        _batteryTray?.Dispose();
         _tray?.Dispose();
         base.OnClosed(e);
     }
@@ -255,10 +293,13 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnSettings(object? sender, RoutedEventArgs e)
+    private async void OnSettings(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is MainWindowViewModel vm)
-            new SettingsWindow(vm.Configuration).ShowDialog(this);
+        if (DataContext is not MainWindowViewModel vm) return;
+        await new SettingsWindow(vm.Configuration).ShowDialog(this);
+        // "Show battery in tray" applies on close; the config object is not observable.
+        _batteryTray?.Refresh();
+        SyncAppTrayIcon();
     }
 
     private void OnAbout(object? sender, RoutedEventArgs e) => new AboutWindow().ShowDialog(this);

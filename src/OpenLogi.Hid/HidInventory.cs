@@ -142,7 +142,8 @@ public static class HidInventory
             DiagnosticLog.Info("sweep",
                 $"  slot {p.Slot}: {p.Codename ?? "(unnamed)"} ({p.Kind}, {(p.Online ? "online" : "offline")}"
                 + $"{(p.Wpid is { } w ? $", wpid {w:x4}" : "")}"
-                + $"{(p.Battery?.Percentage is { } b ? $", batt {b}%" : "")})");
+                + $"{(p.Battery?.Percentage is { } b ? $", batt {b}%" : "")}"
+                + $"{(p.ProbeIncomplete ? ", probe incomplete" : "")})");
     }
 
     /// <summary>
@@ -415,7 +416,7 @@ public static class HidInventory
         if (device is null)
         {
             DiagnosticLog.Warn("sweep", $"  slot {slot}: HID++ 2.0 probe failed ({failure?.Message}) — listed without capabilities");
-            return new PairedDevice { Slot = slot, Codename = codename, Wpid = wpid, Kind = kind, Online = online };
+            return new PairedDevice { Slot = slot, Codename = codename, Wpid = wpid, Kind = kind, Online = online, ProbeIncomplete = true };
         }
         var result = await ProbeOnDeviceAsync(device, slot, kind, online, wpid, codename).ConfigureAwait(false);
         if (postProbe is not null)
@@ -478,8 +479,17 @@ public static class HidInventory
         DeviceModelInfo? modelInfo = null;
         BatteryInfo? battery = null;
 
+        // A null feature list is a definite answer (no FeatureSet); a throw is a read
+        // that failed — typically a device switched on seconds ago — and marks the
+        // probe incomplete so the app re-scans instead of keeping a blank tile.
         IReadOnlyList<FeatureInformation>? features = null;
-        try { features = await device.EnumerateFeaturesAsync().ConfigureAwait(false); } catch { /* best effort */ }
+        var incomplete = false;
+        try { features = await device.EnumerateFeaturesAsync().ConfigureAwait(false); }
+        catch (Exception ex)
+        {
+            incomplete = true;
+            DiagnosticLog.Info("sweep", $"  slot {slot}: feature enumeration failed ({ex.Message})");
+        }
         if (features is not null)
         {
             capabilities = Capabilities.FromFeatureIds([.. features.Select(f => f.Id)]);
@@ -512,6 +522,18 @@ public static class HidInventory
                 var bv = await TryStructAsync(volt.GetBatteryInfoAsync).ConfigureAwait(false);
                 if (bv is { } info3) battery = MapBattery(info3);
             }
+
+            // The device advertised a name or battery feature but the read came back
+            // empty: the same not-ready-yet failure, one step later.
+            var hasName = device.FeatureIndex(DeviceTypeAndNameFeature.Id) is not null;
+            var hasBattery = device.FeatureIndex(UnifiedBatteryFeature.Id) is not null
+                || device.FeatureIndex(BatteryVoltageFeature.Id) is not null;
+            if ((hasName && codename is null) || (hasBattery && battery is null))
+            {
+                incomplete = true;
+                DiagnosticLog.Info("sweep",
+                    $"  slot {slot}: {(hasName && codename is null ? "name" : "battery")} read failed");
+            }
         }
 
         return new PairedDevice
@@ -524,6 +546,7 @@ public static class HidInventory
             Battery = battery,
             ModelInfo = modelInfo,
             Capabilities = capabilities ?? Capabilities.PresumedFromKind(kind),
+            ProbeIncomplete = incomplete,
         };
     }
 

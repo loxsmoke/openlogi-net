@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using OpenLogi.App.Utils;
 using OpenLogi.Core;
 using OpenLogi.Core.Localization;
 

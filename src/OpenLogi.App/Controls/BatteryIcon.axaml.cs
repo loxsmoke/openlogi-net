@@ -2,14 +2,13 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
+using OpenLogi.App.Utils;
 
 namespace OpenLogi.App.Controls;
 
 /// <summary>
 /// A small battery glyph that fills to <see cref="Percent"/> and tints itself by
-/// charge level. Colour scheme (green → amber → red) is a 3-step take on Logitech's
-/// official green/red hardware-LED convention (red at ~10–15%); thresholds live in
-/// <see cref="ColorFor"/> and are easy to tune.
+/// charge level. 
 /// </summary>
 public partial class BatteryIcon : UserControl
 {
@@ -44,7 +43,7 @@ public partial class BatteryIcon : UserControl
     private void Render()
     {
         var pct = Math.Clamp(Percent, 0, 100);
-        var brush = new SolidColorBrush(ColorFor(pct, Charging));
+        var brush = new SolidColorBrush(BatteryUtils.ColorFor(pct, Charging));
 
         var shell = this.FindControl<Border>("Shell");
         var fill = this.FindControl<Border>("Fill");
@@ -56,17 +55,5 @@ public partial class BatteryIcon : UserControl
         fill.Background = brush;
         // A non-zero charge always shows a sliver so "critical" still reads as some fill.
         fill.Width = pct == 0 ? 0 : Math.Max(2, InnerWidth * pct / 100.0);
-    }
-
-    /// <summary>
-    /// Level colour, faithful to Logitech's hardware-LED convention: green when good,
-    /// red below ~15% (their hardware shows red at the low-battery point; the G305
-    /// flashes red &lt;15%). No amber band — Logitech uses only green/red. Charging is green.
-    /// </summary>
-    private static Color ColorFor(int pct, bool charging)
-    {
-        if (charging) return Color.Parse("#3FB950"); // charging → green
-        if (pct < 15) return Color.Parse("#DA3633");  // red (low / critical)
-        return Color.Parse("#3FB950");                 // green (good)
     }
 }

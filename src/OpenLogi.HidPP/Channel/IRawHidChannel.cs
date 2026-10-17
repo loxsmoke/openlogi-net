@@ -19,8 +19,9 @@ public interface IRawHidChannel
     /// <summary>
     /// Read a raw report into <paramref name="buf"/>; returns bytes read. Blocks
     /// until a report arrives: an idle channel must not throw. Cancellation (the
-    /// channel being disposed) must unblock the read promptly and surface as an
-    /// <see cref="OperationCanceledException"/>. Any other exception thrown here is
+    /// channel being disposed) must unblock the read promptly, either returning 0
+    /// (preferred: no exception for the debugger to report on every close) or
+    /// throwing an <see cref="OperationCanceledException"/>. Any other exception thrown here is
     /// treated by the read loop as a failed read and retried with exponential
     /// backoff — a stale handle (device asleep, unplugged, or re-enumerated) fails
     /// instantly on every call, so the loop must never retry it hot — and after

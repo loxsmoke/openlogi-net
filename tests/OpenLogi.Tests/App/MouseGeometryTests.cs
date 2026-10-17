@@ -1,4 +1,4 @@
-using OpenLogi.App;
+using OpenLogi.App.Utils;
 using OpenLogi.Assets;
 using OpenLogi.Core.Config;
 

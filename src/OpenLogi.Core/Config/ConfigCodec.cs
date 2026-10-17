@@ -49,6 +49,7 @@ public static class ConfigCodec
             ["show_in_menu_bar"] = s.ShowInMenuBar,
             ["auto_download_assets"] = s.AutoDownloadAssets,
             ["minimize_to_tray"] = s.MinimizeToTray,
+            ["show_battery_in_tray"] = s.ShowBatteryInTray,
             ["suppress_logging"] = s.SuppressLogging,
             ["shake_to_locate"] = s.ShakeToLocate,
         };
@@ -256,6 +257,7 @@ public static class ConfigCodec
         ShowInMenuBar = GetBool(t, "show_in_menu_bar", true),
         AutoDownloadAssets = GetBool(t, "auto_download_assets", true),
         MinimizeToTray = GetBool(t, "minimize_to_tray", false),
+        ShowBatteryInTray = GetBool(t, "show_battery_in_tray", true),
         SuppressLogging = GetBool(t, "suppress_logging", false),
         Language = GetString(t, "language"),
         ThumbwheelSensitivity = (int)GetLong(t, "thumbwheel_sensitivity", AppSettings.DefaultThumbwheelSensitivity),

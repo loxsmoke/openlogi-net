@@ -68,7 +68,7 @@ public sealed class WindowsRawHidChannel : IRawHidChannel, IDisposable
             // stream is the right way to unblock the read (the owner disposes the
             // channel right after; a second Dispose is harmless). A token already
             // cancelled fires the callback synchronously here, and the read below
-            // then fails as "Closed." and is reported as cancellation.
+            // then fails as "Closed." straight away.
             using var unblock = cancellationToken.Register(static s => ((HidStream)s!).Close(), _stream);
             var temp = new byte[_maxInput];
             try
@@ -80,12 +80,16 @@ public sealed class WindowsRawHidChannel : IRawHidChannel, IDisposable
             }
             catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested)
             {
-                throw new OperationCanceledException(cancellationToken);
+                // Report the cancelled read as "no data": the read loop sees its token
+                // and exits. Throwing an OperationCanceledException here left our code
+                // through Task.Run, so the debugger stopped on it as user-unhandled on
+                // every channel close — each sweep at startup and on every power-on.
+                return 0;
             }
             // Anything else (IOException from a stale handle, ObjectDisposedException
             // from a close we did not request) propagates: the read loop treats it as a
             // failed read, backs off, and after sustained failure asks for a reopen.
-        }, cancellationToken);
+        }, CancellationToken.None); // the token ends the read via the close above, never by cancelling the task
 
     public (bool SupportsShort, bool SupportsLong)? SupportsShortLongHidpp() => _support;
 

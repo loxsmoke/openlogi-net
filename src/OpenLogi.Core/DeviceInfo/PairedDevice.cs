@@ -19,4 +19,14 @@ public sealed record PairedDevice
     /// read-only and never opens a HID++ 2.0 session to it.
     /// </summary>
     public bool IsHidpp10 { get; init; }
+
+    /// <summary>
+    /// The device answered but a read the sweep expected to work failed — the feature
+    /// table, its name, or its battery. A BLE mouse probed within seconds of being
+    /// switched on does this: it answers the ping, then times out on the rest, and is
+    /// listed unnamed with no battery or capabilities. The app re-scans while any
+    /// listed device carries this flag, so the tile (and its tray icon) fill in once
+    /// the device is ready, instead of staying blank until the next topology change.
+    /// </summary>
+    public bool ProbeIncomplete { get; init; }
 }

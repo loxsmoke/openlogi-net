@@ -8,6 +8,7 @@ using OpenLogi.App.Services;
 using OpenLogi.Core;
 using OpenLogi.Core.Logging;
 using OpenLogi.Core.Localization;
+using OpenLogi.App.Utils;
 
 namespace OpenLogi.App.ViewModels;
 

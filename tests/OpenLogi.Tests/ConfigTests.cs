@@ -367,6 +367,15 @@ public class ConfigTests
     }
 
     [Fact]
+    public void AppSettingsShowBatteryInTrayRoundtrips()
+    {
+        Assert.True(new Config().AppSettings.ShowBatteryInTray);
+        var cfg = new Config();
+        cfg.AppSettings.ShowBatteryInTray = false;
+        Assert.False(WriteAndRead(cfg).AppSettings.ShowBatteryInTray);
+    }
+
+    [Fact]
     public void AppSettingsShakeToLocateRoundtrips()
     {
         var cfg = new Config();

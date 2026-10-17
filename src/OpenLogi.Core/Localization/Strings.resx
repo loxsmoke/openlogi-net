@@ -97,6 +97,10 @@
     <value>Minimize to the system tray (hide from the taskbar)</value>
     <comment>Checkbox. "System tray" is the Windows notification area.</comment>
   </data>
+  <data name="Settings_ShowBatteryInTray" xml:space="preserve">
+    <value>Show device battery icons in the system tray</value>
+    <comment>Checkbox. One tray icon per keyboard/mouse showing its charge level.</comment>
+  </data>
   <data name="Settings_SuppressLogging" xml:space="preserve">
     <value>Suppress diagnostic logs</value>
     <comment>Checkbox: stop writing the diagnostic log file.</comment>

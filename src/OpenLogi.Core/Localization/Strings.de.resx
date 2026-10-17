@@ -96,6 +96,10 @@
     <value>In den Infobereich minimieren (aus der Taskleiste ausblenden)</value>
     <comment>EN: Minimize to the system tray (hide from the taskbar)</comment>
   </data>
+  <data name="Settings_ShowBatteryInTray" xml:space="preserve">
+    <value>Akkustand der Geräte im Infobereich anzeigen</value>
+    <comment>EN: Show device battery icons in the system tray</comment>
+  </data>
   <data name="Settings_SuppressLogging" xml:space="preserve">
     <value>Diagnoseprotokolle unterdrücken</value>
     <comment>EN: Suppress diagnostic logs</comment>

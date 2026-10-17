@@ -41,6 +41,7 @@
         <CheckBox Content="{loc:Tr Settings_CheckForUpdates}" IsChecked="{Binding CheckForUpdates}"/>
         <CheckBox Content="{loc:Tr Settings_AutoDownloadAssets}" IsChecked="{Binding AutoDownloadAssets}"/>
         <CheckBox Content="{loc:Tr Settings_MinimizeToTray}" IsChecked="{Binding MinimizeToTray}"/>
+        <CheckBox Content="{loc:Tr Settings_ShowBatteryInTray}" IsChecked="{Binding ShowBatteryInTray}"/>
         <CheckBox Content="{loc:Tr Settings_SuppressLogging}" IsChecked="{Binding SuppressLogging}"/>
 
         <TextBlock Text="{loc:Tr Settings_Footer}"

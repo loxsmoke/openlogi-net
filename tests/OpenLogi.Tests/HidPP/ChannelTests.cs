@@ -257,3 +257,57 @@ public class ChannelTests
         throw new TimeoutException($"timed out waiting for count {expected}");
     }
 }
+
+/// <summary>
+/// The Windows raw channel ends a cancelled read by returning no data instead of
+/// throwing, so closing a channel (every sweep, every power-on) raises no exception
+/// for the debugger to stop on. The read loop must treat that as a clean stop.
+/// </summary>
+public class QuietCloseChannelTests
+{
+    /// <summary>Blocks each read until cancelled, then returns 0 — the Windows channel's close behaviour.</summary>
+    private sealed class QuietRaw : IRawHidChannel
+    {
+        public int Reads;
+        public ushort VendorId => 0x046d;
+        public ushort ProductId => 0xb037;
+        public Task<int> WriteReportAsync(ReadOnlyMemory<byte> src) => Task.FromResult(src.Length);
+        public async Task<int> ReadReportAsync(Memory<byte> buf, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref Reads);
+            await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            return 0;
+        }
+        public (bool SupportsShort, bool SupportsLong)? SupportsShortLongHidpp() => (true, true);
+        public Task<int> GetReportDescriptorAsync(Memory<byte> buf) => throw new NotSupportedException();
+    }
+
+    [Fact]
+    public async Task ZeroLengthReadOnCloseStopsTheLoopWithoutExceptions()
+    {
+        var raw = new QuietRaw();
+        var channel = await HidppChannel.FromRawChannelAsync(raw);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (Volatile.Read(ref raw.Reads) < 1 && DateTime.UtcNow < deadline) await Task.Delay(10);
+
+        var thrown = new List<string>();
+        void OnFirstChance(object? s, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e)
+        {
+            lock (thrown) thrown.Add($"{e.Exception.GetType().Name}: {e.Exception.Message}");
+        }
+        AppDomain.CurrentDomain.FirstChanceException += OnFirstChance;
+        try
+        {
+            var dispose = channel.DisposeAsync().AsTask();
+            Assert.Same(dispose, await Task.WhenAny(dispose, Task.Delay(TimeSpan.FromSeconds(5))));
+            await dispose;
+        }
+        finally
+        {
+            AppDomain.CurrentDomain.FirstChanceException -= OnFirstChance;
+        }
+
+        Assert.Equal(1, Volatile.Read(ref raw.Reads)); // the empty read ended the loop; no re-read
+        lock (thrown) Assert.True(thrown.Count == 0, string.Join("; ", thrown));
+    }
+}

@@ -17,6 +17,12 @@ public sealed class AppSettings
     /// <summary>Minimize to the system tray (hiding from the taskbar) instead of normal minimize. Off by default.</summary>
     public bool MinimizeToTray { get; set; }
     /// <summary>
+    /// One system-tray icon per paired device with a battery, showing its charge
+    /// beside a keyboard or mouse glyph. On by default; the icons are present
+    /// whether or not the window is minimized.
+    /// </summary>
+    public bool ShowBatteryInTray { get; set; } = true;
+    /// <summary>
     /// Suppress diagnostic logging (no log.txt writes). Off by default — a fresh
     /// install or an upgraded config.toml without the key keeps logging on.
     /// </summary>
@@ -35,7 +41,7 @@ public sealed class AppSettings
     /// <summary>True when nothing diverges from the default (so the block is omitted).</summary>
     public bool IsDefault() =>
         !LaunchAtLogin && CheckForUpdates && UpdatePromptSeen && DismissedUpdate is null
-        && ShowInMenuBar && AutoDownloadAssets && !MinimizeToTray && !SuppressLogging
+        && ShowInMenuBar && AutoDownloadAssets && !MinimizeToTray && ShowBatteryInTray && !SuppressLogging
         && Language is null && ThumbwheelSensitivity == DefaultThumbwheelSensitivity
         && !ShakeToLocate;
 }

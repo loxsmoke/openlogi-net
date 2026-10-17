@@ -36,7 +36,7 @@ public class TranslationCoverageTests
 
         // Windows version strings and the Logitech process names used for
         // detection; both are matched against the system, not displayed as prose.
-        ["OpenLogi.App/SystemInfo.cs"] = "OS strings and process names for detection",
+        ["OpenLogi.App/Utils/SystemInfo.cs"] = "OS strings and process names for detection",
 
         // Filesystem and download plumbing: folder names, executables, byte-count
         // errors headed for the log.

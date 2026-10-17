@@ -95,6 +95,10 @@
     <value>最小化到系统托盘（从任务栏隐藏）</value>
     <comment>EN: Minimize to the system tray (hide from the taskbar)</comment>
   </data>
+  <data name="Settings_ShowBatteryInTray" xml:space="preserve">
+    <value>在系统托盘显示设备电量图标</value>
+    <comment>EN: Show device battery icons in the system tray</comment>
+  </data>
   <data name="Settings_SuppressLogging" xml:space="preserve">
     <value>禁用诊断日志</value>
     <comment>EN: Suppress diagnostic logs</comment>

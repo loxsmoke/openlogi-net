@@ -1,7 +1,7 @@
 using OpenLogi.Assets;
 using OpenLogi.Core.Config;
 
-namespace OpenLogi.App;
+namespace OpenLogi.App.Utils;
 
 /// <summary>A positioned, clickable button hotspot over the rendered device image (display pixels).</summary>
 public sealed record Hotspot(ButtonId Id, double X, double Y, double Size);

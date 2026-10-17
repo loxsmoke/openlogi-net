@@ -509,6 +509,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private async Task LoadAsync(bool reactivateMice = true)
     {
         _rescanPending = false; // this scan reflects the current device set
+        BeginScanForProbeRetry();
         SetStatus("Status_Scanning");
         IsScanning = true;
         NoDevices = false;
@@ -554,6 +555,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             foreach (var vm in Devices)
                 if (vm.ConfigKey is not null)
                     _ = ResolveCardImageAsync(vm);
+
+            ScheduleProbeRetry(reactivateMice);
         }
         catch (System.Exception e)
         {
@@ -563,6 +566,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             IsScanning = false;
             NoDevices = Devices.Count == 0;
+            // A device change landed mid-scan (HandleTopologyChangeAsync only flags it
+            // while IsScanning): this scan may predate it — a mouse switched back on
+            // while the "it's gone" sweep was still pinging other nodes — so settle it
+            // with one more scan rather than waiting for an unrelated change.
+            if (_rescanPending && !ShowingDevice) _ = LoadAsync();
         }
     }
 
@@ -659,6 +667,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         _lightingKeepaliveTimer?.Dispose();
         _updateTimer?.Dispose();
+        _probeRetryCts?.Cancel();
         _ = _keepaliveSession?.DisposeAsync();
         _ = _batteryMonitor?.DisposeAsync();
         foreach (var mc in _mouseCaptures)

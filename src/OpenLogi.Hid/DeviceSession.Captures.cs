@@ -126,37 +126,82 @@ public sealed partial class DeviceSession
         if (candidates is null) return null;
         if (_device.GetFeature<ReprogControlsFeature>() is not { } rc) return null;
 
+        // Look the control up, with spaced retries: captures are armed seconds after a
+        // BLE mouse reconnects, when single reads still time out.
         ushort? cid = null;
-        try
+        Exception? lookupFailure = null;
+        for (var attempt = 0; attempt < GestureLookupAttempts; attempt++)
         {
-            var count = await rc.GetCountAsync().ConfigureAwait(false);
-            for (byte i = 0; i < count && cid is null; i++)
+            if (attempt > 0) await Task.Delay(GestureLookupRetryDelay).ConfigureAwait(false);
+            try
             {
-                var info = await rc.GetCidInfoAsync(i).ConfigureAwait(false);
-                // Only divert a control that actually reports raw-XY — without it
-                // there is no swipe travel to read, only a plain click.
-                if (candidates.Contains(info.Cid.Value) && info.Flags.SupportsRawXy())
-                    cid = info.Cid.Value;
+                cid = null;
+                var count = await rc.GetCountAsync().ConfigureAwait(false);
+                for (byte i = 0; i < count && cid is null; i++)
+                {
+                    var info = await rc.GetCidInfoAsync(i).ConfigureAwait(false);
+                    // Only divert a control that actually reports raw-XY — without it
+                    // there is no swipe travel to read, only a plain click.
+                    if (candidates.Contains(info.Cid.Value) && info.Flags.SupportsRawXy())
+                        cid = info.Cid.Value;
+                }
+                lookupFailure = null;
+                break;
             }
-            if (cid is { } c)
-                await rc.SetCidReportingAsync(new ControlId(c),
-                    CidReportingChange.TemporaryDiversion(diverted: true, rawXy: true)).ConfigureAwait(false);
+            catch (Exception ex) { lookupFailure = ex; }
         }
-        catch (Exception ex)
+        if (lookupFailure is not null)
         {
-            DiagnosticLog.Warn("capture", $"gesture: divert for {owner} failed: {ex.Message}");
-            cid = null;
+            DiagnosticLog.Warn("capture",
+                $"gesture: control lookup for {owner} failed after {GestureLookupAttempts} attempts: {lookupFailure.Message}");
+            rc.Dispose();
+            return null;
         }
-
         if (cid is not { } gestureCid)
         {
             DiagnosticLog.Info("capture", $"gesture: no raw-XY-capable control for {owner}");
             rc.Dispose();
             return null;
         }
-        DiagnosticLog.Info("capture", $"gesture capture on {owner} (cid 0x{gestureCid:x4})");
-        return new GestureCapture(rc, gestureCid, _device.GetFeature<WirelessDeviceStatusFeature>(), onGesture);
+
+        // The control exists, so a divert write that fails now is a link that isn't
+        // ready yet, not a missing button. Keep the capture either way: its keepalive
+        // retries the divert shortly, instead of the button acting native until the
+        // next reconnect (2026-10-16: DpiToggle, the MX Anywhere 3S gesture button,
+        // stayed dead after a power cycle because one write timed out).
+        string? divertFailure = null;
+        try
+        {
+            await rc.SetCidReportingAsync(new ControlId(gestureCid),
+                CidReportingChange.TemporaryDiversion(diverted: true, rawXy: true)).ConfigureAwait(false);
+        }
+        catch (Exception ex) { divertFailure = ex.Message; }
+
+        if (divertFailure is null)
+            DiagnosticLog.Info("capture", $"gesture capture on {owner} (cid 0x{gestureCid:x4})");
+        else
+            DiagnosticLog.Warn("capture",
+                $"gesture capture on {owner} (cid 0x{gestureCid:x4}): divert failed ({divertFailure}) — retrying in {PostArmRechecks[0].TotalSeconds:0} s");
+        return new GestureCapture(rc, gestureCid, _device.GetFeature<WirelessDeviceStatusFeature>(), onGesture,
+            divertPending: divertFailure is not null);
     }
+
+    /// <summary>Tries at looking up a gesture control before concluding the device is unreachable.</summary>
+    private const int GestureLookupAttempts = 3;
+
+    /// <summary>Spacing between those tries; the inventory probe uses the same order of delay for a just-woken link.</summary>
+    private static readonly TimeSpan GestureLookupRetryDelay = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// Waits before the first re-asserts after arming, ahead of the steady
+    /// <see cref="DivertKeepalive"/> cadence (re-asserts land at 2, 6 and 14 s). A BLE
+    /// mouse that just reconnected accepts the arm-time writes and then resets its
+    /// volatile state as its link settles, so on the 20 s cadence alone gestures came
+    /// back 10–20 s after a power cycle (2026-10-16, MX Anywhere 3S). The same window
+    /// retries a divert that failed outright while arming.
+    /// </summary>
+    internal static readonly TimeSpan[] PostArmRechecks =
+        [TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(8)];
 
     /// <summary>
     /// Interval between periodic divert re-assertions. Diversion is volatile device
@@ -172,36 +217,58 @@ public sealed partial class DeviceSession
 
     /// <summary>
     /// Run <paramref name="reassert"/> whenever the device announces a wireless
-    /// reconnect (instant heal) and every <see cref="DivertKeepalive"/> (insurance) —
+    /// reconnect (instant heal), on the <see cref="PostArmRechecks"/> schedule right
+    /// after arming, and every <see cref="DivertKeepalive"/> after that (insurance) —
     /// see <see cref="DivertKeepalive"/> for why. Failures are swallowed (the device
     /// is napping/unreachable and a later round retries), but the fail/recover
     /// *transitions* are logged under <paramref name="what"/>: a gap in divert
     /// coverage is the prime suspect when a diverted button acts native.
     /// </summary>
+    /// <param name="startFailing">
+    /// The first divert already failed (while arming): log the first success as a recovery.
+    /// </param>
+    /// <param name="rechecks">Waits before the first rounds; <see cref="PostArmRechecks"/> when null.</param>
     internal static async Task ReassertDivertLoopAsync(
         ChannelReader<WirelessDeviceStatusFeature.StatusBroadcast>? wake,
-        Func<Task<bool>> reassert, string what, CancellationToken ct)
+        Func<Task<bool>> reassert, string what, CancellationToken ct,
+        bool startFailing = false, IReadOnlyList<TimeSpan>? rechecks = null)
     {
-        var failing = false;
+        var failing = startFailing;
+        var schedule = rechecks ?? PostArmRechecks;
+        var round = 0;
+        // One broadcast wait stays pending across rounds, and the round timer is a
+        // plain delay raced against it: a quiet round just completes. Timing out by
+        // cancelling a read threw a first-chance OperationCanceledException every
+        // round, which the debugger reported as a burst each time a mouse was armed
+        // once the post-arm re-checks ran every few seconds.
+        Task<bool>? broadcast = null;
         try
         {
             while (!ct.IsCancellationRequested)
             {
+                var wait = round < schedule.Count ? schedule[round] : DivertKeepalive;
+                round++;
                 var wokeByBroadcast = false;
                 if (wake is not null)
                 {
-                    using var round = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                    round.CancelAfter(DivertKeepalive);
-                    try
+                    broadcast ??= wake.WaitToReadAsync(ct).AsTask();
+                    await Task.WhenAny(broadcast, Task.Delay(wait, ct)).ConfigureAwait(false);
+                    if (ct.IsCancellationRequested) break;
+                    if (broadcast.IsCompleted)
                     {
-                        await wake.ReadAsync(round.Token).ConfigureAwait(false);
-                        wokeByBroadcast = true;
+                        // True: a broadcast is queued. False: the listener closed, so
+                        // carry on with the timer alone.
+                        if (broadcast.IsCompletedSuccessfully && broadcast.Result)
+                            wokeByBroadcast = wake.TryRead(out _);
+                        else
+                            wake = null;
+                        broadcast = null;
                     }
-                    catch (OperationCanceledException) when (!ct.IsCancellationRequested) { /* periodic tick */ }
                 }
                 else
                 {
-                    await Task.Delay(DivertKeepalive, ct).ConfigureAwait(false);
+                    await Task.Delay(wait, ct).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                    if (ct.IsCancellationRequested) break;
                 }
                 // A rejected write is the EXPECTED outcome while the device naps, so it
                 // is reported by return value, not by exception: a throw every 20 s for
@@ -293,20 +360,39 @@ public sealed partial class DeviceSession
         private readonly Task _pump;
         private readonly Task _keepalive;
 
+        /// <param name="divertPending">The arm-time divert failed; the post-arm re-checks retry it.</param>
         public GestureCapture(
             ReprogControlsFeature rc, ushort cid, WirelessDeviceStatusFeature? wireless,
-            System.Action<GestureDirection> onGesture)
+            System.Action<GestureDirection> onGesture, bool divertPending = false)
         {
             _rc = rc;
             _cid = cid;
             _wireless = wireless;
             _pump = PumpAsync(rc.Listen(), onGesture, _cts.Token);
+            var armed = Stopwatch.StartNew();
             _keepalive = ReassertDivertLoopAsync(wireless?.Listen(), async () =>
             {
+                // Read the state first, only to record when the device dropped a divert
+                // we had set — the write below restores it either way, and a failed read
+                // must not stop that write.
+                var dropped = false;
+                if (!divertPending)
+                {
+                    try
+                    {
+                        var state = await _rc.GetCidReportingAsync(new ControlId(_cid)).ConfigureAwait(false);
+                        dropped = !(state.Diverted && state.RawXy);
+                    }
+                    catch { /* unreadable right now; the write reports the real failure */ }
+                }
                 await _rc.SetCidReportingAsync(new ControlId(_cid),
                     CidReportingChange.TemporaryDiversion(diverted: true, rawXy: true)).ConfigureAwait(false);
+                divertPending = false;
+                if (dropped)
+                    DiagnosticLog.Info("capture",
+                        $"gesture (cid 0x{_cid:x4}): device had dropped the divert {armed.Elapsed.TotalSeconds:0.0} s after arming — restored");
                 return true;
-            }, $"gesture (cid 0x{cid:x4})", _cts.Token);
+            }, $"gesture (cid 0x{cid:x4})", _cts.Token, startFailing: divertPending);
         }
 
         /// <summary>

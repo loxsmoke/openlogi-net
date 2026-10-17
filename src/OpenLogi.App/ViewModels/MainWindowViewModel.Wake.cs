@@ -219,6 +219,67 @@ public partial class MainWindowViewModel
     /// device in place when a page is open (its session may have just died); defer a full
     /// rescan for when the user returns home so nothing else is missed.
     /// </summary>
+    /// <summary>
+    /// Waits between re-scans while a listed device's probe is incomplete (see
+    /// <see cref="PairedDevice.ProbeIncomplete"/>). A BLE mouse switched back on took
+    /// over 6 s to answer its feature table (log, 2026-10-16), so the backoff spans
+    /// ~20 s; after the last one the tile stays as probed until the next topology change.
+    /// </summary>
+    internal static readonly TimeSpan[] ProbeRetryDelays =
+        [TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(6), TimeSpan.FromSeconds(12)];
+
+    private int _probeRetries;
+    private CancellationTokenSource? _probeRetryCts;
+    private bool _nextScanIsProbeRetry;
+
+    /// <summary>
+    /// How long to wait before the next re-scan, or null when none is due: every
+    /// device probed fully, or the retries are spent.
+    /// </summary>
+    internal static TimeSpan? ProbeRetryDelay(int retriesSoFar, IEnumerable<PairedDevice> devices) =>
+        retriesSoFar < ProbeRetryDelays.Length && devices.Any(d => d.ProbeIncomplete)
+            ? ProbeRetryDelays[retriesSoFar]
+            : null;
+
+    /// <summary>Called by every full scan as it starts: drop a queued retry, and reset the budget unless this scan is that retry.</summary>
+    private void BeginScanForProbeRetry()
+    {
+        _probeRetryCts?.Cancel();
+        _probeRetryCts = null;
+        if (!_nextScanIsProbeRetry) _probeRetries = 0;
+        _nextScanIsProbeRetry = false;
+    }
+
+    /// <summary>Called by every full scan once the gallery is filled: queue a re-scan if a probe came back incomplete.</summary>
+    private void ScheduleProbeRetry(bool reactivateMice)
+    {
+        var incomplete = Devices.Where(d => d.Device.ProbeIncomplete)
+            .Select(d => $"{d.ReceiverName}/{d.Device.Slot}").ToList();
+        if (ProbeRetryDelay(_probeRetries, Devices.Select(d => d.Device)) is not { } delay)
+        {
+            if (incomplete.Count > 0)
+                DiagnosticLog.Info("sweep", $"probe still incomplete for {string.Join(", ", incomplete)} after {_probeRetries} re-scan(s) — waiting for the next device change");
+            return;
+        }
+
+        _probeRetries++;
+        var cts = _probeRetryCts = new CancellationTokenSource();
+        DiagnosticLog.Info("sweep", $"probe incomplete for {string.Join(", ", incomplete)} — re-scanning in {delay.TotalSeconds:0} s ({_probeRetries}/{ProbeRetryDelays.Length})");
+        _ = RetryScanAfterAsync(delay, reactivateMice, cts.Token);
+    }
+
+    private async Task RetryScanAfterAsync(TimeSpan delay, bool reactivateMice, CancellationToken ct)
+    {
+        // A superseded retry is cancelled; let that complete quietly rather than throw.
+        await Task.Delay(delay, ct).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        if (ct.IsCancellationRequested) return;
+        // Same deferral rules as a topology change: never tear down an open page's
+        // session, and fold into a scan that is already running.
+        if (IsScanning || ShowingDevice) { _rescanPending = true; return; }
+        _nextScanIsProbeRetry = true;
+        await LoadAsync(reactivateMice);
+    }
+
     private async Task HandleTopologyChangeAsync(bool keyboardOnly = false)
     {
         // Whatever else happens below, let the unreachable-mice loop retry now: a

@@ -1,5 +1,6 @@
 using Avalonia.Media.Imaging;
 using OpenLogi.Agent;
+using OpenLogi.App.Utils;
 using OpenLogi.Assets;
 using OpenLogi.Core.Actions;
 using OpenLogi.Core.Config;
