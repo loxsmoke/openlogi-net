@@ -67,11 +67,6 @@ It ships two binaries:
   [docs/MOUSE_GESTURES.md](docs/MOUSE_GESTURES.md).
 - **DPI control** — read and set sensitivity, with presets.
 - **SmartShift** — toggle the wheel ratchet mode and tune sensitivity.
-- **Smooth scrolling** — divert the wheel into high-resolution HID++ reporting
-  and re-inject it as fine sub-line OS scrolling (Options+-style), per device.
-  Note: running Logitech software (Options+, G HUB, Logi Bolt app) alongside
-  may interfere with this setting — both sides write the same volatile wheel
-  mode on the device, so whichever wrote last wins.
 - **Shake to locate the pointer** — wiggle the mouse back and forth and the
   pointer grows, macOS-style, up to 3× while you keep shaking, then eases
   smoothly back once you stop. Off by default; on the Pointer tab.
