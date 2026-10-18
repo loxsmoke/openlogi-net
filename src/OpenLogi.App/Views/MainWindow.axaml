@@ -699,7 +699,7 @@
                                         <TextBlock Text="{Binding Battery}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                     <TextBlock Grid.Row="4" Grid.Column="0" Text="{loc:Tr Main_Connection}" Opacity="0.6"/>
-                                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding ReceiverName}"/>
+                                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding ConnectionDescription}"/>
                                 </Grid>
                                 <!-- HID++ 1.0 device: identity + battery only, nothing to configure -->
                                 <Grid IsVisible="{Binding IsHidpp10}" ColumnDefinitions="Auto,*" Margin="0,6,0,0">

@@ -10,6 +10,7 @@ using OpenLogi.Core.Config;
 using OpenLogi.Core.DeviceInfo;
 using OpenLogi.Core.Gestures;
 using OpenLogi.Core.Localization;
+using OpenLogi.Hid;
 using MouseAction = OpenLogi.Core.Actions.MouseAction;
 
 namespace OpenLogi.Tests.App;
@@ -91,6 +92,19 @@ public class LocalizationTests
 
         Assert.Equal("Verbunden", vm.Status);
         Assert.Equal("Direktes Gerät", vm.ReceiverName);
+        Assert.Equal("Direktes Gerät", vm.ConnectionDescription);
+    });
+
+    [Theory]
+    [InlineData((ushort)0xb034, "Bluetooth")]
+    [InlineData((ushort)0xc547, "USB")]
+    public void DirectConnectionRowShowsTransport(ushort pid, string expected) => InCulture("en", () =>
+    {
+        var device = new PairedDevice { Slot = 1, Kind = DeviceKind.Mouse, Online = true };
+
+        var vm = new DeviceViewModel("Direct device", device, new DeviceRoute.Direct(0x046d, pid));
+
+        Assert.Equal(expected, vm.ConnectionDescription);
     });
 
     [Fact]

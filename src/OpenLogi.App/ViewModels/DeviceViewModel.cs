@@ -25,6 +25,14 @@ public sealed partial class DeviceViewModel : ObservableObject
         ? Loc.Current["Connection_DirectDevice"]
         : _receiverName;
 
+    /// <summary>
+    /// The Device tab's Connection row: the receiver's name for a paired device, or the
+    /// transport (Bluetooth / USB) for a directly-attached one instead of "Direct device".
+    /// </summary>
+    public string ConnectionDescription => _receiverName == DirectDeviceReceiverName && HasConnectionIcon
+        ? ConnectionLabel
+        : ReceiverName;
+
     public PairedDevice Device { get; }
 
     /// <summary>How to reach this device for live DPI/SmartShift control; <c>null</c> if unroutable.</summary>
@@ -134,6 +142,7 @@ public sealed partial class DeviceViewModel : ObservableObject
     {
         if (e.PropertyName is not (nameof(Loc.Culture) or "Item[]")) return;
         OnPropertyChanged(nameof(ReceiverName));
+        OnPropertyChanged(nameof(ConnectionDescription));
         OnPropertyChanged(nameof(Status));
         OnPropertyChanged(nameof(ConnectionLabel));
         OnPropertyChanged(nameof(Battery));
