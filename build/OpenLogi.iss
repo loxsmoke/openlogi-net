@@ -53,14 +53,18 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopico
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+; In-app updates run setup with /SILENT /RELAUNCH (UpdateInstaller.cs), which skips the
+; entry above, so restart the app here. runasoriginaluser: setup is elevated, the app
+; must not be.
+Filename: "{app}\{#AppExe}"; Flags: nowait runasoriginaluser; Check: CmdLineParamExists('/RELAUNCH')
 
 [Code]
 const
   RunRegKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
   RunRegValue = 'OpenLogi'; // written at runtime by Autostart.cs
 
-// True when the uninstaller was invoked with the given switch, e.g.
-//   unins000.exe /VERYSILENT /PURGEDATA
+// True when setup or the uninstaller was invoked with the given switch, e.g.
+//   setup.exe /SILENT /RELAUNCH  or  unins000.exe /VERYSILENT /PURGEDATA
 // (winget can't forward custom uninstall switches, so scripted purges call
 // the uninstaller directly).
 function CmdLineParamExists(const Value: string): Boolean;
