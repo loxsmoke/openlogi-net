@@ -3,11 +3,11 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
-    <Version>0.23.0</Version>
+    <Version>0.24.0</Version>
     <!-- The log header prints the informational version verbatim; keep it the plain version. -->
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <AssemblyVersion>0.23.0.0</AssemblyVersion>
-    <FileVersion>0.23.0.0</FileVersion>
+    <AssemblyVersion>0.24.0.0</AssemblyVersion>
+    <FileVersion>0.24.0.0</FileVersion>
     <Product>OpenLogi.net</Product>
     <Company>OpenLogi</Company>
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
