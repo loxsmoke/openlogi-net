@@ -31,10 +31,12 @@ public sealed class HidppDevice
     /// <summary>
     /// Initialize a device, pinging it to determine the protocol version.
     /// Throws <see cref="DeviceException"/> if no device answers or it is v1.0-only.
+    /// <paramref name="pingReplySibling"/> also accepts the ping's reply from a split
+    /// receiver's other collection (see <see cref="V20.DetermineVersionAsync"/>).
     /// </summary>
-    public static async Task<HidppDevice> NewAsync(HidppChannel channel, byte deviceIndex)
+    public static async Task<HidppDevice> NewAsync(HidppChannel channel, byte deviceIndex, HidppChannel? pingReplySibling = null)
     {
-        var version = await V20.DetermineVersionAsync(channel, deviceIndex).ConfigureAwait(false)
+        var version = await V20.DetermineVersionAsync(channel, deviceIndex, replySibling: pingReplySibling).ConfigureAwait(false)
             ?? throw new DeviceException(DeviceErrorKind.DeviceNotFound, "there is no device with the specified device index");
         if (version is ProtocolVersion.V10)
             throw new DeviceException(DeviceErrorKind.UnsupportedProtocolVersion, "the device does not support HID++2.0 or newer");

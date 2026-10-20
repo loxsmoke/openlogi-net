@@ -513,11 +513,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         SetStatus("Status_Scanning");
         IsScanning = true;
         NoDevices = false;
-        Devices.Clear();
         // Re-evaluate receiver contention alongside the scan (independent of its result).
         _ = RefreshLogiWarningAsync();
         try
         {
+            Devices.Clear();
             var inventories = await HidInventory.EnumerateAsync(postProbe: OnReceiverDeviceProbedAsync);
             foreach (var inv in inventories)
                 foreach (var paired in inv.Paired)
@@ -560,6 +560,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         catch (System.Exception e)
         {
+            OpenLogi.Core.Logging.DiagnosticLog.Warn("sweep", $"scan failed: {e.GetType().Name}: {e.Message}");
             SetStatus("Status_EnumerationFailed", e.Message);
         }
         finally

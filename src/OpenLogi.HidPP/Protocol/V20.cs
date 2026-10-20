@@ -200,9 +200,13 @@ public static class V20
     /// HID++1.0-only device answers with an "invalid sub-id" error, which pins
     /// it to v1.0. Returns <c>null</c> if no device answered for the index.
     /// Ported from Rust <c>protocol::determine_version</c>.
+    /// <paramref name="replySibling"/> is the other half of a split receiver: a HID++ 2.0
+    /// reply is long and a HID++ 1.0 error is short, so on a split receiver one of them
+    /// always lands on the collection the ping didn't go out on.
     /// </summary>
     public static async Task<ProtocolVersion?> DetermineVersionAsync(
-        HidppChannel channel, byte deviceIndex, TimeSpan? pingTimeout = null, int pingAttempts = PingAttempts)
+        HidppChannel channel, byte deviceIndex, TimeSpan? pingTimeout = null, int pingAttempts = PingAttempts,
+        HidppChannel? replySibling = null)
     {
         var swId = channel.GetSwId();
         var msg = V20Message.Short(
@@ -235,7 +239,7 @@ public static class V20
             try
             {
                 response = await channel.SendWithTimeoutAsync(
-                    msg.ToHidpp(), IsPingResponse, pingTimeout ?? PingTimeout).ConfigureAwait(false);
+                    msg.ToHidpp(), IsPingResponse, pingTimeout ?? PingTimeout, replySibling).ConfigureAwait(false);
             }
             catch (ChannelException e) when (e.Kind == ChannelErrorKind.Timeout)
             {

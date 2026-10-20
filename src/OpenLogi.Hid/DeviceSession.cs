@@ -77,7 +77,8 @@ public sealed partial class DeviceSession : IAsyncDisposable
             + (device.FeatureIndex(0x8081) is not null ? 500 : 0)
             + featureCount;
 
-        foreach (var hid in HidDiscovery.EnumerateHidppDevices())
+        var nodes = HidDiscovery.EnumerateHidppDevices();
+        foreach (var hid in nodes)
         {
             if (route is DeviceRoute.Direct d && (hid.VendorID != d.VendorId || hid.ProductID != d.ProductId))
                 continue;
@@ -86,7 +87,7 @@ public sealed partial class DeviceSession : IAsyncDisposable
             try { channel = await HidppChannel.FromRawChannelAsync(WindowsRawHidChannel.Open(hid)).ConfigureAwait(false); }
             catch { continue; }
 
-            if (!await MatchesReceiverAsync(channel, route).ConfigureAwait(false))
+            if (!await MatchesReceiverAsync(channel, route, hid, nodes).ConfigureAwait(false))
             {
                 await channel.DisposeAsync().ConfigureAwait(false);
                 continue;
@@ -127,7 +128,8 @@ public sealed partial class DeviceSession : IAsyncDisposable
         return best;
     }
 
-    private static async Task<bool> MatchesReceiverAsync(HidppChannel channel, DeviceRoute route)
+    private static async Task<bool> MatchesReceiverAsync(
+        HidppChannel channel, DeviceRoute route, HidSharp.HidDevice node, IReadOnlyList<HidSharp.HidDevice> nodes)
     {
         switch (route)
         {
@@ -138,7 +140,7 @@ public sealed partial class DeviceSession : IAsyncDisposable
                        && string.Equals(await rb.Receiver.GetUniqueIdAsync().ConfigureAwait(false), b.ReceiverUid, StringComparison.OrdinalIgnoreCase);
             case DeviceRoute.Unifying u:
                 return Receivers.Detect(channel) is DetectedReceiver.Unifying ru
-                       && string.Equals(await ru.Receiver.GetUniqueIdAsync().ConfigureAwait(false), u.ReceiverUid, StringComparison.OrdinalIgnoreCase);
+                       && string.Equals(await UnifyingUidAsync(channel, ru.Receiver, node, nodes).ConfigureAwait(false), u.ReceiverUid, StringComparison.OrdinalIgnoreCase);
             case DeviceRoute.Lightspeed l:
                 // LIGHTSPEED has no serial register — match on the same synthetic
                 // uid the inventory assigned; no register I/O (each read is a 5 s timeout).
@@ -151,6 +153,48 @@ public sealed partial class DeviceSession : IAsyncDisposable
                        && string.Equals(Receivers.LightspeedSyntheticUid(channel), l.ReceiverUid, StringComparison.OrdinalIgnoreCase);
             default:
                 return false;
+        }
+    }
+
+    /// <summary>
+    /// The serial of the Unifying receiver behind <paramref name="channel"/>, or <c>null</c>
+    /// when it can't be read or this node isn't a usable session channel. Windows can
+    /// split a Unifying receiver's HID++ into a short control collection and a long-only
+    /// device collection (issue #19). The device's HID++ 2.0 replies are long, so on a
+    /// split receiver only the long-only collection can carry a session; and the serial
+    /// read is a short request with a long reply, so it goes out on the control sibling
+    /// and is heard here. Siblings are the other collections of <paramref name="node"/>'s
+    /// own interface (<see cref="HidCollectionPath"/>), so a second identical receiver
+    /// is never mistaken for this one's other half.
+    /// </summary>
+    private static async Task<string?> UnifyingUidAsync(
+        HidppChannel channel, UnifyingReceiver receiver, HidSharp.HidDevice node, IReadOnlyList<HidSharp.HidDevice> nodes)
+    {
+        var siblings = nodes
+            .Where(n => HidCollectionPath.AreSiblings(n.DevicePath, node.DevicePath))
+            .Select(n => (Node: n, Support: WindowsRawHidChannel.DetectSupport(n)))
+            .ToList();
+        try
+        {
+            if (channel.SupportsShort)
+            {
+                // Split receiver: the long-only sibling is the session channel, not this one.
+                if (siblings.Any(s => s.Support is { SupportsShort: false, SupportsLong: true })) return null;
+                return await receiver.GetUniqueIdAsync().ConfigureAwait(false);
+            }
+
+            var control = siblings.FirstOrDefault(s => s.Support is { SupportsShort: true }).Node;
+            if (control is null) return null;
+            await using var controlChannel = await HidppChannel.FromRawChannelAsync(WindowsRawHidChannel.Open(control)).ConfigureAwait(false);
+            using var controlReceiver = UnifyingReceiver.TryCreate(controlChannel);
+            if (controlReceiver is null) return null;
+            controlReceiver.LongReplyChannel = channel;
+            return await controlReceiver.GetUniqueIdAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLog.Debug("session", $"unifying uid read failed: {ex.Message}");
+            return null;
         }
     }
 

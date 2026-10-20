@@ -136,12 +136,13 @@ public static class V10
                 || (raw[1] == (byte)V10MessageType.Error && raw[2] == (byte)type && raw[3] == address));
     }
 
-    private static async Task<V10Message> SendRapAsync(HidppChannel channel, V10Message request, byte device, V10MessageType type, byte address)
+    private static async Task<V10Message> SendRapAsync(
+        HidppChannel channel, V10Message request, byte device, V10MessageType type, byte address, HidppChannel? replySibling = null)
     {
         try
         {
             var raw = await channel.SendAsync(request.ToHidpp(),
-                m => IsRapResponse(device, type, address, m)).ConfigureAwait(false);
+                m => IsRapResponse(device, type, address, m), replySibling).ConfigureAwait(false);
             return V10Message.FromHidpp(raw);
         }
         catch (ChannelException e)
@@ -180,13 +181,18 @@ public static class V10
         ThrowIfError(response);
     }
 
-    /// <summary>Read a long 16-byte register.</summary>
-    public static async Task<byte[]> ReadLongRegisterAsync(this HidppChannel channel, byte device, byte address, byte[] parameters)
+    /// <summary>
+    /// Read a long 16-byte register. The request is short but the reply is long, so on
+    /// a receiver whose long reports live on a separate collection pass that collection
+    /// as <paramref name="replySibling"/> (see <see cref="HidppChannel.SendWithTimeoutAsync(HidppMessage, Func{HidppMessage, bool}, TimeSpan, HidppChannel?)"/>).
+    /// </summary>
+    public static async Task<byte[]> ReadLongRegisterAsync(
+        this HidppChannel channel, byte device, byte address, byte[] parameters, HidppChannel? replySibling = null)
     {
         byte[] data = [address, parameters[0], parameters[1], parameters[2]];
         var response = await SendRapAsync(channel,
             V10Message.Short(new V10MessageHeader(device, (byte)V10MessageType.GetLongRegister), data),
-            device, V10MessageType.GetLongRegister, address).ConfigureAwait(false);
+            device, V10MessageType.GetLongRegister, address, replySibling).ConfigureAwait(false);
         ThrowIfError(response);
         return response.ExtendPayload()[1..17];
     }

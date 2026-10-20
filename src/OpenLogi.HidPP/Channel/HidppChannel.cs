@@ -131,15 +131,7 @@ public sealed class HidppChannel : IAsyncDisposable
             throw new ChannelException(ChannelErrorKind.MessageTypeNotSupported);
 
         var tcs = new TaskCompletionSource<HidppMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var id = Interlocked.Increment(ref _pendingId);
-
-        lock (_pendingLock)
-        {
-            // Prune give-ups (an outer cancellation that abandoned the wait) so a
-            // reused channel can't accumulate pending entries unboundedly.
-            _pending.RemoveAll(p => p.Tcs.Task.IsCompleted);
-            _pending.Add(new PendingMessage(id, responsePredicate, tcs));
-        }
+        var id = AddPending(responsePredicate, tcs);
 
         try
         {
@@ -162,6 +154,49 @@ public sealed class HidppChannel : IAsyncDisposable
         RemovePending(id);
         throw new ChannelException(ChannelErrorKind.Timeout);
     }
+
+    /// <summary>
+    /// Send on this channel and accept the matching response from this channel or
+    /// from <paramref name="replySibling"/>, whichever sees it first. Windows splits
+    /// some receivers' HID++ into a short-only and a long-only collection (col01 /
+    /// col02 — LIGHTSPEED, newer Bolt, and the Unifying 046d:c52b in issue #19), and a
+    /// reply arrives on the collection that owns its report id, not on the one the
+    /// request went out on. With no sibling this is the plain single-channel send.
+    /// </summary>
+    public async Task<HidppMessage> SendWithTimeoutAsync(
+        HidppMessage msg, Func<HidppMessage, bool> responsePredicate, TimeSpan timeout, HidppChannel? replySibling)
+    {
+        if (replySibling is null || ReferenceEquals(replySibling, this))
+            return await SendWithTimeoutAsync(msg, responsePredicate, timeout).ConfigureAwait(false);
+
+        msg = NormalizeOutgoing(msg);
+        if (!SupportsMsg(msg))
+            throw new ChannelException(ChannelErrorKind.MessageTypeNotSupported);
+
+        // One completion shared by a pending entry on each channel: the first read
+        // loop to see a match completes it, and both entries are withdrawn after.
+        var tcs = new TaskCompletionSource<HidppMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var hereId = AddPending(responsePredicate, tcs);
+        var thereId = replySibling.AddPending(responsePredicate, tcs);
+        try
+        {
+            await SendAndForgetAsync(msg).ConfigureAwait(false);
+            return await tcs.Task.WaitAsync(timeout).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            throw new ChannelException(ChannelErrorKind.Timeout);
+        }
+        finally
+        {
+            RemovePending(hereId);
+            replySibling.RemovePending(thereId);
+        }
+    }
+
+    /// <summary><see cref="SendWithTimeoutAsync(HidppMessage, Func{HidppMessage, bool}, TimeSpan, HidppChannel?)"/> with the default <see cref="SendResponseTimeout"/>.</summary>
+    public Task<HidppMessage> SendAsync(HidppMessage msg, Func<HidppMessage, bool> responsePredicate, HidppChannel? replySibling) =>
+        SendWithTimeoutAsync(msg, responsePredicate, SendResponseTimeout, replySibling);
 
     /// <summary>Send a message without waiting for a response.</summary>
     public async Task SendAndForgetAsync(HidppMessage msg)
@@ -200,6 +235,19 @@ public sealed class HidppChannel : IAsyncDisposable
             return HidppMessage.Long(widened);
         }
         return msg;
+    }
+
+    private long AddPending(Func<HidppMessage, bool> responsePredicate, TaskCompletionSource<HidppMessage> tcs)
+    {
+        var id = Interlocked.Increment(ref _pendingId);
+        lock (_pendingLock)
+        {
+            // Prune give-ups (an outer cancellation that abandoned the wait) so a
+            // reused channel can't accumulate pending entries unboundedly.
+            _pending.RemoveAll(p => p.Tcs.Task.IsCompleted);
+            _pending.Add(new PendingMessage(id, responsePredicate, tcs));
+        }
+        return id;
     }
 
     private void RemovePending(long id)

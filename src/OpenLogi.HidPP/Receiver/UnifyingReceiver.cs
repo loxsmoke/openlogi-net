@@ -74,6 +74,14 @@ public sealed class UnifyingReceiver : IDisposable
     public static UnifyingReceiver? TryCreateLightspeed(HidppChannel channel) =>
         LightspeedVpidPairs.Contains((channel.VendorId, channel.ProductId)) ? new UnifyingReceiver(channel) : null;
 
+    /// <summary>
+    /// The receiver's long-only sibling collection, when Windows split its HID++ into a
+    /// short (col01) and a long (col02) collection: long register replies (serial,
+    /// codename, pairing info) arrive there, not on the short channel the requests go
+    /// out on (issue #19). <c>null</c> for a receiver exposing both on one collection.
+    /// </summary>
+    public HidppChannel? LongReplyChannel { get; set; }
+
     /// <summary>Subscribe to device-connection events.</summary>
     public ChannelReader<UnifyingDeviceConnection> Listen() => _emitter.CreateReceiver();
 
@@ -118,7 +126,7 @@ public sealed class UnifyingReceiver : IDisposable
     /// <summary>General receiver info (serial number + pairing slot count).</summary>
     public async Task<UnifyingReceiverInfo> GetReceiverInfoAsync()
     {
-        var r = await _channel.ReadLongRegisterAsync(ReceiverDeviceIndex, RegReceiverInfo, [SubReceiverInfo, 0, 0]).ConfigureAwait(false);
+        var r = await _channel.ReadLongRegisterAsync(ReceiverDeviceIndex, RegReceiverInfo, [SubReceiverInfo, 0, 0], LongReplyChannel).ConfigureAwait(false);
         return new UnifyingReceiverInfo(Convert.ToHexString(r.AsSpan(1, 4)), r[6]);
     }
 
@@ -126,7 +134,7 @@ public sealed class UnifyingReceiver : IDisposable
     public async Task<UnifyingDevicePairingInformation> GetDevicePairingInformationAsync(byte deviceIndex)
     {
         var r = await _channel.ReadLongRegisterAsync(ReceiverDeviceIndex, RegReceiverInfo,
-            [(byte)(SubDevicePairingInformation | (deviceIndex & 0x0f)), 0x00, 0x00]).ConfigureAwait(false);
+            [(byte)(SubDevicePairingInformation | (deviceIndex & 0x0f)), 0x00, 0x00], LongReplyChannel).ConfigureAwait(false);
         if (!Enum.IsDefined(typeof(UnifyingDeviceKind), (byte)(r[1] & 0x0f)))
             throw Hidpp10Exception.UnsupportedResponse();
         return new UnifyingDevicePairingInformation(
@@ -145,7 +153,7 @@ public sealed class UnifyingReceiver : IDisposable
     public async Task<string> GetDeviceCodenameAsync(byte deviceIndex)
     {
         var r = await _channel.ReadLongRegisterAsync(ReceiverDeviceIndex, RegReceiverInfo,
-            [(byte)(SubDeviceCodename | (deviceIndex & 0x0f)), 0x00, 0x00]).ConfigureAwait(false);
+            [(byte)(SubDeviceCodename | (deviceIndex & 0x0f)), 0x00, 0x00], LongReplyChannel).ConfigureAwait(false);
         return ParseCodename(r) ?? throw Hidpp10Exception.UnsupportedResponse();
     }
 

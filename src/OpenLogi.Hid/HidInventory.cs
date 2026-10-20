@@ -111,12 +111,13 @@ public static class HidInventory
                 var detected = Receivers.Detect(channel);
                 var inventory = detected switch
                 {
-                    DetectedReceiver.Bolt b => await BuildBoltInventoryAsync(channel, b.Receiver, DeviceInterfaceFor(nodes, channel), postProbe).ConfigureAwait(false),
+                    DetectedReceiver.Bolt b => await BuildBoltInventoryAsync(channel, b.Receiver, DeviceInterfaceFor(nodes, hidNode), postProbe).ConfigureAwait(false),
                     // LIGHTSPEED shares Unifying's register set; only the name and
                     // the uid differ (no serial register → synthetic uid, no read).
-                    DetectedReceiver.Unifying u => await BuildUnifyingInventoryAsync(channel, u.Receiver, u.Name, postProbe: postProbe).ConfigureAwait(false),
+                    DetectedReceiver.Unifying u => await BuildUnifyingInventoryAsync(channel, u.Receiver, u.Name,
+                        deviceInterface: DeviceInterfaceFor(nodes, hidNode), postProbe: postProbe, pairsHidpp10: true).ConfigureAwait(false),
                     DetectedReceiver.Lightspeed l => await BuildUnifyingInventoryAsync(channel, l.Receiver, l.Name,
-                        Receivers.LightspeedSyntheticUid(channel), DeviceInterfaceFor(nodes, channel), postProbe).ConfigureAwait(false),
+                        Receivers.LightspeedSyntheticUid(channel), DeviceInterfaceFor(nodes, hidNode), postProbe).ConfigureAwait(false),
                     _ => await BuildDirectInventoryAsync(channel).ConfigureAwait(false),
                 };
                 if (inventory is not null)
@@ -264,25 +265,22 @@ public static class HidInventory
         }
     }
 
+    /// <param name="pairsHidpp10">
+    /// The receiver can pair HID++ 1.0 devices (Unifying, issue #13; never LIGHTSPEED).
+    /// On a split receiver their short error replies come back on the control channel,
+    /// so the probe also listens there and starts with a short control-channel ping.
+    /// </param>
     private static async Task<DeviceInventory> BuildUnifyingInventoryAsync(
         HidppChannel channel, UnifyingReceiver receiver, string name, string? uidOverride = null,
-        IHidNode? deviceInterface = null, PostProbeHook? postProbe = null)
+        IHidNode? deviceInterface = null, PostProbeHook? postProbe = null, bool pairsHidpp10 = false)
     {
-        var uid = uidOverride ?? await TryAsync(receiver.GetUniqueIdAsync).ConfigureAwait(false);
-        if (uid is null)
-            DiagnosticLog.Warn("sweep", "receiver uid read (0xb5/03) failed — devices will be visible but not controllable");
-        // Without the wireless-notification flag the arrival trigger below stays
-        // silent on a cold-booted receiver (same reason the Bolt path sets it).
-        try { await receiver.SetWirelessNotificationsAsync(true).ConfigureAwait(false); }
-        catch (Exception ex) { DiagnosticLog.Warn("sweep", $"enable wireless notifications failed: {ex.Message}"); }
-
-        // A LIGHTSPEED receiver carries device HID++ 2.0 on a long-only *device*
-        // interface (col02) that's separate from the short *control* interface
-        // (col01) we enumerate on — the paired device is unreachable via HID++ 2.0 at
-        // its slot on the control channel. Probe on the device interface when one was
-        // found, so the slot yields a real name/model/capabilities (and the tile isn't
-        // just a bare "Keyboard"). Falls back to the control channel when there's no
-        // separate device interface (the combined Bolt/Unifying case).
+        // A LIGHTSPEED receiver — and on Windows a Unifying 046d:c52b too (issue #19) —
+        // splits HID++ into a short *control* collection (col01, the one we enumerate
+        // on) and a long-only *device* collection (col02). Long reports only arrive on
+        // col02: device HID++ 2.0 replies and the receiver's long register replies
+        // (serial, codename). Open it first so the uid read can hear its reply, and
+        // probe the slots on it. Falls back to the control channel when there's no
+        // separate device interface (a receiver exposing both on one collection).
         HidppChannel? deviceChannel = null;
         if (deviceInterface is not null)
         {
@@ -290,9 +288,19 @@ public static class HidInventory
             catch (Exception ex) { DiagnosticLog.Warn("sweep", $"device interface open failed: {ex.Message} — probing on the control interface"); }
         }
         var probeChannel = deviceChannel ?? channel;
+        receiver.LongReplyChannel = deviceChannel;
+        var splitControl = pairsHidpp10 && deviceChannel is not null ? channel : null;
 
         try
         {
+            var uid = uidOverride ?? await TryAsync(receiver.GetUniqueIdAsync).ConfigureAwait(false);
+            if (uid is null)
+                DiagnosticLog.Warn("sweep", "receiver uid read (0xb5/03) failed — devices will be visible but not controllable");
+            // Without the wireless-notification flag the arrival trigger below stays
+            // silent on a cold-booted receiver (same reason the Bolt path sets it).
+            try { await receiver.SetWirelessNotificationsAsync(true).ConfigureAwait(false); }
+            catch (Exception ex) { DiagnosticLog.Warn("sweep", $"enable wireless notifications failed: {ex.Message}"); }
+
             var paired = new List<PairedDevice>();
             foreach (var conn in await receiver.CollectPairedDevicesAsync().ConfigureAwait(false))
             {
@@ -303,7 +311,7 @@ public static class HidInventory
                 string? codename = null;
                 try { codename = await receiver.GetDeviceCodenameAsync(conn.Index).ConfigureAwait(false); }
                 catch (Exception ex) { DiagnosticLog.Debug("sweep", $"  slot {conn.Index}: codename read (0xb5/0x4n) failed: {ex.Message}"); }
-                paired.Add(await ProbeAsync(probeChannel, conn.Index, MapUnifying(conn.Kind), conn.Online, conn.Wpid, codename, postProbe).ConfigureAwait(false));
+                paired.Add(await ProbeAsync(probeChannel, conn.Index, MapUnifying(conn.Kind), conn.Online, conn.Wpid, codename, postProbe, splitControl).ConfigureAwait(false));
             }
 
             return new DeviceInventory
@@ -314,6 +322,7 @@ public static class HidInventory
         }
         finally
         {
+            receiver.LongReplyChannel = null;
             if (deviceChannel is not null) await deviceChannel.DisposeAsync().ConfigureAwait(false);
         }
     }
@@ -321,22 +330,15 @@ public static class HidInventory
     /// <summary>
     /// Find a receiver's long-only *device* interface — the sibling HID node that
     /// carries device HID++ 2.0 traffic, separate from the short *control* interface
-    /// <paramref name="control"/> we enumerate on. LIGHTSPEED and newer Bolt receivers
-    /// (issue #6) split these; older Bolt/Unifying combine them into one interface, so
-    /// there's no sibling to find and this returns <c>null</c>. Matched by
-    /// VID/PID, consistent with the VID/PID-based LIGHTSPEED synthetic uid — two
-    /// identical dongles on one host aren't distinguished, which is already accepted.
+    /// <paramref name="control"/> we enumerate on. LIGHTSPEED, newer Bolt (issue #6) and,
+    /// on Windows, the Unifying c52b (issue #19) split these; a receiver exposing both on
+    /// one collection has no sibling and this returns <c>null</c>. Matched by device
+    /// path (<see cref="HidCollectionPath"/>), so with two identical dongles each control
+    /// collection gets its own receiver's device collection.
     /// </summary>
-    private static IHidNode? DeviceInterfaceFor(IReadOnlyList<IHidNode> nodes, HidppChannel control)
-    {
-        foreach (var n in nodes)
-        {
-            if (n.VendorId != control.VendorId || n.ProductId != control.ProductId) continue;
-            if (n is { SupportsShort: false, SupportsLong: true })
-                return n;
-        }
-        return null;
-    }
+    private static IHidNode? DeviceInterfaceFor(IReadOnlyList<IHidNode> nodes, IHidNode control) =>
+        nodes.FirstOrDefault(n => n is { SupportsShort: false, SupportsLong: true }
+                                  && HidCollectionPath.AreSiblings(n.DevicePath, control.DevicePath));
 
     private static async Task<DeviceInventory?> BuildDirectInventoryAsync(HidppChannel channel)
     {
@@ -354,9 +356,16 @@ public static class HidInventory
         };
     }
 
+    /// <param name="splitControl">
+    /// When <paramref name="channel"/> is a split receiver's long-only device collection
+    /// and the receiver can pair HID++ 1.0 devices: its short control channel. Pings
+    /// also accept replies there (a 1.0 device's error and a sleeping slot's NACK are
+    /// short), and an online slot first gets one short ping on it in case a 1.0 device
+    /// ignores long ones.
+    /// </param>
     private static async Task<PairedDevice> ProbeAsync(
         HidppChannel channel, byte slot, DeviceKind kind, bool online, ushort? wpid, string? codename,
-        PostProbeHook? postProbe = null)
+        PostProbeHook? postProbe = null, HidppChannel? splitControl = null)
     {
         if (!online)
         {
@@ -374,7 +383,7 @@ public static class HidInventory
             for (var attempt = 0; attempt < 3 && !reachable; attempt++)
             {
                 if (attempt > 0) await Task.Delay(400).ConfigureAwait(false);
-                try { reachable = await V20.DetermineVersionAsync(channel, slot, pingAttempts: 1).ConfigureAwait(false) is not null; }
+                try { reachable = await V20.DetermineVersionAsync(channel, slot, pingAttempts: 1, replySibling: splitControl).ConfigureAwait(false) is not null; }
                 catch { /* stays unreachable */ }
             }
             if (!reachable)
@@ -396,6 +405,19 @@ public static class HidInventory
             online = true;
         }
 
+        if (splitControl is not null)
+        {
+            // One short ping on the control side first, hearing replies on both
+            // collections: a HID++ 1.0 device's error reply is short and it may never
+            // answer the long pings below (issue #13's M705 on this receiver). A 2.0
+            // device's answer, or silence, falls through to the device-collection probe.
+            ProtocolVersion? version = null;
+            try { version = await V20.DetermineVersionAsync(splitControl, slot, pingAttempts: 1, replySibling: channel).ConfigureAwait(false); }
+            catch { /* stays unanswered */ }
+            if (version is ProtocolVersion.V10)
+                return await ProbeLegacyAsync(splitControl, slot, kind, online, wpid, codename).ConfigureAwait(false);
+        }
+
         // A just-woken wireless device parks/unparks its link, so a probe attempt can
         // land in a parked moment and fast-NACK — retry a few times (the delays are
         // the dominant cost) instead of losing the whole identity for this sweep.
@@ -404,12 +426,13 @@ public static class HidInventory
         for (var attempt = 0; attempt < 3 && device is null; attempt++)
         {
             if (attempt > 0) await Task.Delay(400).ConfigureAwait(false);
-            try { device = await HidppDevice.NewAsync(channel, slot).ConfigureAwait(false); }
+            try { device = await HidppDevice.NewAsync(channel, slot, splitControl).ConfigureAwait(false); }
             catch (DeviceException ex) when (ex.Kind == DeviceErrorKind.UnsupportedProtocolVersion)
             {
                 // The device answered the ping with a HID++ 1.0 error — it's awake and
                 // reachable, just register-based. No point retrying the 2.0 probe.
-                return await ProbeLegacyAsync(channel, slot, kind, online, wpid, codename).ConfigureAwait(false);
+                // Its register reads are short, so they go over the control channel.
+                return await ProbeLegacyAsync(splitControl ?? channel, slot, kind, online, wpid, codename).ConfigureAwait(false);
             }
             catch (Exception ex) { failure = ex; }
         }

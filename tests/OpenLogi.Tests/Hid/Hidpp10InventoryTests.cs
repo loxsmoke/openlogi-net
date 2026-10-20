@@ -84,8 +84,8 @@ public class Hidpp10InventoryTests
     {
         var reads = new List<byte>();
         var source = new FixedNodeSource(
-            new MockNode(ControlInterface(M705Wpid, batteryLevel: 0x05, reads), @"\?\hid#vid_046d&pid_c52b&mi_02&col01#aaa"),
-            new MockNode(LongOnlyInterface(), @"\?\hid#vid_046d&pid_c52b&mi_02&col02#bbb"));
+            new MockNode(ControlInterface(M705Wpid, batteryLevel: 0x05, reads), @"\?\hid#vid_046d&pid_c52b&mi_02&col01#8&2de4abc&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}"),
+            new MockNode(LongOnlyInterface(), @"\?\hid#vid_046d&pid_c52b&mi_02&col02#8&2de4abc&0&0001#{4d1e55b2-f16f-11cf-88cb-001111000030}"));
 
         var inventory = await HidInventory.EnumerateAsync(source);
 
@@ -120,7 +120,7 @@ public class Hidpp10InventoryTests
         // receiver-reported kind, which the UI falls back to for the name.
         var reads = new List<byte>();
         var source = new FixedNodeSource(
-            new MockNode(ControlInterface(0x1fff, batteryLevel: 0x03, reads), @"\?\hid#vid_046d&pid_c52b&mi_02&col01#aaa"));
+            new MockNode(ControlInterface(0x1fff, batteryLevel: 0x03, reads), @"\?\hid#vid_046d&pid_c52b&mi_02&col01#8&2de4abc&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}"));
 
         var inventory = await HidInventory.EnumerateAsync(source);
 

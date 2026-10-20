@@ -2,7 +2,6 @@ using Avalonia.Threading;
 using OpenLogi.Core.DeviceInfo;
 using OpenLogi.Core.Logging;
 using OpenLogi.Hid;
-using OpenLogi.Core.Localization;
 
 namespace OpenLogi.App.ViewModels;
 
@@ -271,10 +270,12 @@ public partial class MainWindowViewModel
     private async Task RetryScanAfterAsync(TimeSpan delay, bool reactivateMice, CancellationToken ct)
     {
         // A superseded retry is cancelled; let that complete quietly rather than throw.
-        await Task.Delay(delay, ct).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        // ContinueOnCapturedContext is not implied by SuppressThrowing: without it the
+        // rescan below ran on the thread pool, where Devices.Clear() throws and left
+        // the gallery stuck on "Scanning…" (issue #19).
+        await Task.Delay(delay, ct).ConfigureAwait(
+            ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
         if (ct.IsCancellationRequested) return;
-        // Same deferral rules as a topology change: never tear down an open page's
-        // session, and fold into a scan that is already running.
         if (IsScanning || ShowingDevice) { _rescanPending = true; return; }
         _nextScanIsProbeRetry = true;
         await LoadAsync(reactivateMice);

@@ -131,8 +131,8 @@ public class BoltTwoInterfaceInventoryTests
     public async Task BoltDevicesResolveOverTheLongDeviceInterface()
     {
         var source = new FixedNodeSource(
-            new MockNode(ControlInterface(), @"\\?\hid#vid_046d&pid_c548&mi_02&col01#aaa"),
-            new MockNode(DeviceInterface(), @"\\?\hid#vid_046d&pid_c548&mi_02&col02#bbb"));
+            new MockNode(ControlInterface(), @"\\?\hid#vid_046d&pid_c548&mi_02&col01#8&2de4abc&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}"),
+            new MockNode(DeviceInterface(), @"\\?\hid#vid_046d&pid_c548&mi_02&col02#8&2de4abc&0&0001#{4d1e55b2-f16f-11cf-88cb-001111000030}"));
 
         var inventory = await HidInventory.EnumerateAsync(source);
 
