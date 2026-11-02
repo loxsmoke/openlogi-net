@@ -132,10 +132,12 @@ public class GestureArmRetryTests
         Assert.Equal(1, Volatile.Read(ref m.DivertCalls));
 
         // The retry lands on the first post-arm re-check, well before the 20 s keepalive.
-        await WaitForAsync(() => Volatile.Read(ref m.DivertCalls) >= 2,
-            DeviceSession.PostArmRechecks[0] + TimeSpan.FromSeconds(3));
-        Assert.True(Volatile.Read(ref m.DivertCalls) >= 2, "the failed divert was not retried");
-        Assert.True(m.Diverted);
+        // Wait for the divert to be applied, not just attempted: the scripted mouse
+        // counts a write before it applies it, so a wait on the count alone could
+        // check Diverted in between (it did, once, on a slow CI runner).
+        await WaitForAsync(() => m.Diverted, DeviceSession.PostArmRechecks[0] + TimeSpan.FromSeconds(3));
+        Assert.True(m.Diverted, "the failed divert was not retried");
+        Assert.True(Volatile.Read(ref m.DivertCalls) >= 2);
         await capture!.DisposeAsync();
     }
 
