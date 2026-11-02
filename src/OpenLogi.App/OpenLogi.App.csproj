@@ -14,6 +14,8 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- The camera preview copies frames straight into its bitmap. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <Folder Include="Models\" />
@@ -37,6 +39,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OpenLogi.Core\OpenLogi.Core.csproj" />
+    <ProjectReference Include="..\OpenLogi.Camera\OpenLogi.Camera.csproj" />
     <ProjectReference Include="..\OpenLogi.Agent\OpenLogi.Agent.csproj" />
     <ProjectReference Include="..\OpenLogi.Hid\OpenLogi.Hid.csproj" />
     <ProjectReference Include="..\OpenLogi.Assets\OpenLogi.Assets.csproj" />

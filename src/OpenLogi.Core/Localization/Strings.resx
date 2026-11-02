@@ -1177,4 +1177,184 @@
     <value>Clear</value>
     <comment>Chord recorder button that removes the recorded chord (the button then does nothing).</comment>
   </data>
+  <data name="Main_Camera" xml:space="preserve">
+    <value>Camera</value>
+    <comment>MainWindow: TabItem header for a webcam's live preview and controls.</comment>
+  </data>
+  <data name="Camera_StartingPreview" xml:space="preserve">
+    <value>Starting preview…</value>
+    <comment>Camera tab: shown over the preview while the stream opens.</comment>
+  </data>
+  <data name="Camera_ResourcesUnavailable" xml:space="preserve">
+    <value>Camera resources are unavailable. Another application may be using the camera.</value>
+    <comment>Camera tab: the preview could not get the camera's hardware resources.</comment>
+  </data>
+  <data name="Camera_PreviewStartFailed" xml:space="preserve">
+    <value>The camera preview couldn't start.</value>
+    <comment>Camera tab: generic preview failure.</comment>
+  </data>
+  <data name="Camera_PreviewAccessDenied" xml:space="preserve">
+    <value>Windows is blocking camera access. Turn on “Let desktop apps access your camera” in Settings → Privacy &amp; security → Camera.</value>
+    <comment>Camera tab: the Windows camera privacy setting blocks desktop apps. Name the setting as Windows does in this language.</comment>
+  </data>
+  <data name="Camera_Controls" xml:space="preserve">
+    <value>Camera controls</value>
+    <comment>Camera tab: heading over the image controls.</comment>
+  </data>
+  <data name="Camera_ResetToDefaults" xml:space="preserve">
+    <value>Reset to defaults</value>
+    <comment>Camera tab: button that resets every control to the camera's defaults.</comment>
+  </data>
+  <data name="Camera_ControlsUnavailable" xml:space="preserve">
+    <value>This camera has no adjustable image controls.</value>
+    <comment>Camera tab: the camera exposes no controls.</comment>
+  </data>
+  <data name="Camera_Lens" xml:space="preserve">
+    <value>Lens</value>
+    <comment>Camera tab: section heading for zoom/pan/tilt/focus/exposure.</comment>
+  </data>
+  <data name="Camera_Image" xml:space="preserve">
+    <value>Image</value>
+    <comment>Camera tab: section heading for brightness/contrast/… controls.</comment>
+  </data>
+  <data name="Camera_Zoom" xml:space="preserve">
+    <value>Zoom</value>
+    <comment>Camera control label.</comment>
+  </data>
+  <data name="Camera_Pan" xml:space="preserve">
+    <value>Pan</value>
+    <comment>Camera control label (horizontal turn).</comment>
+  </data>
+  <data name="Camera_Tilt" xml:space="preserve">
+    <value>Tilt</value>
+    <comment>Camera control label (vertical turn).</comment>
+  </data>
+  <data name="Camera_Focus" xml:space="preserve">
+    <value>Focus</value>
+    <comment>Camera control label.</comment>
+  </data>
+  <data name="Camera_Exposure" xml:space="preserve">
+    <value>Exposure</value>
+    <comment>Camera control label.</comment>
+  </data>
+  <data name="Camera_AntiFlicker" xml:space="preserve">
+    <value>Anti-flicker</value>
+    <comment>Camera control label (power-line frequency).</comment>
+  </data>
+  <data name="Camera_LowLightCompensation" xml:space="preserve">
+    <value>Low light compensation</value>
+    <comment>Camera control label.</comment>
+  </data>
+  <data name="Camera_Brightness" xml:space="preserve">
+    <value>Brightness</value>
+    <comment>Camera control label.</comment>
+  </data>
+  <data name="Camera_Contrast" xml:space="preserve">
+    <value>Contrast</value>
+    <comment>Camera control label.</comment>
+  </data>
+  <data name="Camera_Saturation" xml:space="preserve">
+    <value>Saturation</value>
+    <comment>Camera control label.</comment>
+  </data>
+  <data name="Camera_Sharpness" xml:space="preserve">
+    <value>Sharpness</value>
+    <comment>Camera control label.</comment>
+  </data>
+  <data name="Camera_Gain" xml:space="preserve">
+    <value>Gain</value>
+    <comment>Camera control label.</comment>
+  </data>
+  <data name="Camera_BacklightCompensation" xml:space="preserve">
+    <value>Backlight compensation</value>
+    <comment>Camera control label.</comment>
+  </data>
+  <data name="Camera_WhiteBalance" xml:space="preserve">
+    <value>White balance</value>
+    <comment>Camera control label.</comment>
+  </data>
+  <data name="Camera_Tint" xml:space="preserve">
+    <value>Tint</value>
+    <comment>Camera control label (hue).</comment>
+  </data>
+  <data name="Camera_Auto" xml:space="preserve">
+    <value>Auto</value>
+    <comment>Camera tab: chip that hands a control to the camera's automatic mode.</comment>
+  </data>
+  <data name="Camera_SetValueTitle" xml:space="preserve">
+    <value>Set {0}</value>
+    <comment>Camera tab: exact-value dialog title. {0} = control name.</comment>
+  </data>
+  <data name="Camera_SupportedRange" xml:space="preserve">
+    <value>Supported range: {0}–{1}</value>
+    <comment>Camera tab: exact-value dialog hint. {0} = minimum, {1} = maximum.</comment>
+  </data>
+  <data name="Camera_SetValueLabel" xml:space="preserve">
+    <value>Set {0} value</value>
+    <comment>Camera tab: tooltip on a control's value. {0} = control name.</comment>
+  </data>
+  <data name="Camera_ProfileDefault" xml:space="preserve">
+    <value>Default</value>
+    <comment>Camera profile chip: the camera's own defaults.</comment>
+  </data>
+  <data name="Camera_ProfileStreaming" xml:space="preserve">
+    <value>Streaming</value>
+    <comment>Camera profile chip: preset tuned for streaming.</comment>
+  </data>
+  <data name="Camera_ProfileVideoCall" xml:space="preserve">
+    <value>Video call</value>
+    <comment>Camera profile chip: preset tuned for video calls.</comment>
+  </data>
+  <data name="Camera_NewProfile" xml:space="preserve">
+    <value>New</value>
+    <comment>Camera profile chip that saves the current settings as a new profile.</comment>
+  </data>
+  <data name="Camera_CustomProfileNumber" xml:space="preserve">
+    <value>Custom {0}</value>
+    <comment>Name of a saved camera profile. {0} = number.</comment>
+  </data>
+  <data name="Camera_DeleteProfile" xml:space="preserve">
+    <value>Delete profile</value>
+    <comment>Camera tab: tooltip on a saved profile's delete button.</comment>
+  </data>
+  <data name="Camera_UsbLinkLimited" xml:space="preserve">
+    <value>Connected at {0}, but this camera supports {1}. On the faster link it may offer more resolutions and frame rates. Plug it straight into a USB 3 port, without a hub, using a USB 3 cable.</value>
+    <comment>Camera tab: the camera runs on a slower USB link than it supports. {0} = current speed, {1} = supported speed (e.g. USB 2.0 (480 Mbps)).</comment>
+  </data>
+  <data name="Camera_Save" xml:space="preserve">
+    <value>Save</value>
+    <comment>Camera exact-value dialog: confirm button.</comment>
+  </data>
+  <data name="Camera_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Camera exact-value dialog: cancel button.</comment>
+  </data>
+  <data name="Camera_ActiveMode" xml:space="preserve">
+    <value>{0} × {1}, {2} fps</value>
+    <comment>Camera tab: the mode the camera is running. {0} = width, {1} = height, {2} = frames per second.</comment>
+  </data>
+  <data name="Camera_ExclusiveAccess" xml:space="preserve">
+    <value>Use the camera exclusively to preview at different resolutions and frame rates</value>
+    <comment>Camera tab: checkbox that makes the preview the camera's controlling app, so it can choose resolution and frame rate.</comment>
+  </data>
+  <data name="Camera_OtherAppUsing" xml:space="preserve">
+    <value>Another app is using the camera, so its resolution and frame rate can't be changed here.</value>
+    <comment>Camera tab: shown next to the disabled exclusive-access checkbox while another app controls the camera.</comment>
+  </data>
+  <data name="Camera_ExclusiveNote" xml:space="preserve">
+    <value>Resolution and frame rate apply to this preview only. While it has exclusive access, other apps can't use the camera.</value>
+    <comment>Camera tab: note under the resolution / frame-rate pickers while the preview holds the camera exclusively.</comment>
+  </data>
+  <data name="Camera_Resolution" xml:space="preserve">
+    <value>Resolution</value>
+    <comment>Camera tab: preview resolution dropdown label.</comment>
+  </data>
+  <data name="Camera_FrameRate" xml:space="preserve">
+    <value>Frame rate</value>
+    <comment>Camera tab: preview frame-rate dropdown label.</comment>
+  </data>
+  <data name="Camera_FrameRateFps" xml:space="preserve">
+    <value>{0} fps</value>
+    <comment>Camera tab: one frame-rate option. {0} = frames per second.</comment>
+  </data>
 </root>

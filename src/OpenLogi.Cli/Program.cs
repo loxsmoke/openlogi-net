@@ -91,8 +91,12 @@ switch (command)
             args.Length > 2 ? Convert.ToByte(args[2], 16) : (byte)0,
             args[3..].Select(h => Convert.ToByte(h, 16)).ToArray());
         break;
+    case "camera":
+        return await Commands.CameraAsync(args[1..]);
+    case "snapshot":
+        return await Commands.SnapshotAsync(args[1..]);
     default:
-        Console.Error.WriteLine($"unknown command '{command}'. Available: list, diag, controls, assets, light <RRGGBB>, hosts, kbinfo, bright <0-100>, kbmode <onboard|host>, effect <idx> [params hex...], v10probe");
+        Console.Error.WriteLine($"unknown command '{command}'. Available: list, diag, controls, assets, light <RRGGBB>, hosts, kbinfo, bright <0-100>, kbmode <onboard|host>, effect <idx> [params hex...], v10probe, camera [get|set <name> <value>] [--id <id>], snapshot <out.png> [--id <id>]");
         return 1;
 }
 

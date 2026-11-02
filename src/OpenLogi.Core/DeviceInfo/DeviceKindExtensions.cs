@@ -20,6 +20,7 @@ public static class DeviceKindExtensions
         "gamepad" => DeviceKind.Gamepad,
         "joystick" => DeviceKind.Joystick,
         "headset" => DeviceKind.Headset,
+        "camera" => DeviceKind.Camera,
         _ => DeviceKind.Unknown,
     };
 }

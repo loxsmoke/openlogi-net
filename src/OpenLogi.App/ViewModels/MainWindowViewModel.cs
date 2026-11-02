@@ -175,8 +175,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty][NotifyPropertyChangedFor(nameof(InitialTabIndex))] private bool _hasLightingTab;
     [ObservableProperty][NotifyPropertyChangedFor(nameof(InitialTabIndex))] private bool _hasGKeysTab;
 
-    /// <summary>The first visible tab to select for the current device (Buttons → Pointer → Lighting → G-Keys → Device).</summary>
-    public int InitialTabIndex => HasButtonsTab ? 0 : HasPointerTab ? 1 : HasLightingTab ? 2 : HasGKeysTab ? 3 : 4;
+    /// <summary>The first visible tab to select for the current device (Camera → Buttons → Pointer → Lighting → G-Keys → Device).</summary>
+    public int InitialTabIndex =>
+        HasCameraTab ? 0 : HasButtonsTab ? 1 : HasPointerTab ? 2 : HasLightingTab ? 3 : HasGKeysTab ? 4 : 5;
 
     [ObservableProperty] private Bitmap? _diagramImage;
     [ObservableProperty] private double _diagramWidth;
@@ -396,6 +397,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             // so a long-lived session re-checks daily rather than waiting for a restart.
             try { StartUpdateTimer(); }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"update timer unavailable: {ex.Message}"); }
+
+            // Webcams are UVC, invisible to the HID watchers above: scan them on a timer.
+            try { StartCameraScan(); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"camera scan unavailable: {ex.Message}"); }
         }
     }
 
@@ -403,6 +408,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         if (!value && _rescanPending && !IsScanning)
             _ = LoadAsync();
+        SyncCameraPage();
         // Entering/leaving a keyboard's page switches which session the keepalive uses.
         PokeLightingKeepalive();
     }
@@ -523,6 +529,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 foreach (var paired in inv.Paired)
                     if (IsConfigurable(paired))
                         Devices.Add(new DeviceViewModel(inv.Receiver.Name, RememberIdentity(paired), DeviceRoute.DeviceRouteFor(inv, paired.Slot)));
+            // Cameras come from their own scan (MainWindowViewModel.Camera.cs); keep their tiles.
+            foreach (var tile in _cameraTiles)
+                Devices.Add(tile);
 
             // Stay on the home gallery; opening a card navigates to its detail.
             SelectedDevice = null;
@@ -553,7 +562,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             }
 
             foreach (var vm in Devices)
-                if (vm.ConfigKey is not null)
+                if (vm.ConfigKey is not null && !vm.IsCamera) // camera tiles resolved theirs when they appeared
                     _ = ResolveCardImageAsync(vm);
 
             ScheduleProbeRetry(reactivateMice);
@@ -593,8 +602,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         HasLightingTab = value?.HasLighting == true;
         HasGKeysTab = value?.HasGKeys == true;
         _ = LoadControlsAsync(value);
+        SyncCameraPage();
 
-        if (value?.ConfigKey is not { } configKey)
+        // A webcam's page is its Camera tab alone; it has no HID++ settings to seed.
+        if (value?.IsCamera == true || value?.ConfigKey is not { } configKey)
             return;
 
         SeedLightingFromConfig(configKey);
@@ -668,6 +679,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         _lightingKeepaliveTimer?.Dispose();
         _updateTimer?.Dispose();
+        _cameraScanTimer?.Stop();
+        Camera?.Dispose();
         _probeRetryCts?.Cancel();
         _ = _keepaliveSession?.DisposeAsync();
         _ = _batteryMonitor?.DisposeAsync();
@@ -688,6 +701,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (SelectedDevice?.ConfigKey is { } configKey)
             RefreshGestureSummaries(configKey);
         RefreshLocalizedMessages();
+        Camera?.RefreshLocalizedText();
     }
 
     private void SetStatus(string key, params object?[] args)
@@ -727,7 +741,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         try
         {
-            var path = await _resolver.ResolveFrontRenderAsync(vm.ConfigKey!, vm.Device.Codename, vm.Ext);
+            var path = await _resolver.ResolveFrontRenderAsync(vm.AssetKey!, vm.Device.Codename, vm.Ext);
             if (path is not null && File.Exists(path))
                 vm.Image = new Bitmap(path);
         }

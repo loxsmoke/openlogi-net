@@ -84,6 +84,8 @@ public static class ConfigCodec
             t["invert_scroll"] = true;
         if (d.SmoothScroll)
             t["smooth_scroll"] = true;
+        if (d.CameraProfile is not null)
+            t["camera_profile"] = d.CameraProfile;
 
         // Sub-tables.
         if (d.Identity is { } identity)
@@ -106,6 +108,30 @@ public static class ConfigCodec
         }
         if (d.PerAppBindings.Count > 0)
             t["per_app_bindings"] = SerializePerAppBindings(d.PerAppBindings);
+        if (d.CameraControls is { } controls)
+            t["camera_controls"] = SerializeCameraControls(controls);
+        if (d.CameraProfiles.Count > 0)
+        {
+            var profiles = new TomlTable();
+            foreach (var (name, snap) in d.CameraProfiles)
+                profiles[name] = SerializeCameraControls(snap);
+            t["camera_profiles"] = profiles;
+        }
+        if (d.CameraStreamMode is { } mode)
+            t["camera_stream_mode"] = new TomlTable
+            {
+                ["width"] = (long)mode.Width,
+                ["height"] = (long)mode.Height,
+                ["fps"] = (long)mode.Fps,
+            };
+        return t;
+    }
+
+    private static TomlTable SerializeCameraControls(SortedDictionary<string, int> controls)
+    {
+        var t = new TomlTable();
+        foreach (var (name, value) in controls)
+            t[name] = (long)value;
         return t;
     }
 
@@ -308,7 +334,31 @@ public static class ConfigCodec
                             map[button] = ParseAction(bv!);
                     d.PerAppBindings[bundle] = map;
                 }
+        d.CameraProfile = GetString(t, "camera_profile");
+        if (t.TryGetValue("camera_controls", out var cc) && cc is TomlTable controls)
+            d.CameraControls = ParseCameraControls(controls);
+        if (t.TryGetValue("camera_profiles", out var cp) && cp is TomlTable profiles)
+            foreach (var (name, value) in profiles)
+                if (value is TomlTable snap)
+                    d.CameraProfiles[name] = ParseCameraControls(snap);
+        if (t.TryGetValue("camera_stream_mode", out var sm) && sm is TomlTable mode)
+        {
+            // Every value is non-zero: a zero refuses to load, like the Rust NonZeroU32.
+            var (w, h, fps) = (GetLong(mode, "width", 0), GetLong(mode, "height", 0), GetLong(mode, "fps", 0));
+            if (w is <= 0 or > uint.MaxValue || h is <= 0 or > uint.MaxValue || fps is <= 0 or > uint.MaxValue)
+                throw new ConfigException("camera_stream_mode needs a non-zero width, height and fps");
+            d.CameraStreamMode = new CameraStreamMode((uint)w, (uint)h, (uint)fps);
+        }
         return d;
+    }
+
+    private static SortedDictionary<string, int> ParseCameraControls(TomlTable t)
+    {
+        var map = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        foreach (var (name, value) in t)
+            if (value is long v && v is >= int.MinValue and <= int.MaxValue)
+                map[name] = (int)v;
+        return map;
     }
 
     private static DeviceIdentity ParseIdentity(TomlTable t)

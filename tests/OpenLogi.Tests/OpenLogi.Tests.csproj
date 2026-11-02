@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\OpenLogi.Core\OpenLogi.Core.csproj" />
+    <ProjectReference Include="..\..\src\OpenLogi.Camera\OpenLogi.Camera.csproj" />
     <ProjectReference Include="..\..\src\OpenLogi.HidPP\OpenLogi.HidPP.csproj" />
     <ProjectReference Include="..\..\src\OpenLogi.Hid\OpenLogi.Hid.csproj" />
     <ProjectReference Include="..\..\src\OpenLogi.Input\OpenLogi.Input.csproj" />

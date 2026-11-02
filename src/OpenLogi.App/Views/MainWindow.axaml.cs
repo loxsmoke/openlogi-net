@@ -77,6 +77,7 @@ public partial class MainWindow : Window
         {
             _subscribedViewModel.UpdateOfferShown += OnUpdateOfferShown;
             _subscribedViewModel.ShortcutRecorder = RecordShortcutAsync;
+            _subscribedViewModel.CameraValuePrompt = PromptCameraValueAsync;
             var vm = _subscribedViewModel;
             _batteryTray = new TrayBatteryIcons(vm,
                 enabled: () => vm.Configuration.AppSettings.ShowBatteryInTray,
@@ -119,6 +120,19 @@ public partial class MainWindow : Window
     {
         await Task.Yield();
         return await new ShortcutRecorderWindow(current).ShowDialog<KeyCombo?>(this);
+    }
+
+    private Task<int?> PromptCameraValueAsync(CameraValuePromptRequest request) =>
+        new CameraValueWindow(request).ShowDialog<int?>(this);
+
+    /// <summary>Double-click a camera-control line to reset that control to its device default.</summary>
+    private void OnCameraRowDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is Control { DataContext: CameraControlRowViewModel row })
+        {
+            row.ResetCommand.Execute(null);
+            e.Handled = true;
+        }
     }
 
     // Launch/open update check. The setting defaults on for new configs and can be
@@ -180,6 +194,10 @@ public partial class MainWindow : Window
         base.OnPropertyChanged(change);
         if (change.Property == WindowStateProperty && WindowState == WindowState.Minimized && MinimizeToTrayEnabled())
             HideToTray();
+        // The camera preview runs only while the window is actually on screen.
+        if ((change.Property == WindowStateProperty || change.Property == IsVisibleProperty)
+            && DataContext is MainWindowViewModel vm)
+            vm.WindowOnScreen = IsVisible && WindowState != WindowState.Minimized;
     }
 
     /// <summary>

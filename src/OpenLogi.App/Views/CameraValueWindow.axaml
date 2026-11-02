@@ -1,0 +1,16 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:OpenLogi.App.Localization"
+        x:Class="OpenLogi.App.Views.CameraValueWindow"
+        Width="320" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False" ShowInTaskbar="False">
+    <StackPanel Margin="20" Spacing="10">
+        <TextBox x:Name="ValueBox" KeyDown="OnKeyDown"/>
+        <TextBlock x:Name="HintText" Opacity="0.6" FontSize="12"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
+            <Button Content="{loc:Tr Camera_Cancel}" Click="OnCancel" MinWidth="84"/>
+            <Button Content="{loc:Tr Camera_Save}" Click="OnSave" MinWidth="84" Classes="accent"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

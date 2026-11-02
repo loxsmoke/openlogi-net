@@ -25,6 +25,15 @@
         <Style Selector="Path.connBadge.bt">
             <Setter Property="Stroke" Value="{DynamicResource ConnectionBadgeBluetoothBrush}"/>
         </Style>
+        <!-- Camera profile chips: the applied profile wears the accent. -->
+        <Style Selector="Border.cameraChip">
+            <Setter Property="BorderBrush" Value="#40808080"/>
+            <Setter Property="Background" Value="#10808080"/>
+        </Style>
+        <Style Selector="Border.cameraChip.active">
+            <Setter Property="BorderBrush" Value="#3B82F6"/>
+            <Setter Property="Background" Value="#263B82F6"/>
+        </Style>
     </Window.Styles>
 
     <!-- Shared templates for the grouped action pickers: a plain row per action,
@@ -53,6 +62,25 @@
     </Window.DataTemplates>
 
     <Window.Resources>
+        <!-- One camera-control line: label · slider · value (click for an exact value)
+             · Auto chip. Double-click the line to reset the control to its default. -->
+        <DataTemplate x:Key="CameraControlRow" x:DataType="vm:CameraControlRowViewModel">
+            <Grid ColumnDefinitions="100,*,44,54" Background="Transparent" Opacity="{Binding RowOpacity}"
+                  DoubleTapped="OnCameraRowDoubleTapped">
+                <TextBlock Grid.Column="0" Text="{Binding Label}" Opacity="0.7" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"/>
+                <Slider Grid.Column="1" Margin="6,0" VerticalAlignment="Center"
+                        Minimum="{Binding Minimum}" Maximum="{Binding Maximum}" Value="{Binding Value}"
+                        TickFrequency="1" IsSnapToTickEnabled="True"/>
+                <Button Grid.Column="2" Content="{Binding ValueText}" Command="{Binding EditValueCommand}"
+                        ToolTip.Tip="{Binding SetValueTip}" HorizontalAlignment="Right" Padding="4,2"
+                        Background="Transparent" BorderThickness="0" Foreground="#3B82F6"/>
+                <ToggleButton Grid.Column="3" Content="{loc:Tr Camera_Auto}" IsVisible="{Binding HasAuto}"
+                              IsChecked="{Binding AutoOn, Mode=OneWay}" Command="{Binding ToggleAutoCommand}"
+                              HorizontalAlignment="Right" Padding="8,2" FontSize="11" CornerRadius="10"/>
+            </Grid>
+        </DataTemplate>
+
         <!-- One gesture-direction editor row (glyph + name + grouped action dropdown).
              Shared by the Gestures panel's Click row and its four swipe rows. -->
         <DataTemplate x:Key="GestureDirectionRow" x:DataType="vm:GestureDirectionBindingViewModel">
@@ -201,7 +229,9 @@
                 <!-- Scanning (first load / refresh) -->
                 <StackPanel IsVisible="{Binding IsScanning}" HorizontalAlignment="Center"
                             VerticalAlignment="Center" Spacing="14">
-                    <ProgressBar IsIndeterminate="True" Width="180"/>
+                    <!-- Indeterminate only while shown: a hidden indeterminate bar keeps its
+                         animation running and the compositor redrawing (idle CPU). -->
+                    <ProgressBar IsIndeterminate="{Binding IsScanning}" Width="180"/>
                     <TextBlock Text="{loc:Tr Main_ScanningDevices}" HorizontalAlignment="Center" Opacity="0.7"/>
                 </StackPanel>
 
@@ -223,6 +253,113 @@
             <Panel IsVisible="{Binding ShowingDevice}">
             <TabControl Margin="8,4"
                         SelectedIndex="{Binding InitialTabIndex, Mode=OneWay}">
+                <!-- Camera tab (webcams): the live preview (shared, or exclusive with a mode
+                     picker) beside the UVC controls.
+                     IsSelected flows back to the VM: the preview runs only while this tab shows. -->
+                <TabItem Header="{loc:Tr Main_Camera}" IsVisible="{Binding HasCameraTab}"
+                         IsSelected="{Binding CameraTabSelected, Mode=OneWayToSource}">
+                    <ScrollViewer x:Name="CameraRoot" DataContext="{Binding Camera}"
+                                  x:DataType="vm:CameraViewModel">
+                        <Grid ColumnDefinitions="*,370" Margin="12,8" ColumnSpacing="20">
+                            <!-- Preview column -->
+                            <StackPanel Grid.Column="0" Spacing="10">
+                                <Border Background="#FF111111" CornerRadius="8" ClipToBounds="True" MinHeight="240">
+                                    <Panel>
+                                        <Image Source="{Binding PreviewImage}" Stretch="Uniform" MaxHeight="520"
+                                               RenderOptions.BitmapInterpolationMode="MediumQuality"/>
+                                        <TextBlock Text="{Binding PreviewMessage}" IsVisible="{Binding HasPreviewMessage}"
+                                                   Foreground="White" Opacity="0.8" TextWrapping="Wrap"
+                                                   TextAlignment="Center" Margin="24"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Panel>
+                                </Border>
+                                <TextBlock Text="{Binding ActiveModeText}" Opacity="0.7" FontSize="12"
+                                           IsVisible="{Binding ActiveModeText, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                                <CheckBox IsChecked="{Binding ExclusiveAccess}" IsEnabled="{Binding CanUseExclusive}">
+                                    <TextBlock Text="{loc:Tr Camera_ExclusiveAccess}" TextWrapping="Wrap"/>
+                                </CheckBox>
+                                <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding ShowOtherAppMessage}">
+                                    <TextBlock Grid.Column="0" Text="⚠" FontSize="12" Foreground="#E3B341"
+                                               Margin="0,0,6,0" VerticalAlignment="Top"/>
+                                    <TextBlock Grid.Column="1" Text="{loc:Tr Camera_OtherAppUsing}" Opacity="0.7"
+                                               FontSize="12" TextWrapping="Wrap"/>
+                                </Grid>
+                                <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="8"
+                                      IsVisible="{Binding ShowModePicker}">
+                                    <TextBlock Grid.Column="0" Text="{loc:Tr Camera_Resolution}" Opacity="0.7"
+                                               VerticalAlignment="Center"/>
+                                    <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
+                                              ItemsSource="{Binding Resolutions}" SelectedItem="{Binding SelectedResolution}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:CameraResolutionOption">
+                                                <TextBlock Text="{Binding Label}"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <TextBlock Grid.Column="2" Text="{loc:Tr Camera_FrameRate}" Opacity="0.7"
+                                               VerticalAlignment="Center" Margin="8,0,0,0"/>
+                                    <ComboBox Grid.Column="3" HorizontalAlignment="Stretch"
+                                              ItemsSource="{Binding Rates}" SelectedItem="{Binding SelectedRate}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:CameraRateOption">
+                                                <TextBlock Text="{Binding Label}"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </Grid>
+                                <TextBlock Text="{loc:Tr Camera_ExclusiveNote}" IsVisible="{Binding ExclusiveAccess}"
+                                           TextWrapping="Wrap" Opacity="0.5" FontSize="12"/>
+                                <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding UsbNotice, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                    <TextBlock Grid.Column="0" Text="⚠" FontSize="12" Foreground="#E3B341"
+                                               Margin="0,0,6,0" VerticalAlignment="Top"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding UsbNotice}" Opacity="0.7" FontSize="12"
+                                               TextWrapping="Wrap"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- Controls column -->
+                            <StackPanel Grid.Column="1" Spacing="8">
+                                <TextBlock Text="{loc:Tr Camera_Controls}" FontWeight="SemiBold"/>
+                                <TextBlock Text="{loc:Tr Camera_ControlsUnavailable}" IsVisible="{Binding ShowControlsUnavailable}"
+                                           Opacity="0.6" TextWrapping="Wrap"/>
+                                <StackPanel Spacing="6" IsVisible="{Binding ShowControls}">
+                                    <!-- Profile chips: built-ins, saved customs (deletable), then New -->
+                                    <ItemsControl ItemsSource="{Binding ProfileChips}" x:CompileBindings="False">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Classes="cameraChip" Classes.active="{Binding IsActive}"
+                                                        CornerRadius="12" BorderThickness="1" Margin="0,0,6,6">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Button Content="{Binding Label}" Padding="10,3"
+                                                                Background="Transparent" BorderThickness="0"
+                                                                Command="{Binding DataContext.ProfileChipCommand, ElementName=CameraRoot}"
+                                                                CommandParameter="{Binding}"/>
+                                                        <Button Content="✕" IsVisible="{Binding IsCustom}" Padding="2,3,8,3"
+                                                                FontSize="10" Background="Transparent" BorderThickness="0"
+                                                                ToolTip.Tip="{loc:Tr Camera_DeleteProfile}"
+                                                                Command="{Binding DataContext.DeleteProfileCommand, ElementName=CameraRoot}"
+                                                                CommandParameter="{Binding}"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="{loc:Tr Camera_Lens}" FontWeight="SemiBold" FontSize="12" Opacity="0.7"
+                                               IsVisible="{Binding ShowSectionHeaders}"/>
+                                    <ItemsControl ItemsSource="{Binding LensRows}" ItemTemplate="{StaticResource CameraControlRow}"/>
+                                    <TextBlock Text="{loc:Tr Camera_Image}" FontWeight="SemiBold" FontSize="12" Opacity="0.7"
+                                               IsVisible="{Binding ShowSectionHeaders}" Margin="0,4,0,0"/>
+                                    <ItemsControl ItemsSource="{Binding ImageRows}" ItemTemplate="{StaticResource CameraControlRow}"/>
+                                    <Button Content="{loc:Tr Camera_ResetToDefaults}" Command="{Binding ResetAllCommand}"
+                                            HorizontalAlignment="Left" Margin="0,6,0,0"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+                    </ScrollViewer>
+                </TabItem>
                 <!-- Buttons tab: mouse diagram with leader-line labels -->
                 <TabItem Header="{loc:Tr Main_Buttons}" IsVisible="{Binding HasButtonsTab}">
                     <ScrollViewer HorizontalScrollBarVisibility="Auto">
@@ -760,7 +897,7 @@
             </TabControl>
             <!-- Indeterminate loading line just under the header. VerticalAlignment=Top +
                  overlay (last child) means toggling it never shifts the tabs/content. -->
-            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsLoadingDevice}"
+            <ProgressBar IsIndeterminate="{Binding IsLoadingDevice}" IsVisible="{Binding IsLoadingDevice}"
                          VerticalAlignment="Top" HorizontalAlignment="Stretch"
                          Height="3" MinHeight="3" Padding="0" CornerRadius="0"/>
             </Panel>

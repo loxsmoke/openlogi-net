@@ -19,5 +19,7 @@ public enum DeviceKind
     Gamepad,
     Joystick,
     Headset,
+    /// <summary>Logitech webcam (UVC), configured through <c>OpenLogi.Camera</c>, not HID++.</summary>
+    Camera,
     Unknown,
 }

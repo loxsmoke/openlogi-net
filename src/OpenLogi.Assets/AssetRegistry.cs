@@ -100,6 +100,14 @@ public sealed class DepotManifest
     public string? ResourceForVariant(string baseModelId, byte ext, string resourceKey) =>
         ResourceFor(VariantModelId(baseModelId, ext), resourceKey);
 
+    /// <summary>
+    /// The first variant's <paramref name="resourceKey"/>, whatever its model id. For
+    /// webcam depots that list only a colour variant (Brio 101: <c>094d_ext7</c>):
+    /// a UVC camera reports no extended model id to pick one by.
+    /// </summary>
+    public string? AnyResource(string resourceKey) =>
+        Devices.SelectMany(d => d.Resources).FirstOrDefault(r => r.Key == resourceKey)?.Src;
+
     /// <summary>Build the variant model-id (<c>ext == 0</c> → base; else <c>{base}_ext{N}</c>).</summary>
     public static string VariantModelId(string baseId, byte ext) => ext == 0 ? baseId : $"{baseId}_ext{ext}";
 }

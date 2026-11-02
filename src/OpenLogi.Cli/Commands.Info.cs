@@ -21,7 +21,8 @@ static partial class Commands
             return;
         }
 
-        if (inventories.Count == 0)
+        var cameras = await OpenLogi.Camera.Cameras.EnumerateAsync();
+        if (inventories.Count == 0 && cameras.Count == 0)
         {
             Console.WriteLine("No Logitech HID++ receivers or devices found.");
             return;
@@ -43,6 +44,12 @@ static partial class Commands
                 var battery = dev.Battery is { } b ? $", battery {b.Percentage}% ({b.Status})" : "";
                 Console.WriteLine($"  slot {dev.Slot}: {name} [{dev.Kind}] — {state}{battery}");
             }
+        }
+
+        if (cameras.Count > 0)
+        {
+            if (inventories.Count > 0) Console.WriteLine();
+            PrintCameras(cameras);
         }
     }
 

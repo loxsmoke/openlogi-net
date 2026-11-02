@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="..\OpenLogi.Core\OpenLogi.Core.csproj" />
+    <ProjectReference Include="..\OpenLogi.Camera\OpenLogi.Camera.csproj" />
     <ProjectReference Include="..\OpenLogi.Agent\OpenLogi.Agent.csproj" />
     <ProjectReference Include="..\OpenLogi.Hid\OpenLogi.Hid.csproj" />
     <ProjectReference Include="..\OpenLogi.Assets\OpenLogi.Assets.csproj" />

@@ -295,6 +295,49 @@ public sealed class Config
     public void SetSmoothScroll(string deviceKey, bool enabled) =>
         Device(deviceKey).SmoothScroll = enabled;
 
+    /// <summary>The saved UVC controls for a camera (control/auto name → value), if any.</summary>
+    public SortedDictionary<string, int>? CameraControls(string deviceKey) =>
+        Devices.TryGetValue(deviceKey, out var d) ? d.CameraControls : null;
+
+    /// <summary>Persist one UVC control or auto toggle (0/1) for a camera.</summary>
+    public void SetCameraControl(string deviceKey, string name, int value)
+    {
+        var device = Device(deviceKey);
+        device.CameraControls ??= new SortedDictionary<string, int>(StringComparer.Ordinal);
+        device.CameraControls[name] = value;
+    }
+
+    /// <summary>The saved custom camera profiles for a camera (name → snapshot).</summary>
+    public SortedDictionary<string, SortedDictionary<string, int>> CameraProfiles(string deviceKey) =>
+        Devices.TryGetValue(deviceKey, out var d) ? d.CameraProfiles : new(StringComparer.Ordinal);
+
+    /// <summary>Save (or overwrite) a custom camera profile.</summary>
+    public void SaveCameraProfile(string deviceKey, string name, SortedDictionary<string, int> snapshot) =>
+        Device(deviceKey).CameraProfiles[name] = new SortedDictionary<string, int>(snapshot, StringComparer.Ordinal);
+
+    /// <summary>Delete a custom camera profile, clearing the active selection if it was that one.</summary>
+    public void DeleteCameraProfile(string deviceKey, string name)
+    {
+        if (!Devices.TryGetValue(deviceKey, out var device)) return;
+        device.CameraProfiles.Remove(name);
+        if (device.CameraProfile == name)
+            device.CameraProfile = null;
+    }
+
+    /// <summary>The camera profile last applied, if any.</summary>
+    public string? CameraActiveProfile(string deviceKey) =>
+        Devices.TryGetValue(deviceKey, out var d) ? d.CameraProfile : null;
+
+    public void SetCameraActiveProfile(string deviceKey, string? name) =>
+        Device(deviceKey).CameraProfile = name;
+
+    /// <summary>The resolution and frame rate saved for a camera's live preview, if any.</summary>
+    public CameraStreamMode? CameraStreamMode(string deviceKey) =>
+        Devices.TryGetValue(deviceKey, out var d) ? d.CameraStreamMode : null;
+
+    public void SetCameraStreamMode(string deviceKey, CameraStreamMode mode) =>
+        Device(deviceKey).CameraStreamMode = mode;
+
     private DeviceConfig Device(string deviceKey)
     {
         if (!Devices.TryGetValue(deviceKey, out var d))

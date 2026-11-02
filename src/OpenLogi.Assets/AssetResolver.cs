@@ -43,8 +43,12 @@ public sealed class AssetResolver(string cacheDir, AssetClient? client = null)
             catch { /* fall back to preferred filenames */ }
         }
 
+        // Webcam depots key their hero render `device_camera_image` and ship no bare
+        // front*.png, sometimes only for a colour variant — so any variant's will do.
         var frontName = manifest?.ResourceForVariant(entry.ModelId, ext, "device_image")
-                        ?? entry.PreferredFile(DeviceEntry.FrontRenderFiles);
+                        ?? manifest?.ResourceForVariant(entry.ModelId, ext, "device_camera_image")
+                        ?? entry.PreferredFile(DeviceEntry.FrontRenderFiles)
+                        ?? manifest?.AnyResource("device_camera_image");
         var buttonsName = manifest?.ResourceForVariant(entry.ModelId, ext, "device_buttons_image")
                           ?? entry.PreferredFile(DeviceEntry.ButtonsRenderFiles);
         var metadataName = entry.PreferredFile(DeviceEntry.MetadataFiles);

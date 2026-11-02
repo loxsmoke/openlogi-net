@@ -1152,4 +1152,184 @@
     <value>Löschen</value>
     <comment>EN: Clear</comment>
   </data>
+  <data name="Main_Camera" xml:space="preserve">
+    <value>Kamera</value>
+    <comment>EN: Camera</comment>
+  </data>
+  <data name="Camera_StartingPreview" xml:space="preserve">
+    <value>Vorschau wird gestartet…</value>
+    <comment>EN: Starting preview…</comment>
+  </data>
+  <data name="Camera_ResourcesUnavailable" xml:space="preserve">
+    <value>Kameraressourcen sind nicht verfügbar. Möglicherweise verwendet eine andere Anwendung die Kamera.</value>
+    <comment>EN: Camera resources are unavailable. Another application may be using the camera.</comment>
+  </data>
+  <data name="Camera_PreviewStartFailed" xml:space="preserve">
+    <value>Die Kameravorschau konnte nicht gestartet werden.</value>
+    <comment>EN: The camera preview couldn't start.</comment>
+  </data>
+  <data name="Camera_PreviewAccessDenied" xml:space="preserve">
+    <value>Windows blockiert den Kamerazugriff. Aktivieren Sie „Desktop-Apps Zugriff auf Ihre Kamera gewähren“ unter Einstellungen → Datenschutz und Sicherheit → Kamera.</value>
+    <comment>EN: Windows is blocking camera access. Turn on “Let desktop apps access your camera” in Settings → Privacy &amp; security → Camera.</comment>
+  </data>
+  <data name="Camera_Controls" xml:space="preserve">
+    <value>Kameraeinstellungen</value>
+    <comment>EN: Camera controls</comment>
+  </data>
+  <data name="Camera_ResetToDefaults" xml:space="preserve">
+    <value>Auf Standard zurücksetzen</value>
+    <comment>EN: Reset to defaults</comment>
+  </data>
+  <data name="Camera_ControlsUnavailable" xml:space="preserve">
+    <value>Diese Kamera hat keine einstellbaren Bildparameter.</value>
+    <comment>EN: This camera has no adjustable image controls.</comment>
+  </data>
+  <data name="Camera_Lens" xml:space="preserve">
+    <value>Objektiv</value>
+    <comment>EN: Lens</comment>
+  </data>
+  <data name="Camera_Image" xml:space="preserve">
+    <value>Bild</value>
+    <comment>EN: Image</comment>
+  </data>
+  <data name="Camera_Zoom" xml:space="preserve">
+    <value>Zoom</value>
+    <comment>EN: Zoom</comment>
+  </data>
+  <data name="Camera_Pan" xml:space="preserve">
+    <value>Schwenken</value>
+    <comment>EN: Pan</comment>
+  </data>
+  <data name="Camera_Tilt" xml:space="preserve">
+    <value>Neigen</value>
+    <comment>EN: Tilt</comment>
+  </data>
+  <data name="Camera_Focus" xml:space="preserve">
+    <value>Fokus</value>
+    <comment>EN: Focus</comment>
+  </data>
+  <data name="Camera_Exposure" xml:space="preserve">
+    <value>Belichtung</value>
+    <comment>EN: Exposure</comment>
+  </data>
+  <data name="Camera_AntiFlicker" xml:space="preserve">
+    <value>Flimmerschutz</value>
+    <comment>EN: Anti-flicker</comment>
+  </data>
+  <data name="Camera_LowLightCompensation" xml:space="preserve">
+    <value>Schwachlichtausgleich</value>
+    <comment>EN: Low light compensation</comment>
+  </data>
+  <data name="Camera_Brightness" xml:space="preserve">
+    <value>Helligkeit</value>
+    <comment>EN: Brightness</comment>
+  </data>
+  <data name="Camera_Contrast" xml:space="preserve">
+    <value>Kontrast</value>
+    <comment>EN: Contrast</comment>
+  </data>
+  <data name="Camera_Saturation" xml:space="preserve">
+    <value>Sättigung</value>
+    <comment>EN: Saturation</comment>
+  </data>
+  <data name="Camera_Sharpness" xml:space="preserve">
+    <value>Schärfe</value>
+    <comment>EN: Sharpness</comment>
+  </data>
+  <data name="Camera_Gain" xml:space="preserve">
+    <value>Verstärkung</value>
+    <comment>EN: Gain</comment>
+  </data>
+  <data name="Camera_BacklightCompensation" xml:space="preserve">
+    <value>Gegenlichtausgleich</value>
+    <comment>EN: Backlight compensation</comment>
+  </data>
+  <data name="Camera_WhiteBalance" xml:space="preserve">
+    <value>Weißabgleich</value>
+    <comment>EN: White balance</comment>
+  </data>
+  <data name="Camera_Tint" xml:space="preserve">
+    <value>Farbton</value>
+    <comment>EN: Tint</comment>
+  </data>
+  <data name="Camera_Auto" xml:space="preserve">
+    <value>Auto</value>
+    <comment>EN: Auto</comment>
+  </data>
+  <data name="Camera_SetValueTitle" xml:space="preserve">
+    <value>{0} festlegen</value>
+    <comment>EN: Set {0}</comment>
+  </data>
+  <data name="Camera_SupportedRange" xml:space="preserve">
+    <value>Unterstützter Bereich: {0}–{1}</value>
+    <comment>EN: Supported range: {0}–{1}</comment>
+  </data>
+  <data name="Camera_SetValueLabel" xml:space="preserve">
+    <value>Wert für {0} festlegen</value>
+    <comment>EN: Set {0} value</comment>
+  </data>
+  <data name="Camera_ProfileDefault" xml:space="preserve">
+    <value>Standard</value>
+    <comment>EN: Default</comment>
+  </data>
+  <data name="Camera_ProfileStreaming" xml:space="preserve">
+    <value>Streaming</value>
+    <comment>EN: Streaming</comment>
+  </data>
+  <data name="Camera_ProfileVideoCall" xml:space="preserve">
+    <value>Videoanruf</value>
+    <comment>EN: Video call</comment>
+  </data>
+  <data name="Camera_NewProfile" xml:space="preserve">
+    <value>Neu</value>
+    <comment>EN: New</comment>
+  </data>
+  <data name="Camera_CustomProfileNumber" xml:space="preserve">
+    <value>Benutzerdefiniert {0}</value>
+    <comment>EN: Custom {0}</comment>
+  </data>
+  <data name="Camera_DeleteProfile" xml:space="preserve">
+    <value>Profil löschen</value>
+    <comment>EN: Delete profile</comment>
+  </data>
+  <data name="Camera_UsbLinkLimited" xml:space="preserve">
+    <value>Verbunden mit {0}, aber diese Kamera unterstützt {1}. Über die schnellere Verbindung bietet sie möglicherweise mehr Auflösungen und Bildraten. Schließen Sie sie ohne Hub mit einem USB-3-Kabel direkt an einen USB-3-Anschluss an.</value>
+    <comment>EN: Connected at {0}, but this camera supports {1}. On the faster link it may offer more resolutions and frame rates. Plug it straight into a USB 3 port, without a hub, using a USB 3 cable.</comment>
+  </data>
+  <data name="Camera_Save" xml:space="preserve">
+    <value>Speichern</value>
+    <comment>EN: Save</comment>
+  </data>
+  <data name="Camera_Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+    <comment>EN: Cancel</comment>
+  </data>
+  <data name="Camera_ActiveMode" xml:space="preserve">
+    <value>{0} × {1}, {2} fps</value>
+    <comment>EN: {0} × {1}, {2} fps</comment>
+  </data>
+  <data name="Camera_ExclusiveAccess" xml:space="preserve">
+    <value>Kamera exklusiv verwenden, um die Vorschau in anderen Auflösungen und Bildraten anzuzeigen</value>
+    <comment>EN: Use the camera exclusively to preview at different resolutions and frame rates</comment>
+  </data>
+  <data name="Camera_OtherAppUsing" xml:space="preserve">
+    <value>Eine andere App verwendet die Kamera, daher können Auflösung und Bildrate hier nicht geändert werden.</value>
+    <comment>EN: Another app is using the camera, so its resolution and frame rate can't be changed here.</comment>
+  </data>
+  <data name="Camera_ExclusiveNote" xml:space="preserve">
+    <value>Auflösung und Bildrate gelten nur für diese Vorschau. Solange sie exklusiven Zugriff hat, können andere Apps die Kamera nicht verwenden.</value>
+    <comment>EN: Resolution and frame rate apply to this preview only. While it has exclusive access, other apps can't use the camera.</comment>
+  </data>
+  <data name="Camera_Resolution" xml:space="preserve">
+    <value>Auflösung</value>
+    <comment>EN: Resolution</comment>
+  </data>
+  <data name="Camera_FrameRate" xml:space="preserve">
+    <value>Bildrate</value>
+    <comment>EN: Frame rate</comment>
+  </data>
+  <data name="Camera_FrameRateFps" xml:space="preserve">
+    <value>{0} fps</value>
+    <comment>EN: {0} fps</comment>
+  </data>
 </root>

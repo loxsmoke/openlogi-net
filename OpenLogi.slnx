@@ -3,6 +3,7 @@
     <Project Path="src/OpenLogi.Agent/OpenLogi.Agent.csproj" />
     <Project Path="src/OpenLogi.App/OpenLogi.App.csproj" />
     <Project Path="src/OpenLogi.Assets/OpenLogi.Assets.csproj" />
+    <Project Path="src/OpenLogi.Camera/OpenLogi.Camera.csproj" />
     <Project Path="src/OpenLogi.Cli/OpenLogi.Cli.csproj" />
     <Project Path="src/OpenLogi.Core/OpenLogi.Core.csproj" />
     <Project Path="src/OpenLogi.Hid/OpenLogi.Hid.csproj" />

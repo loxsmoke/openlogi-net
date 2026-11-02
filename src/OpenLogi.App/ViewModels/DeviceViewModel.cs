@@ -21,6 +21,31 @@ public sealed partial class DeviceViewModel : ObservableObject
         Loc.Current.WeakSubscribe(this, static (self, e) => self.OnCultureChanged(null, e));
     }
 
+    /// <summary>
+    /// A webcam tile. Cameras are UVC, not HID++, so they come from a parallel
+    /// discovery path, carry no route, and are always USB-attached and online.
+    /// </summary>
+    public DeviceViewModel(OpenLogi.Camera.CameraInfo camera)
+        : this(DirectDeviceReceiverName,
+            new PairedDevice { Slot = 0, Codename = camera.Name, Kind = DeviceKind.Camera, Online = true },
+            null)
+    {
+        Camera = camera;
+        Connection = ConnectionKind.UsbCable;
+    }
+
+    /// <summary>The webcam behind this tile; null for HID++ devices.</summary>
+    public OpenLogi.Camera.CameraInfo? Camera { get; }
+
+    public bool IsCamera => Camera is not null;
+
+    /// <summary>
+    /// The asset-registry lookup key for the tile render: HID++ devices use their
+    /// config key, cameras their 4-hex USB product id (how the registry's camera
+    /// depots are keyed).
+    /// </summary>
+    public string? AssetKey => Camera is { } c ? $"{c.ProductId:x4}" : ConfigKey;
+
     public string ReceiverName => _receiverName == DirectDeviceReceiverName
         ? Loc.Current["Connection_DirectDevice"]
         : _receiverName;
@@ -54,7 +79,7 @@ public sealed partial class DeviceViewModel : ObservableObject
     public double TileImageOpacity => IsAsleep ? 0.4 : 1.0;
 
     /// <summary>How the device is connected (dongle vs Bluetooth vs cable) — the tile's corner icon.</summary>
-    public ConnectionKind Connection { get; }
+    public ConnectionKind Connection { get; private init; }
 
     public bool HasConnectionIcon => Connection != ConnectionKind.Unknown;
 
@@ -94,7 +119,8 @@ public sealed partial class DeviceViewModel : ObservableObject
 
     private BatteryInfo? CurrentBattery => LiveBattery ?? Device.Battery;
 
-    public string Battery => CurrentBattery is { } b ? $"{b.Percentage}% · {b.Status.Label()}" : "—";
+    // A webcam has no battery at all, so its tile shows no placeholder either.
+    public string Battery => CurrentBattery is { } b ? $"{b.Percentage}% · {b.Status.Label()}" : IsCamera ? "" : "—";
 
     /// <summary>Whether a battery reading is available (drives the battery icon's visibility).</summary>
     public bool HasBattery => CurrentBattery is not null;
@@ -105,8 +131,8 @@ public sealed partial class DeviceViewModel : ObservableObject
     /// <summary>Whether the device is currently charging (icon shows the charging colour).</summary>
     public bool BatteryCharging => CurrentBattery is { Status: BatteryStatus.Charging or BatteryStatus.ChargingSlow };
 
-    /// <summary>HID++ config key (model id), used to resolve the device render.</summary>
-    public string? ConfigKey => Device.ModelInfo?.ConfigKey();
+    /// <summary>Settings key: the HID++ model id, or a camera's serial/model key.</summary>
+    public string? ConfigKey => Camera?.ConfigKey ?? Device.ModelInfo?.ConfigKey();
 
     /// <summary>Colour/SKU variant byte for the asset registry.</summary>
     public byte Ext => Device.ModelInfo?.ExtendedModelId ?? 0;

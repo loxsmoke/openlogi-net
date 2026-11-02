@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Source-generated COM ([GeneratedComInterface]) and the frame copies need
+         unsafe code. Built-in COM is off in the trimmed release build, so the
+         Media Foundation / DirectShow interfaces go through ComWrappers. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="OpenLogi.Tests" />
+  </ItemGroup>
+
+</Project>
