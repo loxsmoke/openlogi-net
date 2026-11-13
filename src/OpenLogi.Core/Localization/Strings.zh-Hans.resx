@@ -254,8 +254,8 @@
     <comment>EN: Buttons</comment>
   </data>
   <data name="Main_GesturesEnabled" xml:space="preserve">
-    <value>手势已启用</value>
-    <comment>EN: Gestures Enabled</comment>
+    <value>鼠标手势已启用</value>
+    <comment>EN: Mouse Gestures Enabled</comment>
   </data>
   <data name="Main_GesturesTurnMouseButtonInto" xml:space="preserve">
     <value>手势会把一个鼠标按键变成五个控制项：按住并向上 / 下 / 左 / 右滑动可触发四个操作（切换桌面、媒体控制、贴靠窗口等），普通点击则触发第五个操作。所选按键会放弃它原本的功能。</value>

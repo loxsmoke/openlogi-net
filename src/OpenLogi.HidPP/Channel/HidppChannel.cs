@@ -380,8 +380,15 @@ public sealed class HidppChannel : IAsyncDisposable
         else DiagnosticLog.Debug("channel", $"{VendorId:x4}:{ProductId:x4}: {text}");
     }
 
+    private int _disposed;
+
     public async ValueTask DisposeAsync()
     {
+        // Idempotent: a session shared between the device page and the persistent
+        // captures can be disposed by both owners, and CancelAsync on the disposed
+        // source throws — which once killed the capture re-activation mid-way and left
+        // every diverted button dead (2026-11-12).
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         await _cts.CancelAsync().ConfigureAwait(false);
         try { await _readLoop.ConfigureAwait(false); }
         catch (OperationCanceledException) { /* expected */ }

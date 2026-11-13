@@ -249,8 +249,8 @@
     <comment>EN: Buttons</comment>
   </data>
   <data name="Main_GesturesEnabled" xml:space="preserve">
-    <value>Gesten aktiviert</value>
-    <comment>EN: Gestures Enabled</comment>
+    <value>Mausgesten aktiviert</value>
+    <comment>EN: Mouse Gestures Enabled</comment>
   </data>
   <data name="Main_GesturesTurnMouseButtonInto" xml:space="preserve">
     <value>Gesten machen aus einer Maustaste fünf Steuerelemente: Halten Sie sie gedrückt und wischen Sie nach oben / unten / links / rechts für vier Aktionen (Desktops wechseln, Medien, Fenster andocken…); ein einfacher Klick löst die fünfte aus. Die gewählte Taste gibt ihre normale Funktion ab.</value>

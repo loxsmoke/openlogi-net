@@ -571,6 +571,7 @@
                                     <!-- Always visible, so it's clear what enabling gestures buys -->
                                     <TextBlock Text="{loc:Tr Main_GesturesTurnMouseButtonInto}"
                                                TextWrapping="Wrap" Opacity="0.6" FontSize="12"/>
+                                    <Border Height="1" Background="#338895A5" Margin="0,2"/>
                                     <!-- Gestures are on, but the selected button can't be diverted for them -->
                                     <TextBlock Text="{loc:Tr Main_ButtonCannotGesture}"
                                                TextWrapping="Wrap" Opacity="0.6" FontSize="12"

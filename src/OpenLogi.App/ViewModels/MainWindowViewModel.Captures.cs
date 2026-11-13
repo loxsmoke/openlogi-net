@@ -29,11 +29,28 @@ public partial class MainWindowViewModel
         mice = [.. mice.Where(m => m.Device.Kind is not (DeviceKind.Keyboard or DeviceKind.Numpad))];
         var old = _mouseCaptures.ToArray();
         _mouseCaptures.Clear();
+        // The old sessions stay "persistent" until this teardown is done with them:
+        // LoadControlsAsync treats a session missing from _mouseCaptures as a throwaway
+        // and disposes it, which — in the gap the Clear above opens — closed the HID
+        // handle under the un-divert writes below and then made this method's own
+        // dispose throw, so nothing was re-armed (2026-11-12: every diverted button
+        // dead after a rescan started from the mouse's page).
+        foreach (var mc in old) _retiringSessions.Add(mc.Session);
         foreach (var mc in old)
         {
-            await mc.Capture.DisposeAsync();
-            // Don't dispose a session the UI is still showing — LoadControlsAsync owns that.
-            if (!ReferenceEquals(mc.Session, _session)) await mc.Session.DisposeAsync();
+            // A failed teardown must never stop the re-arm below.
+            try
+            {
+                await mc.Capture.DisposeAsync();
+                // Don't dispose a session the UI is still showing — LoadControlsAsync owns that.
+                if (!ReferenceEquals(mc.Session, _session)) await mc.Session.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLog.Warn("capture",
+                    $"{mc.Device.Name}: capture teardown failed: {ex.GetType().Name}: {ex.Message}");
+            }
+            finally { _retiringSessions.Remove(mc.Session); }
         }
 
         // The global OS hook applies one mouse's Middle/Back/Forward bindings.
@@ -49,6 +66,20 @@ public partial class MainWindowViewModel
         // Every (re)scan/reconnect/wake funnels through here, so this is where we (re)arm
         // the No-profile lighting keepalive — and re-apply on wake.
         PokeLightingKeepalive();
+    }
+
+    /// <summary>
+    /// <see cref="ActivateAgentMiceAsync"/> for fire-and-forget callers: a failure there
+    /// means no mouse override works until the next activation, so it must reach the log
+    /// instead of vanishing with the discarded task.
+    /// </summary>
+    private async Task ActivateAgentMiceLoggedAsync(IReadOnlyList<DeviceViewModel> mice)
+    {
+        try { await ActivateAgentMiceAsync(mice); }
+        catch (Exception ex)
+        {
+            DiagnosticLog.Warn("capture", $"capture activation failed: {ex.GetType().Name}: {ex.Message}");
+        }
     }
 
     // Bumped by every ActivateAgentMiceAsync run; an older run's background re-arm

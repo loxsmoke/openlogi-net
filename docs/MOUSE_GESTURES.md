@@ -51,7 +51,7 @@ configures something.
 The upstream Rust project (and Options+) has exactly **one gesture role per
 device**. openlogi-net generalizes this: **each capable button carries its own
 gesture map** (`Config.GestureButtons`), several may gesture at once, and a
-single **"Gestures Enabled"** master switch (`GestureOwner.Off` when unchecked)
+single **"Mouse Gestures Enabled"** master switch (`GestureOwner.Off` when unchecked)
 silences them all while keeping every map. Two kinds of control can gesture:
 
 1. **A HID++-captured button**, diverted over **HID++** with **raw-XY
@@ -146,7 +146,7 @@ The **Gestures panel** sits to the right of the mouse diagram on the **Buttons**
 tab, shown for any mouse that exposes a HID++-capturable gesture control. Its
 layout, top to bottom:
 
-1. **Gestures Enabled** checkbox — the device-wide master switch. Unchecking it
+1. **Mouse Gestures Enabled** checkbox — the device-wide master switch. Unchecking it
    silences every button's gestures at once (every map is kept), releases all
    diverted controls, and clears the Button selection; re-checking brings every
    configured button back to life. An explanatory note under the checkbox is
@@ -205,7 +205,7 @@ Gestures do nothing — the button behaves natively — in any of these cases:
   e.g. the MX Anywhere 3S, expose a *Virtual Gesture Button* `0x00d7` that
   Logi Options+ uses; openlogi-net does not drive that virtual control directly —
   it repurposes a real button instead.)
-- **The "Gestures Enabled" master switch is off** (`Config.DisableGestures` →
+- **The "Mouse Gestures Enabled" master switch is off** (`Config.DisableGestures` →
   `GestureOwner.Off`). Every gesture control is left undiverted and keeps its
   native function; all maps are preserved for re-enabling.
 - **The button has no gesture map** (never configured, i.e. its swipe set is

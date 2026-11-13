@@ -37,6 +37,18 @@ public class ChannelTests
     }
 
     [Fact]
+    public async Task DisposingTwiceIsANoOp()
+    {
+        // A session shared by the device page and the persistent captures can be
+        // disposed by both; the second dispose used to throw ObjectDisposedException
+        // and abort the capture re-activation that issued it.
+        var channel = await HidppChannel.FromRawChannelAsync(new MockRawHidChannel());
+
+        await channel.DisposeAsync();
+        await channel.DisposeAsync();
+    }
+
+    [Fact]
     public async Task PaddedWindowsReadStillMatchesPendingRequest()
     {
         // Windows reads return the collection's max input-report length, so a

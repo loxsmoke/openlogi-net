@@ -58,7 +58,7 @@ public partial class MainWindowViewModel
                     await LoadControlsAsync(showing);
             } while (_reconnectQueued);
         }
-        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"resume reconnect failed: {ex.Message}"); }
+        catch (Exception ex) { DiagnosticLog.Warn("capture", $"reconnect failed: {ex.GetType().Name}: {ex.Message}"); }
         finally { _reconnecting = false; }
     }
 

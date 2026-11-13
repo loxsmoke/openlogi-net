@@ -262,7 +262,7 @@
     <comment>MainWindow: TabItem header.</comment>
   </data>
   <data name="Main_GesturesEnabled" xml:space="preserve">
-    <value>Gestures Enabled</value>
+    <value>Mouse Gestures Enabled</value>
     <comment>MainWindow: CheckBox content.</comment>
   </data>
   <data name="Main_GesturesTurnMouseButtonInto" xml:space="preserve">

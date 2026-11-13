@@ -318,7 +318,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     private bool IsPersistentSession(DeviceSession s) =>
-        _mouseCaptures.Any(mc => ReferenceEquals(mc.Session, s));
+        _mouseCaptures.Any(mc => ReferenceEquals(mc.Session, s)) || _retiringSessions.Contains(s);
+
+    // Sessions ActivateAgentMiceAsync has taken out of _mouseCaptures and is still
+    // tearing down (UI thread only). They are not throwaways yet — see that method.
+    private readonly HashSet<DeviceSession> _retiringSessions = [];
 
     // The OS mouse hook that remaps Middle/Back/Forward to bound actions and
     // injects keystrokes (e.g. Task View = Win+Tab). Runs for the app's lifetime.
@@ -546,7 +550,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             // a per-mouse session that diverts each mouse's DPI button.
             if (reactivateMice)
             {
-                _ = ActivateAgentMiceAsync([.. Devices.Where(d => d.HasButtons)]);
+                _ = ActivateAgentMiceLoggedAsync([.. Devices.Where(d => d.HasButtons)]);
             }
             else
             {
