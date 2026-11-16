@@ -18,6 +18,12 @@ public partial class MainWindowViewModel
     /// The watcher's node-change path is suppressed while a page is open, so this
     /// resume signal is what recovers the on-screen device.
     /// </summary>
+    // Set while the resume handler is invalidating the pool and rebuilding every
+    // session (UI thread only). The invalidation faults each open session, and those
+    // per-session fault handlers would each start their own reconnect on top of the
+    // one the resume handler is already running.
+    private bool _resumeRecovering;
+
     private void OnPowerModeChanged(object? sender, Microsoft.Win32.PowerModeChangedEventArgs e)
     {
         if (e.Mode != Microsoft.Win32.PowerModes.Resume) return;
@@ -25,7 +31,22 @@ public partial class MainWindowViewModel
         {
             // Let USB/BLE links re-establish before we re-enumerate and talk to devices.
             await Task.Delay(TimeSpan.FromSeconds(2));
-            await ReconnectAfterResumeAsync();
+            // Every HID handle opened before the sleep is dead. Close them all at the one
+            // place they live, the channel pool — whoever holds them, including holders
+            // this method knows nothing about — so none is left failing reads forever.
+            // Each holder hears it through its session's/lease's Faulted event: the
+            // receiver watcher rebinds itself, and the reconnect below rebuilds the rest.
+            // Only here, not in ReconnectAfterResumeAsync — that also runs on receiver
+            // wakes and topology changes, where the handles are alive and a rebind would
+            // cut the watcher's wake-hold pings.
+            _resumeRecovering = true;
+            try
+            {
+                await HidChannelPool.Shared.InvalidateAllAsync();
+                await ReconnectAfterResumeAsync();
+            }
+            catch (Exception ex) { DiagnosticLog.Warn("capture", $"resume recovery failed: {ex.GetType().Name}: {ex.Message}"); }
+            finally { _resumeRecovering = false; }
         });
     }
 
@@ -52,7 +73,16 @@ public partial class MainWindowViewModel
                 // ActivateAgentMiceAsync deliberately keeps alive. Drop the reference so it
                 // disposes that dead HID handle too — no lingering handle to block the fresh
                 // open, and LoadControlsAsync then rebinds the UI to the new session.
+                var stalePageSession = _session;
                 _session = null;
+                // Non-persistent page sessions are not part of ActivateAgentMiceAsync's
+                // teardown, so dispose them explicitly; otherwise their dead read loops keep
+                // retrying forever after resume.
+                if (stalePageSession is not null && !IsPersistentSession(stalePageSession))
+                    await stalePageSession.DisposeAsync();
+                // The gallery lighting keepalive may hold a stale pre-sleep HID handle too.
+                // Drop it now so the next keepalive tick opens a fresh session.
+                await ReleaseKeepaliveSessionAsync();
                 await ActivateAgentMiceAsync([.. Devices.Where(d => d.HasButtons)]);
                 if (showing is not null && ReferenceEquals(SelectedDevice, showing))
                     await LoadControlsAsync(showing);
@@ -108,9 +138,15 @@ public partial class MainWindowViewModel
         IsScanning = true;
         try
         {
-            var inventories = await HidInventory.EnumerateAsync(
-                postProbe: OnReceiverDeviceProbedAsync,
-                nodeFilter: n => n.VendorId == vid && n.ProductId == pid);
+            IReadOnlyList<DeviceInventory> inventories;
+            await _deviceIoGate.WaitAsync();
+            try
+            {
+                inventories = await HidInventory.EnumerateAsync(
+                    postProbe: OnReceiverDeviceProbedAsync,
+                    nodeFilter: n => n.VendorId == vid && n.ProductId == pid);
+            }
+            finally { _deviceIoGate.Release(); }
             foreach (var inv in inventories)
                 MergeInventoryIntoGallery(inv);
             SetStatus("Status_DeviceCount", Devices.Count);
@@ -250,11 +286,19 @@ public partial class MainWindowViewModel
     }
 
     /// <summary>Called by every full scan once the gallery is filled: queue a re-scan if a probe came back incomplete.</summary>
-    private void ScheduleProbeRetry(bool reactivateMice)
+    /// <param name="reactivateMice">Passed on to the re-scan.</param>
+    /// <param name="scanned">
+    /// Every device the sweep found — not the gallery tiles. A probe that fails outright
+    /// leaves the device unnamed with no kind, which the gallery filters out; going by
+    /// the tiles, exactly the device that most needed the re-scan never got one, and the
+    /// gallery stayed empty until the next device change (2026-11-15: a BLE mouse
+    /// answering errors for ~15 s after resume from hibernation).
+    /// </param>
+    private void ScheduleProbeRetry(bool reactivateMice, IReadOnlyList<(string Receiver, PairedDevice Device)> scanned)
     {
-        var incomplete = Devices.Where(d => d.Device.ProbeIncomplete)
-            .Select(d => $"{d.ReceiverName}/{d.Device.Slot}").ToList();
-        if (ProbeRetryDelay(_probeRetries, Devices.Select(d => d.Device)) is not { } delay)
+        var incomplete = scanned.Where(d => d.Device.ProbeIncomplete)
+            .Select(d => $"{d.Receiver}/{d.Device.Slot}").ToList();
+        if (ProbeRetryDelay(_probeRetries, scanned.Select(d => d.Device)) is not { } delay)
         {
             if (incomplete.Count > 0)
                 DiagnosticLog.Info("sweep", $"probe still incomplete for {string.Join(", ", incomplete)} after {_probeRetries} re-scan(s) — waiting for the next device change");

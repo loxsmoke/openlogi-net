@@ -14,19 +14,27 @@ namespace OpenLogi.App.ViewModels;
 public partial class MainWindowViewModel
 {
     /// <summary>
-    /// Create a per-key color editor bound to the device's <em>current</em> session.
-    /// A fresh instance each open (the session is replaced on every control reload,
-    /// so a cached editor would hold a disposed handle); painted keys persist via
-    /// config, seeded back in here, so nothing is lost by not caching.
+    /// Create a per-key color editor for the keyboard on screen. The editor never holds
+    /// a session: it asks for the page's current one on every write, because the page
+    /// replaces its session on each control reload and after a resume or reconnect —
+    /// which can happen while the editor window is open. Painted keys persist via
+    /// config, seeded back in here.
     /// </summary>
     public PerKeyColorViewModel? CreatePerKeyEditor()
     {
-        if (PerKeySession is not { } s) return null;
-        var ck = SelectedDevice?.ConfigKey;
+        if (PerKeySession is null || SelectedDevice is not { } device) return null;
+        var ck = device.ConfigKey;
+        // The main window can move to another device while the editor stays open;
+        // only ever hand it the session of the keyboard it was opened for. Matched by
+        // config key where there is one, since a rescan replaces the view models.
+        DeviceSession? Current() =>
+            SelectedDevice is { } now && (ck is not null ? now.ConfigKey == ck : ReferenceEquals(now, device))
+                ? PerKeySession
+                : null;
         var paint = ck is not null && _config.Lighting(ck)?.PaintColor is { } p
             ? (Avalonia.Media.Color?)ParseHexColor(p) : null;
         return new PerKeyColorViewModel(
-            s, LightingColor, paint, LoadPerKeyColors(ck),
+            Current, LightingColor, paint, LoadPerKeyColors(ck),
             (painted, baseColor, paintColor) => SavePerKeyColors(ck, painted, baseColor, paintColor));
     }
 
@@ -401,6 +409,11 @@ public partial class MainWindowViewModel
                     await ReleaseKeepaliveSessionAsync();
                     var opened = await DeviceSession.OpenAsync(route);
                     if (opened is null) return; // asleep/unreachable — retry next tick
+                    // A stale handle (sleep/resume, dongle re-plug) fails every read while
+                    // the session's lighting writes merely return false — indistinguishable
+                    // here from a napping keyboard, which must NOT trigger a reopen. The
+                    // session's fault signal (the pool closed its channel) tells them apart.
+                    opened.Faulted += () => OnKeepaliveSessionFaulted(opened);
                     _keepaliveSession = opened;
                     _keepaliveKey = key;
                     DiagnosticLog.Info("lightwake", $"{key}: No-profile lighting keepalive session opened ({LightingKeepaliveInterval.TotalSeconds:0}s)");
@@ -415,6 +428,27 @@ public partial class MainWindowViewModel
         catch (Exception ex) { DiagnosticLog.Warn("lightwake", $"keepalive tick failed: {ex.Message}"); }
         finally { _keepaliveBusy = false; }
     }
+
+    /// <summary>
+    /// The keepalive session's HID handle is dead (reads failing continuously past the
+    /// channel's threshold, raised off the UI thread). Dispose it — ending its failing
+    /// read loop — and tick again so a fresh session is opened; if the device really is
+    /// gone that open fails and the regular cadence keeps retrying.
+    /// </summary>
+    private void OnKeepaliveSessionFaulted(DeviceSession session) =>
+        Dispatcher.UIThread.Post(async () =>
+        {
+            if (_resumeRecovering) return; // the resume handler releases it and re-arms the keepalive
+            // A session already released or replaced can still fault late — ignore it.
+            if (!ReferenceEquals(_keepaliveSession, session)) return;
+            DiagnosticLog.Warn("lightwake", $"{_keepaliveKey}: keepalive HID handle dead — reopening");
+            try
+            {
+                await ReleaseKeepaliveSessionAsync();
+                await LightingKeepaliveTickAsync();
+            }
+            catch (Exception ex) { DiagnosticLog.Warn("lightwake", $"keepalive reopen failed: {ex.Message}"); }
+        });
 
     private async Task ReleaseKeepaliveSessionAsync()
     {

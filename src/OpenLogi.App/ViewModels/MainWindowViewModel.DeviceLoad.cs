@@ -125,6 +125,10 @@ public partial class MainWindowViewModel
         var persistent = _mouseCaptures.FirstOrDefault(mc => ReferenceEquals(mc.Device, device))?.Session;
         var session = persistent ?? await OpenWokenAsync(device, route);
         if (session is null) return null;
+        // A persistent session reports its own faults (TryActivateMouseAsync); a
+        // throwaway page session — a keyboard's — had nobody listening, so a handle that
+        // died under an open page left every control silently dead.
+        if (persistent is null) session.Faulted += () => OnPageSessionFaulted(device, session);
         if (!ReferenceEquals(SelectedDevice, device))
         {
             if (!IsPersistentSession(session)) await session.DisposeAsync();
@@ -132,6 +136,30 @@ public partial class MainWindowViewModel
         }
         return session;
     }
+
+    /// <summary>
+    /// The page's own (non-persistent) session lost its HID handle. Reload the page so
+    /// its controls bind to a fresh session; if the page is no longer on screen, just
+    /// let the dead session go.
+    /// </summary>
+    private void OnPageSessionFaulted(DeviceViewModel device, DeviceSession session) =>
+        Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
+        {
+            if (_resumeRecovering) return; // the resume handler reloads the page itself
+            if (!ReferenceEquals(_session, session)) return; // already replaced
+            DiagnosticLog.Warn("session", $"{device.Name}: page session's HID handle dead — reopening");
+            try
+            {
+                if (ShowingDevice && ReferenceEquals(SelectedDevice, device))
+                {
+                    await LoadControlsAsync(device); // disposes the dead session first
+                    return;
+                }
+                _session = null;
+                await session.DisposeAsync();
+            }
+            catch (Exception ex) { DiagnosticLog.Warn("session", $"page session reopen failed: {ex.GetType().Name}: {ex.Message}"); }
+        });
 
     /// <summary>
     /// Battery: read once on open (benefits from the wake-retry), then subscribe to

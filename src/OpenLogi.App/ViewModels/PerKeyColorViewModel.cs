@@ -17,7 +17,12 @@ public sealed record SpecialKey(string Label, byte Zone);
 /// </summary>
 public sealed partial class PerKeyColorViewModel : ObservableObject
 {
-    private readonly DeviceSession _session;
+    // The keyboard's session is looked up on every use, never held: the page replaces
+    // it on each control reload and after a resume/reconnect, and an editor left open
+    // across that would keep painting into a closed handle.
+    private readonly Func<DeviceSession?> _currentSession;
+    // The session host mode + the painted keys were last asserted on.
+    private DeviceSession? _preparedSession;
     private readonly Dictionary<byte, Color> _painted = [];
     // Persist the editor's state (painted keys, base color, paint color) on change.
     private readonly Action<IReadOnlyDictionary<byte, Color>, Color, Color>? _save;
@@ -26,14 +31,18 @@ public sealed partial class PerKeyColorViewModel : ObservableObject
     [ObservableProperty] private Color _baseColor = Colors.White;
     [ObservableProperty] private string _status = Loc.Current["PerKey_Hint"];
 
+    /// <param name="currentSession">
+    /// Returns the keyboard's live session right now, or <c>null</c> while there is
+    /// none (the page is reloading, or the keyboard is unreachable).
+    /// </param>
     public PerKeyColorViewModel(
-        DeviceSession session,
+        Func<DeviceSession?> currentSession,
         Color? baseColor = null,
         Color? paintColor = null,
         IReadOnlyDictionary<byte, Color>? initialPainted = null,
         Action<IReadOnlyDictionary<byte, Color>, Color, Color>? save = null)
     {
-        _session = session;
+        _currentSession = currentSession;
         if (baseColor is { } b) _baseColor = b;
         if (paintColor is { } p) _selectedColor = p;
         if (initialPainted is not null)
@@ -75,7 +84,27 @@ public sealed partial class PerKeyColorViewModel : ObservableObject
     }
 
     public async Task<bool> SetZoneAsync(byte zone, Color color)
-        => await _session.SetZoneAsync(zone, color.R, color.G, color.B);
+        => await PreparedSessionAsync() is { } session
+           && await session.SetZoneAsync(zone, color.R, color.G, color.B);
+
+    /// <summary>
+    /// The keyboard's current session, made ready for painting. A session not seen
+    /// before — the first one, or the replacement after a reload or reconnect — is put
+    /// into host mode and given the painted keys first: a fresh session's keyboard may
+    /// be back on its onboard profile, where single-zone writes show nothing.
+    /// <c>null</c> while the keyboard has no session; the paint is still recorded and
+    /// lands with the next session.
+    /// </summary>
+    private async Task<DeviceSession?> PreparedSessionAsync()
+    {
+        var session = _currentSession();
+        if (session is null || ReferenceEquals(session, _preparedSession)) return session;
+        _preparedSession = session;
+        await session.EnsureHostModeAsync();
+        foreach (var (zone, color) in _painted.ToArray())
+            await session.SetZoneAsync(zone, color.R, color.G, color.B);
+        return session;
+    }
 
     /// <summary>
     /// Prepare the keyboard for editing when the window opens: enter host mode so
@@ -83,12 +112,7 @@ public sealed partial class PerKeyColorViewModel : ObservableObject
     /// whatever is already showing. Deliberately does NOT flood the board to the base
     /// color — that would wipe the colors currently on the keyboard.
     /// </summary>
-    public async Task InitAsync()
-    {
-        await _session.EnsureHostModeAsync();
-        foreach (var (zone, color) in _painted)
-            await SetZoneAsync(zone, color);
-    }
+    public Task InitAsync() => PreparedSessionAsync();
 
     /// <summary>Handle a physical key press: paint that key, or reset it if already painted with this color.</summary>
     public async Task PressAsync(PhysicalKey physical)
@@ -139,7 +163,12 @@ public sealed partial class PerKeyColorViewModel : ObservableObject
         // One range write (zones 0x00–0xfe) + commit floods the whole board to the
         // base color at once, instead of walking key by key.
         _painted.Clear();
-        await _session.ApplyPerKeyColorAsync(BaseColor.R, BaseColor.G, BaseColor.B);
+        // The range fill enters host mode itself, so any session will do.
+        if (_currentSession() is { } session)
+        {
+            _preparedSession = session;
+            await session.ApplyPerKeyColorAsync(BaseColor.R, BaseColor.G, BaseColor.B);
+        }
         Status = Loc.Current["PerKey_AllReset"];
         Persist();
     }

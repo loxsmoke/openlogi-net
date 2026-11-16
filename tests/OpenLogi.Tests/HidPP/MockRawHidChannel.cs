@@ -28,7 +28,13 @@ public sealed class MockRawHidChannel : IRawHidChannel, IDisposable
     /// a stale Windows HID handle, which fails every read without waiting. Clear
     /// with <c>null</c> to model the handle recovering (BLE device waking).
     /// </summary>
-    public void FailReads(Exception? failure) => Volatile.Write(ref _readFailure, failure);
+    public void FailReads(Exception? failure)
+    {
+        Volatile.Write(ref _readFailure, failure);
+        // A read already blocked on the handle fails too when the handle goes stale;
+        // an empty report wakes it so it can see the failure.
+        if (failure is not null) _incoming.Writer.TryWrite([]);
+    }
 
     public ushort VendorId { get; init; } = 0x046d;
     public ushort ProductId { get; init; } = 0xc539;
@@ -68,6 +74,7 @@ public sealed class MockRawHidChannel : IRawHidChannel, IDisposable
         Interlocked.Increment(ref _readAttempts);
         if (Volatile.Read(ref _readFailure) is { } failure) throw failure;
         var report = await _incoming.Reader.ReadAsync(cancellationToken);
+        if (Volatile.Read(ref _readFailure) is { } wokenByFailure) throw wokenByFailure;
         var len = Math.Min(report.Length, buf.Length);
         report.AsSpan(0, len).CopyTo(buf.Span);
         return len;

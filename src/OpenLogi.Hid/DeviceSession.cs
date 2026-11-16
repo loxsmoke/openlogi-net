@@ -25,25 +25,29 @@ public sealed partial class DeviceSession : IAsyncDisposable
 {
     private readonly HidppChannel _channel;
     private readonly HidppDevice _device;
-    private readonly bool _ownsChannel;
+    // The session's hold on its pooled channel; null for an attached session, which
+    // borrows a channel someone else owns (see Attach).
+    private readonly ChannelLease? _lease;
 
-    private DeviceSession(HidppChannel channel, HidppDevice device, bool ownsChannel = true)
+    private DeviceSession(HidppChannel channel, HidppDevice device, ChannelLease? lease)
     {
         _channel = channel;
         _device = device;
-        _ownsChannel = ownsChannel;
+        _lease = lease;
     }
 
     /// <summary>
-    /// Raised (off the UI thread) when the session's HID handle has failed every read
-    /// for <see cref="HidppChannel.DefaultDeadReadThreshold"/>: writes have been
-    /// failing too, the captures riding this session are dead, and the device node is
-    /// typically still present so no rescan will come. The owner should reopen.
+    /// Raised (off the UI thread) when the session's HID handle is gone: it failed
+    /// every read for <see cref="HidppChannel.DefaultDeadReadThreshold"/> (writes have
+    /// been failing too, and the device node is typically still present so no rescan
+    /// will come), or the channel pool was invalidated on resume. The pool has already
+    /// closed the handle; the captures riding this session are dead and the owner
+    /// should dispose it and open a new one.
     /// </summary>
     public event Action? Faulted
     {
-        add => _channel.ReadsDead += value;
-        remove => _channel.ReadsDead -= value;
+        add { if (_lease is not null) _lease.Faulted += value; else _channel.ReadsDead += value; }
+        remove { if (_lease is not null) _lease.Faulted -= value; else _channel.ReadsDead -= value; }
     }
 
     /// <summary>
@@ -53,7 +57,7 @@ public sealed partial class DeviceSession : IAsyncDisposable
     /// channel closes. Disposing an attached session leaves the channel open.
     /// </summary>
     public static DeviceSession Attach(HidppChannel channel, HidppDevice device) =>
-        new(channel, device, ownsChannel: false);
+        new(channel, device, lease: null);
 
     /// <summary>
     /// Open a session for <paramref name="route"/>, or <c>null</c> if unreachable.
@@ -63,8 +67,11 @@ public sealed partial class DeviceSession : IAsyncDisposable
     /// since enumeration order isn't stable and only one interface is the real
     /// control interface.
     /// </summary>
-    public static async Task<DeviceSession?> OpenAsync(DeviceRoute route)
+    /// <param name="route">The device to reach.</param>
+    /// <param name="pool">The channel pool to lease from; defaults to <see cref="HidChannelPool.Shared"/>.</param>
+    public static async Task<DeviceSession?> OpenAsync(DeviceRoute route, HidChannelPool? pool = null)
     {
+        pool ??= HidChannelPool.Shared;
         DeviceSession? best = null;
         var bestScore = -1;
 
@@ -77,19 +84,31 @@ public sealed partial class DeviceSession : IAsyncDisposable
             + (device.FeatureIndex(0x8081) is not null ? 500 : 0)
             + featureCount;
 
-        var nodes = HidDiscovery.EnumerateHidppDevices();
+        var nodes = pool.Enumerate();
         foreach (var hid in nodes)
         {
-            if (route is DeviceRoute.Direct d && (hid.VendorID != d.VendorId || hid.ProductID != d.ProductId))
+            if (route is DeviceRoute.Direct d && (hid.VendorId != d.VendorId || hid.ProductId != d.ProductId))
                 continue;
 
-            HidppChannel channel;
-            try { channel = await HidppChannel.FromRawChannelAsync(WindowsRawHidChannel.Open(hid)).ConfigureAwait(false); }
+            // A lease on the node's shared channel: if the receiver watcher or another
+            // session already holds this node, no second handle is opened.
+            ChannelLease lease;
+            try { lease = await pool.AcquireAsync(hid).ConfigureAwait(false); }
             catch { continue; }
+            var channel = lease.Channel;
 
-            if (!await MatchesReceiverAsync(channel, route, hid, nodes).ConfigureAwait(false))
+            bool matches;
+            try { matches = await MatchesReceiverAsync(pool, channel, route, hid, nodes).ConfigureAwait(false); }
+            catch (Exception ex)
             {
-                await channel.DisposeAsync().ConfigureAwait(false);
+                // A receiver that won't give its uid (register read timed out) is not
+                // the one this route names — keep looking instead of abandoning the open.
+                DiagnosticLog.Debug("session", $"receiver match failed: {ex.Message}");
+                matches = false;
+            }
+            if (!matches)
+            {
+                await lease.DisposeAsync().ConfigureAwait(false);
                 continue;
             }
 
@@ -103,7 +122,7 @@ public sealed partial class DeviceSession : IAsyncDisposable
             }
             catch
             {
-                await channel.DisposeAsync().ConfigureAwait(false);
+                await lease.DisposeAsync().ConfigureAwait(false);
                 continue;
             }
 
@@ -113,12 +132,13 @@ public sealed partial class DeviceSession : IAsyncDisposable
             if (score > bestScore)
             {
                 if (best is not null) await best.DisposeAsync().ConfigureAwait(false);
-                best = new DeviceSession(channel, device);
+                best = new DeviceSession(channel, device, lease);
                 bestScore = score;
             }
             else
             {
-                await channel.DisposeAsync().ConfigureAwait(false);
+                device.Dispose();
+                await lease.DisposeAsync().ConfigureAwait(false);
             }
         }
         if (best is null)
@@ -129,30 +149,45 @@ public sealed partial class DeviceSession : IAsyncDisposable
     }
 
     private static async Task<bool> MatchesReceiverAsync(
-        HidppChannel channel, DeviceRoute route, HidSharp.HidDevice node, IReadOnlyList<HidSharp.HidDevice> nodes)
+        HidChannelPool pool, HidppChannel channel, DeviceRoute route, IHidNode node, IReadOnlyList<IHidNode> nodes)
     {
-        switch (route)
+        if (route is DeviceRoute.Direct) return true;
+
+        // The receiver object registers a notification listener on the channel. The
+        // channel is shared and outlives this check, so the listener must be removed.
+        var detected = Receivers.Detect(channel);
+        try
         {
-            case DeviceRoute.Direct:
-                return true;
-            case DeviceRoute.Bolt b:
-                return Receivers.Detect(channel) is DetectedReceiver.Bolt rb
-                       && string.Equals(await rb.Receiver.GetUniqueIdAsync().ConfigureAwait(false), b.ReceiverUid, StringComparison.OrdinalIgnoreCase);
-            case DeviceRoute.Unifying u:
-                return Receivers.Detect(channel) is DetectedReceiver.Unifying ru
-                       && string.Equals(await UnifyingUidAsync(channel, ru.Receiver, node, nodes).ConfigureAwait(false), u.ReceiverUid, StringComparison.OrdinalIgnoreCase);
-            case DeviceRoute.Lightspeed l:
-                // LIGHTSPEED has no serial register — match on the same synthetic
-                // uid the inventory assigned; no register I/O (each read is a 5 s timeout).
-                // Don't gate on short support: a LIGHTSPEED receiver carries device
-                // HID++ 2.0 on a long-only *device* interface (col02), separate from the
-                // short *control* interface (col01) where the slot is unreachable. The
-                // scored open below tries every matching interface and keeps whichever one
-                // actually answers HID++ 2.0 for the slot.
-                return Receivers.Detect(channel) is DetectedReceiver.Lightspeed
-                       && string.Equals(Receivers.LightspeedSyntheticUid(channel), l.ReceiverUid, StringComparison.OrdinalIgnoreCase);
-            default:
-                return false;
+            switch (route)
+            {
+                case DeviceRoute.Bolt b:
+                    return detected is DetectedReceiver.Bolt rb
+                           && string.Equals(await rb.Receiver.GetUniqueIdAsync().ConfigureAwait(false), b.ReceiverUid, StringComparison.OrdinalIgnoreCase);
+                case DeviceRoute.Unifying u:
+                    return detected is DetectedReceiver.Unifying ru
+                           && string.Equals(await UnifyingUidAsync(pool, channel, ru.Receiver, node, nodes).ConfigureAwait(false), u.ReceiverUid, StringComparison.OrdinalIgnoreCase);
+                case DeviceRoute.Lightspeed l:
+                    // LIGHTSPEED has no serial register — match on the same synthetic
+                    // uid the inventory assigned; no register I/O (each read is a 5 s timeout).
+                    // Don't gate on short support: a LIGHTSPEED receiver carries device
+                    // HID++ 2.0 on a long-only *device* interface (col02), separate from the
+                    // short *control* interface (col01) where the slot is unreachable. The
+                    // scored open below tries every matching interface and keeps whichever one
+                    // actually answers HID++ 2.0 for the slot.
+                    return detected is DetectedReceiver.Lightspeed
+                           && string.Equals(Receivers.LightspeedSyntheticUid(channel), l.ReceiverUid, StringComparison.OrdinalIgnoreCase);
+                default:
+                    return false;
+            }
+        }
+        finally
+        {
+            switch (detected)
+            {
+                case DetectedReceiver.Bolt x: x.Receiver.Dispose(); break;
+                case DetectedReceiver.Unifying x: x.Receiver.Dispose(); break;
+                case DetectedReceiver.Lightspeed x: x.Receiver.Dispose(); break;
+            }
         }
     }
 
@@ -168,24 +203,24 @@ public sealed partial class DeviceSession : IAsyncDisposable
     /// is never mistaken for this one's other half.
     /// </summary>
     private static async Task<string?> UnifyingUidAsync(
-        HidppChannel channel, UnifyingReceiver receiver, HidSharp.HidDevice node, IReadOnlyList<HidSharp.HidDevice> nodes)
+        HidChannelPool pool, HidppChannel channel, UnifyingReceiver receiver, IHidNode node, IReadOnlyList<IHidNode> nodes)
     {
         var siblings = nodes
             .Where(n => HidCollectionPath.AreSiblings(n.DevicePath, node.DevicePath))
-            .Select(n => (Node: n, Support: WindowsRawHidChannel.DetectSupport(n)))
             .ToList();
         try
         {
             if (channel.SupportsShort)
             {
                 // Split receiver: the long-only sibling is the session channel, not this one.
-                if (siblings.Any(s => s.Support is { SupportsShort: false, SupportsLong: true })) return null;
+                if (siblings.Any(s => s is { SupportsShort: false, SupportsLong: true })) return null;
                 return await receiver.GetUniqueIdAsync().ConfigureAwait(false);
             }
 
-            var control = siblings.FirstOrDefault(s => s.Support is { SupportsShort: true }).Node;
+            var control = siblings.FirstOrDefault(s => s.SupportsShort);
             if (control is null) return null;
-            await using var controlChannel = await HidppChannel.FromRawChannelAsync(WindowsRawHidChannel.Open(control)).ConfigureAwait(false);
+            await using var controlLease = await pool.AcquireAsync(control).ConfigureAwait(false);
+            var controlChannel = controlLease.Channel;
             using var controlReceiver = UnifyingReceiver.TryCreate(controlChannel);
             if (controlReceiver is null) return null;
             controlReceiver.LongReplyChannel = channel;
@@ -313,6 +348,10 @@ public sealed partial class DeviceSession : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (_ownsChannel) await _channel.DisposeAsync().ConfigureAwait(false);
+        if (_lease is null) return; // attached: the channel and device belong to the caller
+        // The channel is shared and may stay open for its other users, so the
+        // listeners this session's features registered on it have to go now.
+        _device.Dispose();
+        await _lease.DisposeAsync().ConfigureAwait(false);
     }
 }

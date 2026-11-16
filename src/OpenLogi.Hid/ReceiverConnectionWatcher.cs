@@ -52,9 +52,45 @@ public sealed class ReceiverConnectionWatcher : IAsyncDisposable
     private bool _wakeMixed;               // …several receivers woke together
     private bool _disposed;
 
+    private readonly HidChannelPool _pool;
+
     /// <param name="quietPeriod">How long to coalesce a burst of connection events before firing (default 400 ms).</param>
-    public ReceiverConnectionWatcher(TimeSpan? quietPeriod = null)
-        => _quietPeriod = quietPeriod ?? TimeSpan.FromMilliseconds(400);
+    /// <param name="pool">The channel pool to lease receiver channels from; defaults to <see cref="HidChannelPool.Shared"/>.</param>
+    public ReceiverConnectionWatcher(TimeSpan? quietPeriod = null, HidChannelPool? pool = null)
+    {
+        _quietPeriod = quietPeriod ?? TimeSpan.FromMilliseconds(400);
+        _pool = pool ?? HidChannelPool.Shared;
+    }
+
+    /// <summary>How long a channel fault waits before the rebind, so a receiver's two channels faulting together rebind once.</summary>
+    internal static readonly TimeSpan RebindDelay = TimeSpan.FromMilliseconds(300);
+
+    private int _rebindQueued;
+
+    /// <summary>
+    /// A leased receiver channel was closed under us (stale handle, or the pool was
+    /// invalidated on resume): bind again on fresh channels. Nothing outside has to
+    /// remember to do this — a watcher left on dead channels hears no wakes at all.
+    /// </summary>
+    private void OnChannelFaulted()
+    {
+        if (Interlocked.Exchange(ref _rebindQueued, 1) != 0) return;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(RebindDelay).ConfigureAwait(false);
+                Interlocked.Exchange(ref _rebindQueued, 0);
+                DiagnosticLog.Info("rxwatch", "receiver channel lost — rebinding");
+                await RefreshAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Interlocked.Exchange(ref _rebindQueued, 0);
+                DiagnosticLog.Warn("rxwatch", $"rebind failed: {ex.Message}");
+            }
+        });
+    }
 
     /// <summary>
     /// (Re)bind to the receivers currently present: drop every existing channel and open
@@ -63,6 +99,18 @@ public sealed class ReceiverConnectionWatcher : IAsyncDisposable
     /// detection for that one, nothing else breaks).
     /// </summary>
     public async Task RefreshAsync()
+    {
+        // Serialized: a resume and the node-change events it causes can call this
+        // back to back, and interleaved runs would each bind every receiver — leaving
+        // duplicate channels (and duplicate wake signals) per receiver.
+        await _refreshGate.WaitAsync().ConfigureAwait(false);
+        try { await RefreshCoreAsync().ConfigureAwait(false); }
+        finally { _refreshGate.Release(); }
+    }
+
+    private readonly SemaphoreSlim _refreshGate = new(1, 1);
+
+    private async Task RefreshCoreAsync()
     {
         Binding[] old;
         lock (_gate)
@@ -73,23 +121,26 @@ public sealed class ReceiverConnectionWatcher : IAsyncDisposable
         }
         foreach (var b in old) await b.DisposeAsync().ConfigureAwait(false);
 
-        var receiverNodes = HidDiscovery.EnumerateHidppDevices()
-            .Where(h => Receivers.IsReceiverPid((ushort)h.VendorID, (ushort)h.ProductID))
+        var receiverNodes = _pool.Enumerate()
+            .Where(h => Receivers.IsReceiverPid(h.VendorId, h.ProductId))
             .ToList();
 
         foreach (var hid in receiverNodes)
         {
             // Receiver registers ride the short (7-byte) report; the long-only interface
             // answers pings but times out on every register op — not the control node.
-            if (WindowsRawHidChannel.DetectSupport(hid) is not { SupportsShort: true }) continue;
+            if (!hid.SupportsShort) continue;
 
-            HidppChannel channel;
-            try { channel = await HidppChannel.FromRawChannelAsync(WindowsRawHidChannel.Open(hid)).ConfigureAwait(false); }
+            // Leased from the pool: a session routed through this receiver shares the
+            // same channel instead of opening a second handle on the node.
+            ChannelLease lease;
+            try { lease = await _pool.AcquireAsync(hid).ConfigureAwait(false); }
             catch { continue; }
+            var channel = lease.Channel;
 
             if (!channel.SupportsShort || Receivers.Detect(channel) is not { } detected)
             {
-                await channel.DisposeAsync().ConfigureAwait(false);
+                await lease.DisposeAsync().ConfigureAwait(false);
                 continue;
             }
 
@@ -97,29 +148,47 @@ public sealed class ReceiverConnectionWatcher : IAsyncDisposable
             // rides a separate long-only sibling interface — the wake-hold pings must go
             // there, since the control interface can't reach the device slots. Combined
             // receivers have no sibling and the control channel serves both roles.
-            HidppChannel? deviceChannel = null;
+            ChannelLease? deviceLease = null;
             foreach (var sibling in receiverNodes)
             {
-                if (sibling.VendorID != hid.VendorID || sibling.ProductID != hid.ProductID) continue;
-                if (WindowsRawHidChannel.DetectSupport(sibling) is not { SupportsShort: false, SupportsLong: true }) continue;
-                try { deviceChannel = await HidppChannel.FromRawChannelAsync(WindowsRawHidChannel.Open(sibling)).ConfigureAwait(false); }
+                if (sibling.VendorId != hid.VendorId || sibling.ProductId != hid.ProductId) continue;
+                if (sibling is not { SupportsShort: false, SupportsLong: true }) continue;
+                try { deviceLease = await _pool.AcquireAsync(sibling).ConfigureAwait(false); }
                 catch { /* wake-hold falls back to the control channel */ }
                 break;
             }
 
             Binding binding;
             var (vid, pid) = (channel.VendorId, channel.ProductId);
-            try { binding = await Binding.StartAsync(channel, deviceChannel, detected, isKb => OnDeviceOnline(isKb, vid, pid)).ConfigureAwait(false); }
+            try { binding = await Binding.StartAsync(lease, deviceLease, detected, isKb => OnDeviceOnline(isKb, vid, pid)).ConfigureAwait(false); }
             catch
             {
-                await channel.DisposeAsync().ConfigureAwait(false);
-                if (deviceChannel is not null) await deviceChannel.DisposeAsync().ConfigureAwait(false);
+                DisposeReceiver(detected);
+                await lease.DisposeAsync().ConfigureAwait(false);
+                if (deviceLease is not null) await deviceLease.DisposeAsync().ConfigureAwait(false);
                 continue;
             }
+
+            // Subscribed only once the binding stands, and dropped with its leases.
+            lease.Faulted += OnChannelFaulted;
+            if (deviceLease is not null) deviceLease.Faulted += OnChannelFaulted;
+            // A fault that landed while the binding was starting raised no event for us.
+            if (lease.IsFaulted || deviceLease?.IsFaulted == true) OnChannelFaulted();
 
             bool keep;
             lock (_gate) { keep = !_disposed; if (keep) _bindings.Add(binding); }
             if (!keep) await binding.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Remove the notification listener a detected receiver registered on its (shared) channel.</summary>
+    private static void DisposeReceiver(DetectedReceiver detected)
+    {
+        switch (detected)
+        {
+            case DetectedReceiver.Bolt r: r.Receiver.Dispose(); break;
+            case DetectedReceiver.Unifying r: r.Receiver.Dispose(); break;
+            case DetectedReceiver.Lightspeed r: r.Receiver.Dispose(); break;
         }
     }
 
@@ -170,7 +239,7 @@ public sealed class ReceiverConnectionWatcher : IAsyncDisposable
         foreach (var b in bindings) await b.DisposeAsync().ConfigureAwait(false);
     }
 
-    /// <summary>One receiver: its open channel, the parsed receiver, and the pump reading connection events.</summary>
+    /// <summary>One receiver: its leased channel(s), the parsed receiver, and the pump reading connection events.</summary>
     private sealed class Binding : IAsyncDisposable
     {
         // A fresh "online" this long after the device was last seen online counts as a
@@ -190,8 +259,10 @@ public sealed class ReceiverConnectionWatcher : IAsyncDisposable
         private static readonly TimeSpan HoldDuration = TimeSpan.FromSeconds(15);
         private static readonly TimeSpan HoldInterval = TimeSpan.FromMilliseconds(250);
 
+        private readonly ChannelLease _lease;
+        private readonly ChannelLease? _deviceLease; // long-only sibling: device slots' HID++ 2.0 on split receivers
         private readonly HidppChannel _channel;
-        private readonly HidppChannel? _deviceChannel; // long-only sibling: device slots' HID++ 2.0 on split receivers
+        private readonly HidppChannel? _deviceChannel;
         private readonly IDisposable _receiver; // Bolt/UnifyingReceiver — owns the 0x41 channel listener
         private readonly CancellationTokenSource _cts = new();
         private readonly Dictionary<byte, DateTime> _lastOnline = []; // per device index
@@ -199,22 +270,24 @@ public sealed class ReceiverConnectionWatcher : IAsyncDisposable
         private readonly object _stateLock = new();
         private Task _pump = Task.CompletedTask;
 
-        private Binding(HidppChannel channel, HidppChannel? deviceChannel, IDisposable receiver)
+        private Binding(ChannelLease lease, ChannelLease? deviceLease, IDisposable receiver)
         {
-            _channel = channel;
-            _deviceChannel = deviceChannel;
+            _lease = lease;
+            _deviceLease = deviceLease;
+            _channel = lease.Channel;
+            _deviceChannel = deviceLease?.Channel;
             _receiver = receiver;
         }
 
-        public static async Task<Binding> StartAsync(HidppChannel channel, HidppChannel? deviceChannel, DetectedReceiver detected, Action<bool> onWake)
+        public static async Task<Binding> StartAsync(ChannelLease lease, ChannelLease? deviceLease, DetectedReceiver detected, Action<bool> onWake)
         {
             Binding b = detected switch
             {
-                DetectedReceiver.Bolt r => Make(channel, deviceChannel, r.Receiver, r.Receiver.Listen(),
+                DetectedReceiver.Bolt r => Make(lease, deviceLease, r.Receiver, r.Receiver.Listen(),
                     c => c.Index, c => c.Online, c => c.Kind == BoltDeviceKind.Keyboard, onWake),
-                DetectedReceiver.Unifying r => Make(channel, deviceChannel, r.Receiver, r.Receiver.Listen(),
+                DetectedReceiver.Unifying r => Make(lease, deviceLease, r.Receiver, r.Receiver.Listen(),
                     c => c.Index, c => c.Online, c => c.Kind == UnifyingDeviceKind.Keyboard, onWake),
-                DetectedReceiver.Lightspeed r => Make(channel, deviceChannel, r.Receiver, r.Receiver.Listen(),
+                DetectedReceiver.Lightspeed r => Make(lease, deviceLease, r.Receiver, r.Receiver.Listen(),
                     c => c.Index, c => c.Online, c => c.Kind == UnifyingDeviceKind.Keyboard, onWake),
                 _ => throw new InvalidOperationException("channel carries no recognised receiver"),
             };
@@ -233,10 +306,10 @@ public sealed class ReceiverConnectionWatcher : IAsyncDisposable
         }
 
         private static Binding Make<T>(
-            HidppChannel channel, HidppChannel? deviceChannel, IDisposable receiver, ChannelReader<T> reader,
+            ChannelLease lease, ChannelLease? deviceLease, IDisposable receiver, ChannelReader<T> reader,
             Func<T, byte> index, Func<T, bool> online, Func<T, bool> isKeyboard, Action<bool> onWake)
         {
-            var b = new Binding(channel, deviceChannel, receiver);
+            var b = new Binding(lease, deviceLease, receiver);
             b._pump = b.PumpAsync(reader, index, online, isKeyboard, onWake, b._cts.Token);
             return b;
         }
@@ -332,9 +405,9 @@ public sealed class ReceiverConnectionWatcher : IAsyncDisposable
             await _cts.CancelAsync().ConfigureAwait(false);
             try { await _pump.ConfigureAwait(false); } catch { /* cancellation */ }
             _cts.Dispose();
-            _receiver.Dispose();               // removes the 0x41 listener from the channel
-            await _channel.DisposeAsync().ConfigureAwait(false);
-            if (_deviceChannel is not null) await _deviceChannel.DisposeAsync().ConfigureAwait(false);
+            _receiver.Dispose();               // removes the 0x41 listener from the (shared) channel
+            await _lease.DisposeAsync().ConfigureAwait(false);
+            if (_deviceLease is not null) await _deviceLease.DisposeAsync().ConfigureAwait(false);
         }
     }
 }

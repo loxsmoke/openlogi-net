@@ -16,7 +16,7 @@ namespace OpenLogi.Tests.Hid;
 public class IncompleteProbeInventoryTests
 {
     private const ushort BleMousePid = 0xb037; // MX Anywhere 3S for Mac over Bluetooth
-    private const byte FeatureSetIndex = 1, NameIndex = 2, BatteryIndex = 3;
+    private const byte FeatureSetIndex = 1, NameIndex = 2, BatteryIndex = 3, ModelInfoIndex = 4;
 
     private sealed class MockNode(MockRawHidChannel raw, string path) : IHidNode
     {
@@ -33,7 +33,7 @@ public class IncompleteProbeInventoryTests
         public IReadOnlyList<IHidNode> Enumerate() => nodes;
     }
 
-    private enum Failure { None, FeatureTable, Battery }
+    private enum Failure { None, FeatureTable, Battery, ModelInfo }
 
     /// <summary>
     /// A direct HID++ 2.0 mouse at 0xff with FeatureSet, DeviceTypeAndName ("MX A3",
@@ -65,8 +65,9 @@ public class IncompleteProbeInventoryTests
             if (h.FeatureIndex == FeatureSetIndex)
             {
                 if (failure == Failure.FeatureTable) return Busy(req);
-                if (fn == 0x0) return Reply(0x03); // three features
-                var id = msg.ExtendPayload()[0] switch { 1 => (ushort)0x0001, 2 => (ushort)0x0005, _ => (ushort)0x1004 };
+                // DeviceInformation (0x0003) is only advertised in the case that fails it.
+                if (fn == 0x0) return Reply((byte)(failure == Failure.ModelInfo ? 0x04 : 0x03));
+                var id = msg.ExtendPayload()[0] switch { 1 => (ushort)0x0001, 2 => (ushort)0x0005, 3 => (ushort)0x1004, _ => (ushort)0x0003 };
                 return Reply((byte)(id >> 8), (byte)id, 0x00, 0x00);
             }
             if (h.FeatureIndex == NameIndex)
@@ -75,6 +76,7 @@ public class IncompleteProbeInventoryTests
                 if (fn == 0x1) return Reply(name);
                 if (fn == 0x2) return Reply(0x03); // Mouse
             }
+            if (h.FeatureIndex == ModelInfoIndex) return Busy(req);
             if (h.FeatureIndex == BatteryIndex && fn == 0x1) // get_status
                 return failure == Failure.Battery ? Busy(req) : Reply(72, 0x04, 0x00); // 72 %, Good, Discharging
             return null;
@@ -131,6 +133,20 @@ public class IncompleteProbeInventoryTests
         var mouse = await SweepAsync(Failure.Battery);
         Assert.Equal("MX A3", mouse.Codename); // named, so the gallery looks fine…
         Assert.Null(mouse.Battery);             // …but the tray has nothing to draw
+        Assert.True(mouse.ProbeIncomplete);
+    }
+
+    [Fact]
+    public async Task AdvertisedModelInfoThatFailsToReadIsIncomplete()
+    {
+        // 2026-11-15, after a resume from hibernation: the sweep probed the mouse while
+        // its captures were being armed. Name and battery read fine, the model did not —
+        // and with no model there is no config key, so the tile had no image, no saved
+        // settings and a fallback button list, and nothing re-scanned to repair it.
+        var mouse = await SweepAsync(Failure.ModelInfo);
+        Assert.Equal("MX A3", mouse.Codename);
+        Assert.Equal((byte)72, mouse.Battery?.Percentage);
+        Assert.Null(mouse.ModelInfo);
         Assert.True(mouse.ProbeIncomplete);
     }
 }

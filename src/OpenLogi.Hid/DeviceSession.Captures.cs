@@ -154,6 +154,7 @@ public sealed partial class DeviceSession
         {
             DiagnosticLog.Warn("capture",
                 $"gesture: control lookup for {owner} failed after {GestureLookupAttempts} attempts: {lookupFailure.Message}");
+            CaptureArmFailed = true;
             rc.Dispose();
             return null;
         }
@@ -188,6 +189,13 @@ public sealed partial class DeviceSession
 
     /// <summary>Tries at looking up a gesture control before concluding the device is unreachable.</summary>
     private const int GestureLookupAttempts = 3;
+
+    /// <summary>
+    /// Set once a capture could not be armed because the device answered the control
+    /// lookup with errors (as opposed to having no such control). Lets the owner tell
+    /// "nothing to capture on this device" from "the device was not ready — try again".
+    /// </summary>
+    public bool CaptureArmFailed { get; private set; }
 
     /// <summary>Spacing between those tries; the inventory probe uses the same order of delay for a just-woken link.</summary>
     private static readonly TimeSpan GestureLookupRetryDelay = TimeSpan.FromSeconds(1);

@@ -317,6 +317,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
+    // One device conversation at a time between the sweep and capture activation.
+    // After a resume a rescan, the resume reconnect and a second rescan all start
+    // within seconds; run together they probe and re-arm the same mouse at once, and
+    // reads time out — the sweep then lists the mouse without its model (no image, no
+    // settings, fallback buttons; 2026-11-15) or activation arms nothing. Never held
+    // across a call that takes it again.
+    private readonly SemaphoreSlim _deviceIoGate = new(1, 1);
+
     private bool IsPersistentSession(DeviceSession s) =>
         _mouseCaptures.Any(mc => ReferenceEquals(mc.Session, s)) || _retiringSessions.Contains(s);
 
@@ -527,8 +535,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _ = RefreshLogiWarningAsync();
         try
         {
-            Devices.Clear();
-            var inventories = await HidInventory.EnumerateAsync(postProbe: OnReceiverDeviceProbedAsync);
+            IReadOnlyList<DeviceInventory> inventories;
+            // Wait out a capture activation before sweeping (see _deviceIoGate), and
+            // only then clear the gallery, so it isn't blank for the wait.
+            await _deviceIoGate.WaitAsync();
+            try
+            {
+                Devices.Clear();
+                inventories = await HidInventory.EnumerateAsync(postProbe: OnReceiverDeviceProbedAsync);
+            }
+            finally { _deviceIoGate.Release(); }
             foreach (var inv in inventories)
                 foreach (var paired in inv.Paired)
                     if (IsConfigurable(paired))
@@ -569,7 +585,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 if (vm.ConfigKey is not null && !vm.IsCamera) // camera tiles resolved theirs when they appeared
                     _ = ResolveCardImageAsync(vm);
 
-            ScheduleProbeRetry(reactivateMice);
+            ScheduleProbeRetry(reactivateMice,
+                [.. inventories.SelectMany(inv => inv.Paired.Select(p => (inv.Receiver.Name, p)))]);
         }
         catch (System.Exception e)
         {

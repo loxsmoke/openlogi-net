@@ -521,6 +521,15 @@ public static class HidInventory
             {
                 var di = await TryAsync(info.GetDeviceInfoAsync).ConfigureAwait(false);
                 if (di is not null) modelInfo = MapModelInfo(di);
+                else
+                {
+                    // Without the model there is no config key: the tile gets no image,
+                    // no saved settings and a fallback button list. Name and battery can
+                    // still read fine in the same probe (2026-11-15, a mouse probed while
+                    // its captures were being armed), so this needs its own check.
+                    incomplete = true;
+                    DiagnosticLog.Info("sweep", $"  slot {slot}: model info read failed");
+                }
             }
             if (device.GetFeature<DeviceTypeAndNameFeature>() is { } typeName)
             {

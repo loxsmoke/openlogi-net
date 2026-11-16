@@ -27,40 +27,47 @@ public partial class MainWindowViewModel
         // hook's "first mouse" slot — killing the real mouse's Middle/Back/Forward
         // bindings and gestures — and get pointless session opens while asleep.
         mice = [.. mice.Where(m => m.Device.Kind is not (DeviceKind.Keyboard or DeviceKind.Numpad))];
-        var old = _mouseCaptures.ToArray();
-        _mouseCaptures.Clear();
-        // The old sessions stay "persistent" until this teardown is done with them:
-        // LoadControlsAsync treats a session missing from _mouseCaptures as a throwaway
-        // and disposes it, which — in the gap the Clear above opens — closed the HID
-        // handle under the un-divert writes below and then made this method's own
-        // dispose throw, so nothing was re-armed (2026-11-12: every diverted button
-        // dead after a rescan started from the mouse's page).
-        foreach (var mc in old) _retiringSessions.Add(mc.Session);
-        foreach (var mc in old)
-        {
-            // A failed teardown must never stop the re-arm below.
-            try
-            {
-                await mc.Capture.DisposeAsync();
-                // Don't dispose a session the UI is still showing — LoadControlsAsync owns that.
-                if (!ReferenceEquals(mc.Session, _session)) await mc.Session.DisposeAsync();
-            }
-            catch (Exception ex)
-            {
-                DiagnosticLog.Warn("capture",
-                    $"{mc.Device.Name}: capture teardown failed: {ex.GetType().Name}: {ex.Message}");
-            }
-            finally { _retiringSessions.Remove(mc.Session); }
-        }
-
-        // The global OS hook applies one mouse's Middle/Back/Forward bindings.
-        _agent.SetSelectedDevice(mice.FirstOrDefault()?.ConfigKey);
-
-        var gen = ++_mouseActivationGen;
         var unreachable = new List<DeviceViewModel>();
-        foreach (var mouse in mice)
-            if (!await TryActivateMouseAsync(mouse, gen))
-                unreachable.Add(mouse);
+        int gen;
+        // Not alongside a sweep or another activation (see _deviceIoGate).
+        await _deviceIoGate.WaitAsync();
+        try
+        {
+            var old = _mouseCaptures.ToArray();
+            _mouseCaptures.Clear();
+            // The old sessions stay "persistent" until this teardown is done with them:
+            // LoadControlsAsync treats a session missing from _mouseCaptures as a throwaway
+            // and disposes it, which — in the gap the Clear above opens — closed the HID
+            // handle under the un-divert writes below and then made this method's own
+            // dispose throw, so nothing was re-armed (2026-11-12: every diverted button
+            // dead after a rescan started from the mouse's page).
+            foreach (var mc in old) _retiringSessions.Add(mc.Session);
+            foreach (var mc in old)
+            {
+                // A failed teardown must never stop the re-arm below.
+                try
+                {
+                    await mc.Capture.DisposeAsync();
+                    // Don't dispose a session the UI is still showing — LoadControlsAsync owns that.
+                    if (!ReferenceEquals(mc.Session, _session)) await mc.Session.DisposeAsync();
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticLog.Warn("capture",
+                        $"{mc.Device.Name}: capture teardown failed: {ex.GetType().Name}: {ex.Message}");
+                }
+                finally { _retiringSessions.Remove(mc.Session); }
+            }
+
+            // The global OS hook applies one mouse's Middle/Back/Forward bindings.
+            _agent.SetSelectedDevice(mice.FirstOrDefault()?.ConfigKey);
+
+            gen = ++_mouseActivationGen;
+            foreach (var mouse in mice)
+                if (!await TryActivateMouseAsync(mouse, gen))
+                    unreachable.Add(mouse);
+        }
+        finally { _deviceIoGate.Release(); }
         if (unreachable.Count > 0) _ = RearmUnreachableMiceAsync(unreachable, gen);
 
         // Every (re)scan/reconnect/wake funnels through here, so this is where we (re)arm
@@ -125,7 +132,16 @@ public partial class MainWindowViewModel
                 await session.DisposeAsync();
                 return true;
             }
-            if (captures.Count == 0) { await session.DisposeAsync(); return true; } // nothing capturable
+            if (captures.Count == 0)
+            {
+                // "Nothing to capture" and "the device answered every lookup with an
+                // error" both end up here; only the first is final. A mouse that is
+                // busy right after a resume must be retried, or its gestures stay dead
+                // until some unrelated rescan.
+                var retry = session.CaptureArmFailed;
+                await session.DisposeAsync();
+                return !retry;
+            }
 
             // The persistent capture session doubles as the gallery tile's live battery
             // feed. The scan-time snapshot goes stale the moment the user plugs in a
@@ -159,6 +175,7 @@ public partial class MainWindowViewModel
     private void OnMouseSessionFaulted(DeviceViewModel mouse, DeviceSession session) =>
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
+            if (_resumeRecovering) return; // the resume handler is already rebuilding everything
             // A session already replaced by a newer activation can still fault late — ignore it.
             var live = ReferenceEquals(_session, session)
                 || _mouseCaptures.Any(mc => ReferenceEquals(mc.Session, session));
@@ -215,7 +232,12 @@ public partial class MainWindowViewModel
                 foreach (var mouse in mice.ToArray())
                 {
                     if (gen != _mouseActivationGen) return;
-                    if (!await TryActivateMouseAsync(mouse, gen)) continue;
+                    bool armed;
+                    await _deviceIoGate.WaitAsync();
+                    try { armed = gen == _mouseActivationGen && await TryActivateMouseAsync(mouse, gen); }
+                    finally { _deviceIoGate.Release(); }
+                    if (gen != _mouseActivationGen) return;
+                    if (!armed) continue;
                     mice.Remove(mouse);
                     if (gen == _mouseActivationGen)
                         DiagnosticLog.Info("capture", $"{mouse.Name}: captures re-armed after the device returned");

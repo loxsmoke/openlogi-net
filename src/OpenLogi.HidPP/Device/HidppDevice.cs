@@ -10,7 +10,7 @@ namespace OpenLogi.HidPP.Device;
 /// becomes a feature table (ID → index/version) populated by enumeration; typed
 /// features are resolved on demand via <see cref="GetFeature{T}"/>.
 /// </summary>
-public sealed class HidppDevice
+public sealed class HidppDevice : IDisposable
 {
     /// <summary>An enumerated feature's table index plus its reported version/type.</summary>
     public readonly record struct FeatureEntry(byte Index, byte Version, FeatureType Type);
@@ -54,10 +54,38 @@ public sealed class HidppDevice
     /// Resolve a typed feature, or <c>null</c> if the device did not report it
     /// during <see cref="EnumerateFeaturesAsync"/>.
     /// </summary>
-    public T? GetFeature<T>() where T : class, ICreatableFeature<T> =>
-        _featureTable.TryGetValue(T.Id, out var entry)
-            ? T.Create(_channel, DeviceIndex, entry.Index)
-            : null;
+    public T? GetFeature<T>() where T : class, ICreatableFeature<T>
+    {
+        if (!_featureTable.TryGetValue(T.Id, out var entry)) return null;
+        var feature = T.Create(_channel, DeviceIndex, entry.Index);
+        if (feature is IDisposable listening)
+            lock (_listeningFeatures)
+            {
+                if (_disposed) listening.Dispose();
+                else _listeningFeatures.Add(listening);
+            }
+        return feature;
+    }
+
+    // Features that registered a listener on the channel. Callers dispose most of them
+    // themselves; this is the net for the rest, because the channel is shared and can
+    // long outlive this device object — a listener left behind would stay on it.
+    private readonly List<IDisposable> _listeningFeatures = [];
+    private bool _disposed;
+
+    /// <summary>Remove every channel listener registered by features resolved from this device.</summary>
+    public void Dispose()
+    {
+        IDisposable[] features;
+        lock (_listeningFeatures)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            features = [.. _listeningFeatures];
+            _listeningFeatures.Clear();
+        }
+        foreach (var feature in features) feature.Dispose();
+    }
 
     /// <summary>
     /// Detect all features the device supports and record them in the feature
